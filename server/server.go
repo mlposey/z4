@@ -16,6 +16,6 @@ func Start(port int, opts []grpc.ServerOption) error {
 
 	server := grpc.NewServer(opts...)
 	proto.RegisterAdminServer(server, &admin{})
-	proto.RegisterCollectionServer(server, &collection{})
+	proto.RegisterCollectionServer(server, newCollection())
 	return server.Serve(lis)
 }
