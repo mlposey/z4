@@ -26,12 +26,13 @@ type SimpleStore struct {
 	tasks []Task
 }
 
-func (s *SimpleStore) Save(ctx context.Context, task TaskDefinition) error {
-	s.tasks = append(s.tasks, Task{
+func (s *SimpleStore) Save(ctx context.Context, task TaskDefinition) (Task, error) {
+	t := Task{
 		ID:             rand.Int63(),
 		TaskDefinition: task,
-	})
-	return nil
+	}
+	s.tasks = append(s.tasks, t)
+	return t, nil
 }
 
 func (s *SimpleStore) Get(ctx context.Context, tr TaskRange) ([]Task, error) {
