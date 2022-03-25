@@ -1,0 +1,38 @@
+syntax = "proto3";
+package z4;
+option go_package = "z4/proto;proto";
+
+import "google/protobuf/timestamp.proto";
+
+// The Admin service supports administrative/maintenance operations.
+service Admin {
+  rpc CheckHealth(CheckHealthRequest) returns (Status) {};
+}
+
+message CheckHealthRequest {
+
+}
+
+message Status {
+
+}
+
+// The Collection service manages tasks.
+service Collection {
+  rpc CreateTask(CreateTaskRequest) returns (Task) {};
+  rpc StreamTasks(StreamTasksRequest) returns (stream Task) {};
+}
+
+message CreateTaskRequest {
+
+}
+
+message StreamTasksRequest {
+
+}
+
+message Task {
+  map<string, string> metadata = 1;
+  bytes payload = 2;
+  google.protobuf.Timestamp deliver_at = 3;
+}
