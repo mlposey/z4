@@ -24,7 +24,9 @@ service Collection {
 }
 
 message CreateTaskRequest {
-
+  map<string, string> metadata = 1;
+  bytes payload = 2;
+  google.protobuf.Timestamp deliver_at = 3;
 }
 
 message StreamTasksRequest {
@@ -35,4 +37,5 @@ message Task {
   map<string, string> metadata = 1;
   bytes payload = 2;
   google.protobuf.Timestamp deliver_at = 3;
+  int64 id = 4;
 }
