@@ -6,7 +6,6 @@ import (
 	"fmt"
 	"github.com/dgraph-io/badger/v3"
 	"github.com/mlposey/z4/telemetry"
-	"github.com/segmentio/ksuid"
 	"go.uber.org/zap"
 	"time"
 )
@@ -71,7 +70,7 @@ func (bc *BadgerClient) Close() error {
 	return bc.db.Close()
 }
 
-func (bc *BadgerClient) SaveTask(namespace string, task Task) error {
+func (bc *BadgerClient) SaveTask(task Task) error {
 	telemetry.Logger.Debug("writing task to db", zap.Any("task", task))
 	return bc.db.Update(func(txn *badger.Txn) error {
 		// TODO: Use protobuf for task encode/decode.
@@ -79,7 +78,7 @@ func (bc *BadgerClient) SaveTask(namespace string, task Task) error {
 		if err != nil {
 			return fmt.Errorf("could not encode task: %w", err)
 		}
-		key := bc.getTaskFQN(namespace, task.ID)
+		key := bc.getTaskFQN(task.Namespace, task.ID)
 		return txn.Set(key, payload)
 	})
 }
@@ -106,7 +105,7 @@ func (bc *BadgerClient) GetTask(query TaskRange) ([]Task, error) {
 					return err
 				}
 
-				if !task.ID.IsNil() {
+				if task.ID != "" {
 					tasks = append(tasks, task)
 				}
 				return nil
@@ -120,8 +119,8 @@ func (bc *BadgerClient) GetTask(query TaskRange) ([]Task, error) {
 	return tasks, err
 }
 
-func (bc *BadgerClient) getTaskFQN(namespace string, id ksuid.KSUID) []byte {
-	return []byte(fmt.Sprintf("%s#task#%s", namespace, id.String()))
+func (bc *BadgerClient) getTaskFQN(namespace string, id string) []byte {
+	return []byte(fmt.Sprintf("%s#task#%s", namespace, id))
 }
 
 func (bc *BadgerClient) getConfigFQN(namespace string) []byte {

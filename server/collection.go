@@ -28,11 +28,13 @@ func (c *collection) CreateTask(ctx context.Context, req *proto.CreateTaskReques
 	lease := c.qm.Lease(req.GetNamespace())
 	defer lease.Release()
 
-	task := storage.NewTask(storage.TaskDefinition{
-		RunTime:  c.getRunTime(req),
-		Metadata: req.GetMetadata(),
-		Payload:  req.GetPayload(),
-	})
+	task := storage.Task{
+		ID:        storage.NewTaskID(c.getRunTime(req)),
+		Namespace: req.GetNamespace(),
+		RunTime:   c.getRunTime(req),
+		Metadata:  req.GetMetadata(),
+		Payload:   req.GetPayload(),
+	}
 	err := lease.Queue().Add(task)
 
 	if err != nil {
@@ -42,7 +44,7 @@ func (c *collection) CreateTask(ctx context.Context, req *proto.CreateTaskReques
 		Metadata:  task.Metadata,
 		Payload:   task.Payload,
 		DeliverAt: timestamppb.New(task.RunTime),
-		Id:        task.ID.String(),
+		Id:        task.ID,
 	}, nil
 }
 
@@ -60,7 +62,7 @@ func (c *collection) StreamTasks(req *proto.StreamTasksRequest, stream proto.Col
 			Metadata:  task.Metadata,
 			Payload:   task.Payload,
 			DeliverAt: timestamppb.New(task.RunTime),
-			Id:        task.ID.String(),
+			Id:        task.ID,
 		})
 
 		if err != nil {

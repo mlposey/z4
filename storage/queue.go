@@ -99,7 +99,7 @@ func (t *Queue) Feed() <-chan Task {
 }
 
 func (t *Queue) Add(task Task) error {
-	return t.db.SaveTask(t.namespace, task)
+	return t.db.SaveTask(task)
 }
 
 func (t *Queue) Namespace() string {

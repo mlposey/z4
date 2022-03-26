@@ -38,8 +38,9 @@ message StreamTasksRequest {
 }
 
 message Task {
-  map<string, string> metadata = 1;
-  bytes payload = 2;
-  google.protobuf.Timestamp deliver_at = 3;
-  string id = 4;
+  string id = 1;
+  string namespace = 2;
+  map<string, string> metadata = 3;
+  bytes payload = 4;
+  google.protobuf.Timestamp deliver_at = 5;
 }
