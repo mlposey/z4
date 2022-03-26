@@ -17,6 +17,12 @@ func New() *Tasks {
 }
 
 func (t *Tasks) Feed(ctx context.Context) <-chan storage.Task {
+	// TODO: Move goroutine logic out of this method.
+	// We have to worry about multiple calls to Feed starting
+	// goroutines that duplicate efforts. This logic can be
+	// moved to the New method or maybe a Start method. Then,
+	// Feed will simply return the task channel.
+
 	delay := time.Millisecond * 10
 	var lastRun time.Time
 	taskC := make(chan storage.Task)
