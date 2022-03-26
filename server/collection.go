@@ -7,7 +7,6 @@ import (
 	"google.golang.org/grpc/status"
 	"google.golang.org/protobuf/types/known/timestamppb"
 	"z4/proto"
-	"z4/queue"
 	"z4/storage"
 	"z4/telemetry"
 )
@@ -15,12 +14,12 @@ import (
 // collection implements the gRPC Collection service.
 type collection struct {
 	proto.UnimplementedCollectionServer
-	tasks *queue.Tasks
+	tasks *storage.Queue
 }
 
 func newCollection() proto.CollectionServer {
 	return &collection{
-		tasks: queue.New(),
+		tasks: storage.New(),
 	}
 }
 
