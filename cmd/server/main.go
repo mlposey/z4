@@ -1,6 +1,7 @@
 package main
 
 import (
+	"go.uber.org/zap"
 	"log"
 	"os"
 	"strconv"
@@ -11,10 +12,12 @@ import (
 func main() {
 	initLogger()
 
+	telemetry.Logger.Info("starting server")
 	// TODO: Support configurable port.
 	err := server.Start(6355, nil)
 	if err != nil {
-		panic(err)
+		telemetry.Logger.Error("server stopped",
+			zap.Error(err))
 	}
 }
 
