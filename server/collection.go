@@ -45,6 +45,7 @@ func (c *collection) CreateTask(ctx context.Context, req *proto.CreateTaskReques
 		Payload:   task.Payload,
 		DeliverAt: timestamppb.New(task.RunTime),
 		Id:        task.ID,
+		Namespace: task.Namespace,
 	}, nil
 }
 
@@ -63,6 +64,7 @@ func (c *collection) StreamTasks(req *proto.StreamTasksRequest, stream proto.Col
 			Payload:   task.Payload,
 			DeliverAt: timestamppb.New(task.RunTime),
 			Id:        task.ID,
+			Namespace: task.Namespace,
 		})
 
 		if err != nil {
