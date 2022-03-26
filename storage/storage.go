@@ -17,11 +17,16 @@ type TaskDefinition struct {
 	Payload  []byte
 }
 
+// TaskRange is a query for tasks within a time range.
 type TaskRange struct {
 	Min time.Time
 	Max time.Time
 }
 
+// SimpleStore manages a collection of tasks.
+//
+// This is a very inefficient, in-memory implementation of a task store.
+// It should not be used in production.
 type SimpleStore struct {
 	tasks []Task
 }
