@@ -9,6 +9,7 @@ import (
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 	"google.golang.org/protobuf/types/known/timestamppb"
+	"time"
 )
 
 // collection implements the gRPC Collection service.
@@ -17,9 +18,9 @@ type collection struct {
 	qm *storage.QueueManager
 }
 
-func newCollection() proto.CollectionServer {
+func newCollection(db *storage.BadgerClient) proto.CollectionServer {
 	return &collection{
-		qm: storage.NewQueueManager(new(storage.SimpleStore)),
+		qm: storage.NewQueueManager(db),
 	}
 }
 
@@ -27,20 +28,21 @@ func (c *collection) CreateTask(ctx context.Context, req *proto.CreateTaskReques
 	lease := c.qm.Lease(req.GetNamespace())
 	defer lease.Release()
 
-	t, err := lease.Queue().Add(ctx, storage.TaskDefinition{
-		RunTime:  req.GetDeliverAt().AsTime(),
+	task := storage.NewTask(storage.TaskDefinition{
+		RunTime:  c.getRunTime(req),
 		Metadata: req.GetMetadata(),
 		Payload:  req.GetPayload(),
 	})
+	err := lease.Queue().Add(task)
 
 	if err != nil {
-		return nil, status.Errorf(codes.Internal, "failed to save task: %v", err)
+		return nil, status.Errorf(codes.Internal, "failed to save storage: %v", err)
 	}
 	return &proto.Task{
-		Metadata:  t.Metadata,
-		Payload:   t.Payload,
-		DeliverAt: timestamppb.New(t.RunTime),
-		Id:        t.ID,
+		Metadata:  task.Metadata,
+		Payload:   task.Payload,
+		DeliverAt: timestamppb.New(task.RunTime),
+		Id:        task.ID.String(),
 	}, nil
 }
 
@@ -58,7 +60,7 @@ func (c *collection) StreamTasks(req *proto.StreamTasksRequest, stream proto.Col
 			Metadata:  task.Metadata,
 			Payload:   task.Payload,
 			DeliverAt: timestamppb.New(task.RunTime),
-			Id:        task.ID,
+			Id:        task.ID.String(),
 		})
 
 		if err != nil {
@@ -66,7 +68,14 @@ func (c *collection) StreamTasks(req *proto.StreamTasksRequest, stream proto.Col
 		}
 	}
 
-	telemetry.Logger.Info("client closed task stream",
+	telemetry.Logger.Info("client closed storage stream",
 		telemetry.LogRequestID(req.GetRequestId()))
 	return nil
+}
+
+func (c *collection) getRunTime(req *proto.CreateTaskRequest) time.Time {
+	if req.GetTtsSeconds() > 0 {
+		return time.Now().Add(time.Duration(req.GetTtsSeconds()) * time.Second)
+	}
+	return req.GetDeliverAt().AsTime()
 }
