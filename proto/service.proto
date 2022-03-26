@@ -10,7 +10,7 @@ service Admin {
 }
 
 message CheckHealthRequest {
-
+  string request_id = 1;
 }
 
 message Status {
