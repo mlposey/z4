@@ -8,14 +8,14 @@ import (
 // QueueManager ensures that only one Queue is active per requested namespace.
 type QueueManager struct {
 	queues map[string]*managedQueue
-	store  *SimpleStore
+	db     *BadgerClient
 	mu     sync.Mutex
 }
 
-func NewQueueManager(store *SimpleStore) *QueueManager {
+func NewQueueManager(db *BadgerClient) *QueueManager {
 	return &QueueManager{
 		queues: make(map[string]*managedQueue),
-		store:  store,
+		db:     db,
 	}
 }
 
@@ -26,7 +26,7 @@ func (qm *QueueManager) Lease(namespace string) *Lease {
 
 	queue, exists := qm.queues[namespace]
 	if !exists {
-		queue = newManagedQueue(namespace, qm.store)
+		queue = newManagedQueue(namespace, qm.db)
 		qm.queues[namespace] = queue
 	}
 	return queue.Lease()
@@ -38,9 +38,9 @@ type managedQueue struct {
 	mu     sync.Mutex
 }
 
-func newManagedQueue(namespace string, store *SimpleStore) *managedQueue {
+func newManagedQueue(namespace string, db *BadgerClient) *managedQueue {
 	return &managedQueue{
-		Q:      New(namespace, store),
+		Q:      New(namespace, db),
 		leases: make(map[string]*Lease),
 	}
 }

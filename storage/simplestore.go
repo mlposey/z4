@@ -2,31 +2,12 @@ package storage
 
 import (
 	"context"
-	"math/rand"
 	"sync"
-	"time"
 )
-
-type Task struct {
-	ID int64
-	TaskDefinition
-}
-
-type TaskDefinition struct {
-	RunTime  time.Time
-	Metadata map[string]string
-	Payload  []byte
-}
-
-// TaskRange is a query for tasks within a time range.
-type TaskRange struct {
-	Min time.Time
-	Max time.Time
-}
 
 // SimpleStore manages a collection of tasks.
 //
-// This is a very inefficient, in-memory implementation of a task store.
+// This is a very inefficient, in-memory implementation of a storage store.
 // It should not be used in production.
 // It is safe for concurrent use by multiple goroutines.
 type SimpleStore struct {
@@ -35,10 +16,7 @@ type SimpleStore struct {
 }
 
 func (s *SimpleStore) Save(ctx context.Context, task TaskDefinition) (Task, error) {
-	t := Task{
-		ID:             rand.Int63(),
-		TaskDefinition: task,
-	}
+	t := NewTask(task)
 	s.mu.Lock()
 	s.tasks = append(s.tasks, t)
 	s.mu.Unlock()

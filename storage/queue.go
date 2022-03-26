@@ -1,22 +1,21 @@
 package storage
 
 import (
-	"context"
 	"github.com/mlposey/z4/telemetry"
 	"go.uber.org/zap"
 	"time"
 )
 
 type Queue struct {
-	store     *SimpleStore
+	db        *BadgerClient
 	feed      chan Task
 	namespace string
 	closed    bool
 }
 
-func New(namespace string, store *SimpleStore) *Queue {
+func New(namespace string, db *BadgerClient) *Queue {
 	q := &Queue{
-		store:     store,
+		db:        db,
 		namespace: namespace,
 		feed:      make(chan Task),
 	}
@@ -30,9 +29,10 @@ func (t *Queue) startFeed() {
 	for !t.closed {
 		now := time.Now()
 		// TODO: Add timeout when fetching tasks from store.
-		tasks, err := t.store.Get(context.Background(), TaskRange{
-			Min: lastRun,
-			Max: now,
+		tasks, err := t.db.Get(TaskRange{
+			Namespace: t.namespace,
+			Min:       lastRun,
+			Max:       now,
 		})
 		lastRun = now
 
@@ -57,12 +57,8 @@ func (t *Queue) Feed() <-chan Task {
 	return t.feed
 }
 
-func (t *Queue) Add(ctx context.Context, def TaskDefinition) (Task, error) {
-	return t.store.Save(ctx, def)
-}
-
-func (t *Queue) Remove(ctx context.Context, task Task) error {
-	return t.store.Delete(ctx, task)
+func (t *Queue) Add(task Task) error {
+	return t.db.Save(t.namespace, task)
 }
 
 func (t *Queue) Namespace() string {
@@ -73,7 +69,7 @@ func (t *Queue) Close() error {
 	// TODO: Find a better way to do this.
 	// This won't immediately close the feed, and it is likely the feed
 	// won't close at all. This is because the goroutine blocks until
-	// a consumer takes a task from the channel.
+	// a consumer takes a storage from the channel.
 	t.closed = true
 	return nil
 }

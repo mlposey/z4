@@ -17,9 +17,9 @@ type collection struct {
 	qm *storage.QueueManager
 }
 
-func newCollection() proto.CollectionServer {
+func newCollection(db *storage.BadgerClient) proto.CollectionServer {
 	return &collection{
-		qm: storage.NewQueueManager(new(storage.SimpleStore)),
+		qm: storage.NewQueueManager(db),
 	}
 }
 
@@ -27,20 +27,21 @@ func (c *collection) CreateTask(ctx context.Context, req *proto.CreateTaskReques
 	lease := c.qm.Lease(req.GetNamespace())
 	defer lease.Release()
 
-	t, err := lease.Queue().Add(ctx, storage.TaskDefinition{
+	task := storage.NewTask(storage.TaskDefinition{
 		RunTime:  req.GetDeliverAt().AsTime(),
 		Metadata: req.GetMetadata(),
 		Payload:  req.GetPayload(),
 	})
+	err := lease.Queue().Add(task)
 
 	if err != nil {
-		return nil, status.Errorf(codes.Internal, "failed to save task: %v", err)
+		return nil, status.Errorf(codes.Internal, "failed to save storage: %v", err)
 	}
 	return &proto.Task{
-		Metadata:  t.Metadata,
-		Payload:   t.Payload,
-		DeliverAt: timestamppb.New(t.RunTime),
-		Id:        t.ID,
+		Metadata:  task.Metadata,
+		Payload:   task.Payload,
+		DeliverAt: timestamppb.New(task.RunTime),
+		Id:        task.ID,
 	}, nil
 }
 
@@ -50,8 +51,8 @@ func (c *collection) StreamTasks(req *proto.StreamTasksRequest, stream proto.Col
 
 	tasks := lease.Queue().Feed()
 	for task := range tasks {
-		telemetry.Logger.Debug("sending task to client",
-			zap.Any("task", task),
+		telemetry.Logger.Debug("sending storage to client",
+			zap.Any("storage", task),
 			telemetry.LogRequestID(req.GetRequestId()))
 
 		err := stream.Send(&proto.Task{
@@ -66,7 +67,7 @@ func (c *collection) StreamTasks(req *proto.StreamTasksRequest, stream proto.Col
 		}
 	}
 
-	telemetry.Logger.Info("client closed task stream",
+	telemetry.Logger.Info("client closed storage stream",
 		telemetry.LogRequestID(req.GetRequestId()))
 	return nil
 }

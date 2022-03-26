@@ -1,3 +1,4 @@
 .idea
 z4_server
 proto/*.pb.go
+z4data
