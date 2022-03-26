@@ -2,13 +2,14 @@ package server
 
 import (
 	"context"
-	"fmt"
+	"go.uber.org/zap"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 	"google.golang.org/protobuf/types/known/timestamppb"
 	"z4/proto"
 	"z4/queue"
 	"z4/storage"
+	"z4/telemetry"
 )
 
 type collection struct {
@@ -43,7 +44,10 @@ func (c *collection) CreateTask(ctx context.Context, req *proto.CreateTaskReques
 func (c *collection) StreamTasks(req *proto.StreamTasksRequest, stream proto.Collection_StreamTasksServer) error {
 	tasks := c.tasks.Feed(stream.Context())
 	for task := range tasks {
-		fmt.Println("sending task to client", task)
+		telemetry.Logger.Debug("sending task to client",
+			zap.Any("task", task),
+			telemetry.LogRequestID(req.GetRequestId()))
+
 		err := stream.Send(&proto.Task{
 			Metadata:  task.Metadata,
 			Payload:   task.Payload,
@@ -55,6 +59,8 @@ func (c *collection) StreamTasks(req *proto.StreamTasksRequest, stream proto.Col
 			return status.Errorf(codes.Internal, "failed to send tasks to client: %v", err)
 		}
 	}
-	fmt.Println("client conn closed")
+
+	telemetry.Logger.Info("client closed task stream",
+		telemetry.LogRequestID(req.GetRequestId()))
 	return nil
 }

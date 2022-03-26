@@ -1,7 +1,7 @@
 .PHONY: proto
 
 build_and_run_m1: build_m1
-	./z4_server
+	DEBUG_LOGGING_ENABLED=1 ./z4_server
 
 build_m1: proto
 	GOOS=darwin GOARCH=arm64 GO111MODULE=on go build -o z4_server cmd/server/main.go

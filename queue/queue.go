@@ -2,9 +2,10 @@ package queue
 
 import (
 	"context"
-	"log"
+	"go.uber.org/zap"
 	"time"
 	"z4/storage"
+	"z4/telemetry"
 )
 
 type Tasks struct {
@@ -29,7 +30,8 @@ func (t *Tasks) Feed(ctx context.Context) <-chan storage.Task {
 			lastRun = now
 
 			if err != nil {
-				log.Printf("failed to fetch tasks: %v\n", err)
+				telemetry.Logger.Error("failed to fetch tasks",
+					zap.Error(err))
 			}
 
 			for _, task := range tasks {

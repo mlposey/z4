@@ -24,13 +24,14 @@ service Collection {
 }
 
 message CreateTaskRequest {
-  map<string, string> metadata = 1;
-  bytes payload = 2;
-  google.protobuf.Timestamp deliver_at = 3;
+  string request_id = 1;
+  map<string, string> metadata = 2;
+  bytes payload = 3;
+  google.protobuf.Timestamp deliver_at = 4;
 }
 
 message StreamTasksRequest {
-
+  string request_id = 1;
 }
 
 message Task {
