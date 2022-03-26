@@ -2,11 +2,11 @@ package server
 
 import (
 	"fmt"
+	"github.com/mlposey/z4/proto"
+	"github.com/mlposey/z4/telemetry"
 	"go.uber.org/zap"
 	"google.golang.org/grpc"
 	"net"
-	"z4/proto"
-	"z4/telemetry"
 )
 
 // Start opens the port to incoming gRPC requests.

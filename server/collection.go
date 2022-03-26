@@ -2,13 +2,13 @@ package server
 
 import (
 	"context"
+	"github.com/mlposey/z4/proto"
+	"github.com/mlposey/z4/storage"
+	"github.com/mlposey/z4/telemetry"
 	"go.uber.org/zap"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 	"google.golang.org/protobuf/types/known/timestamppb"
-	"z4/proto"
-	"z4/storage"
-	"z4/telemetry"
 )
 
 // collection implements the gRPC Collection service.

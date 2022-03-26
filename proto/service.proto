@@ -1,6 +1,6 @@
 syntax = "proto3";
 package z4;
-option go_package = "z4/proto;proto";
+option go_package = "github.com/mlposey/z4/proto;proto";
 
 import "google/protobuf/timestamp.proto";
 

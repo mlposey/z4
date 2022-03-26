@@ -2,9 +2,9 @@ package storage
 
 import (
 	"context"
+	"github.com/mlposey/z4/telemetry"
 	"go.uber.org/zap"
 	"time"
-	"z4/telemetry"
 )
 
 type Queue struct {

@@ -1,12 +1,12 @@
 package main
 
 import (
+	"github.com/mlposey/z4/server"
+	"github.com/mlposey/z4/telemetry"
 	"go.uber.org/zap"
 	"log"
 	"os"
 	"strconv"
-	"z4/server"
-	"z4/telemetry"
 )
 
 func main() {

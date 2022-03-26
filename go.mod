@@ -1,4 +1,4 @@
-module z4
+module github.com/mlposey/z4
 
 go 1.17
 

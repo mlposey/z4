@@ -2,7 +2,7 @@ package server
 
 import (
 	"context"
-	"z4/proto"
+	"github.com/mlposey/z4/proto"
 )
 
 // admin implements the gRPC Admin service.
