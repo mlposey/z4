@@ -5,6 +5,7 @@ import (
 	"z4/proto"
 )
 
+// admin implements the gRPC Admin service.
 type admin struct {
 	proto.UnimplementedAdminServer
 }

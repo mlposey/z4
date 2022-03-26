@@ -12,6 +12,7 @@ import (
 	"z4/telemetry"
 )
 
+// collection implements the gRPC Collection service.
 type collection struct {
 	proto.UnimplementedCollectionServer
 	tasks *queue.Tasks
