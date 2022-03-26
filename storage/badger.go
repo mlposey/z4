@@ -48,7 +48,7 @@ func (bc *BadgerClient) Save(namespace string, task Task) error {
 		if err != nil {
 			return fmt.Errorf("could not encode task: %w", err)
 		}
-		key := []byte(fmt.Sprintf("%s#%s", namespace, task.ID))
+		key := []byte(bc.getKeyFQN(namespace, task.ID))
 		return txn.Set(key, payload)
 	})
 }
@@ -58,8 +58,8 @@ func (bc *BadgerClient) Get(query TaskRange) ([]Task, error) {
 	err := bc.db.View(func(txn *badger.Txn) error {
 		it := txn.NewIterator(badger.DefaultIteratorOptions)
 		defer it.Close()
-		startID := query.MinID()
-		endID := query.MaxID()
+		startID := bc.getKeyFQN(query.Namespace, query.MinID())
+		endID := bc.getKeyFQN(query.Namespace, query.MaxID())
 
 		it.Seek([]byte(startID))
 		for it.Valid() {
@@ -85,4 +85,8 @@ func (bc *BadgerClient) Get(query TaskRange) ([]Task, error) {
 		return nil
 	})
 	return tasks, err
+}
+
+func (bc *BadgerClient) getKeyFQN(namespace string, id string) string {
+	return fmt.Sprintf("%s#%s", namespace, id)
 }
