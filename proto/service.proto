@@ -29,6 +29,7 @@ message CreateTaskRequest {
   map<string, string> metadata = 3;
   bytes payload = 4;
   google.protobuf.Timestamp deliver_at = 5;
+  int64 tts_seconds = 6;
 }
 
 message StreamTasksRequest {

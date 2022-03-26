@@ -1,5 +1,9 @@
 .PHONY: proto
 
+clean_db:
+	rm -rf z4data
+	mkdir z4data
+
 build_and_run_m1: build_m1
 	Z4_DEBUG_LOGGING_ENABLED=true \
 	Z4_PORT=6355 \

@@ -1,19 +1,25 @@
 package storage
 
 import (
+	"github.com/mlposey/z4/telemetry"
 	"github.com/segmentio/ksuid"
+	"go.uber.org/zap"
 	"time"
 )
 
 type Task struct {
-	ID string
+	ID ksuid.KSUID
 	// TODO: Consider putting namespace in here or the definition.
 	TaskDefinition
 }
 
 func NewTask(def TaskDefinition) Task {
+	id, err := ksuid.NewRandomWithTime(def.RunTime)
+	if err != nil {
+		telemetry.Logger.Fatal("could not create task id", zap.Error(err))
+	}
 	return Task{
-		ID:             ksuid.New().String(),
+		ID:             id,
 		TaskDefinition: def,
 	}
 }
@@ -32,19 +38,19 @@ type TaskRange struct {
 }
 
 // MinID returns the id that would theoretically be at the start of the range.
-func (tr TaskRange) MinID() string {
+func (tr TaskRange) MinID() ksuid.KSUID {
 	return tr.idFromTime(tr.Min)
 }
 
 // MaxID returns the id that would theoretically be at the end of the range.
-func (tr TaskRange) MaxID() string {
+func (tr TaskRange) MaxID() ksuid.KSUID {
 	return tr.idFromTime(tr.Max)
 }
 
-func (tr TaskRange) idFromTime(ts time.Time) string {
-	id, err := ksuid.NewRandomWithTime(tr.Min)
+func (tr TaskRange) idFromTime(ts time.Time) ksuid.KSUID {
+	id, err := ksuid.NewRandomWithTime(ts)
 	if err != nil {
 		panic(err)
 	}
-	return id.String()
+	return id
 }

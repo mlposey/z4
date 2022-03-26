@@ -1,13 +1,20 @@
 package storage
 
 import (
+	"errors"
+	"github.com/dgraph-io/badger/v3"
 	"github.com/mlposey/z4/telemetry"
 	"go.uber.org/zap"
 	"time"
 )
 
+type QueueConfig struct {
+	LastRun time.Time
+}
+
 type Queue struct {
 	db        *BadgerClient
+	config    QueueConfig
 	feed      chan Task
 	namespace string
 	closed    bool
@@ -19,22 +26,56 @@ func New(namespace string, db *BadgerClient) *Queue {
 		namespace: namespace,
 		feed:      make(chan Task),
 	}
+	q.loadConfig()
+	go q.startConfigSync()
 	go q.startFeed()
 	return q
 }
 
+func (t *Queue) loadConfig() {
+	// TODO: Return error instead of fatal logging.
+	config, err := t.db.GetConfig(t.namespace)
+	if err != nil {
+		if !errors.Is(err, badger.ErrKeyNotFound) {
+			telemetry.Logger.Fatal("failed to load namespace config from database",
+				zap.Error(err))
+		}
+
+		config = QueueConfig{LastRun: time.Now().Add(-time.Minute)}
+		err = t.db.SaveConfig(t.namespace, config)
+		if err != nil {
+			telemetry.Logger.Fatal("failed to save config to database",
+				zap.Error(err))
+		}
+	}
+	t.config = config
+}
+
+func (t *Queue) startConfigSync() {
+	for !t.closed {
+		err := t.db.SaveConfig(t.namespace, t.config)
+		if err != nil {
+			telemetry.Logger.Error("failed to save config to database",
+				zap.Error(err))
+		}
+		time.Sleep(time.Second * 5)
+	}
+}
+
 func (t *Queue) startFeed() {
-	delay := time.Millisecond * 10
-	var lastRun time.Time
+	delay := time.Second
 	for !t.closed {
 		now := time.Now()
 		// TODO: Add timeout when fetching tasks from store.
-		tasks, err := t.db.Get(TaskRange{
+		tasks, err := t.db.GetTask(TaskRange{
 			Namespace: t.namespace,
-			Min:       lastRun,
+			Min:       t.config.LastRun,
 			Max:       now,
 		})
-		lastRun = now
+		if len(tasks) > 0 {
+			telemetry.Logger.Debug("got tasks from db", zap.Int("count", len(tasks)))
+		}
+		t.config.LastRun = now
 
 		if err != nil {
 			telemetry.Logger.Error("failed to fetch tasks",
@@ -45,7 +86,7 @@ func (t *Queue) startFeed() {
 			t.feed <- task
 		}
 
-		sleep := time.Now().Sub(lastRun)
+		sleep := time.Now().Sub(t.config.LastRun)
 		if sleep < delay {
 			time.Sleep(delay - sleep)
 		}
@@ -58,7 +99,7 @@ func (t *Queue) Feed() <-chan Task {
 }
 
 func (t *Queue) Add(task Task) error {
-	return t.db.Save(t.namespace, task)
+	return t.db.SaveTask(t.namespace, task)
 }
 
 func (t *Queue) Namespace() string {

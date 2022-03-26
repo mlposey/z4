@@ -1,10 +1,13 @@
 package storage
 
 import (
+	"bytes"
 	"encoding/json"
 	"fmt"
-	badger "github.com/dgraph-io/badger/v3"
+	"github.com/dgraph-io/badger/v3"
 	"github.com/mlposey/z4/telemetry"
+	"github.com/segmentio/ksuid"
+	"go.uber.org/zap"
 	"time"
 )
 
@@ -37,34 +40,62 @@ func (bc *BadgerClient) handleGC() {
 	}
 }
 
+func (bc *BadgerClient) SaveConfig(namespace string, config QueueConfig) error {
+	return bc.db.Update(func(txn *badger.Txn) error {
+		payload, err := json.Marshal(config)
+		if err != nil {
+			return fmt.Errorf("could not encode config: %w", err)
+		}
+		key := bc.getConfigFQN(namespace)
+		return txn.Set(key, payload)
+	})
+}
+
+func (bc *BadgerClient) GetConfig(namespace string) (QueueConfig, error) {
+	telemetry.Logger.Debug("getting config from db")
+	var config QueueConfig
+	return config, bc.db.View(func(txn *badger.Txn) error {
+		key := bc.getConfigFQN(namespace)
+		item, err := txn.Get(key)
+		if err != nil {
+			return err
+		}
+
+		return item.Value(func(val []byte) error {
+			return json.Unmarshal(val, &config)
+		})
+	})
+}
+
 func (bc *BadgerClient) Close() error {
 	return bc.db.Close()
 }
 
-func (bc *BadgerClient) Save(namespace string, task Task) error {
+func (bc *BadgerClient) SaveTask(namespace string, task Task) error {
+	telemetry.Logger.Debug("writing task to db", zap.Any("task", task))
 	return bc.db.Update(func(txn *badger.Txn) error {
 		// TODO: Use protobuf for task encode/decode.
 		payload, err := json.Marshal(task)
 		if err != nil {
 			return fmt.Errorf("could not encode task: %w", err)
 		}
-		key := []byte(bc.getKeyFQN(namespace, task.ID))
+		key := bc.getTaskFQN(namespace, task.ID)
 		return txn.Set(key, payload)
 	})
 }
 
-func (bc *BadgerClient) Get(query TaskRange) ([]Task, error) {
+func (bc *BadgerClient) GetTask(query TaskRange) ([]Task, error) {
 	var tasks []Task
 	err := bc.db.View(func(txn *badger.Txn) error {
 		it := txn.NewIterator(badger.DefaultIteratorOptions)
 		defer it.Close()
-		startID := bc.getKeyFQN(query.Namespace, query.MinID())
-		endID := bc.getKeyFQN(query.Namespace, query.MaxID())
+		startID := bc.getTaskFQN(query.Namespace, query.MinID())
+		endID := bc.getTaskFQN(query.Namespace, query.MaxID())
 
-		it.Seek([]byte(startID))
-		for it.Valid() {
+		it.Seek(startID)
+		for ; it.Valid(); it.Next() {
 			item := it.Item()
-			if string(item.Key()) > endID {
+			if bytes.Compare(item.Key(), endID) > 0 {
 				return nil
 			}
 
@@ -75,7 +106,9 @@ func (bc *BadgerClient) Get(query TaskRange) ([]Task, error) {
 					return err
 				}
 
-				tasks = append(tasks, task)
+				if !task.ID.IsNil() {
+					tasks = append(tasks, task)
+				}
 				return nil
 			})
 			if err != nil {
@@ -87,6 +120,10 @@ func (bc *BadgerClient) Get(query TaskRange) ([]Task, error) {
 	return tasks, err
 }
 
-func (bc *BadgerClient) getKeyFQN(namespace string, id string) string {
-	return fmt.Sprintf("%s#%s", namespace, id)
+func (bc *BadgerClient) getTaskFQN(namespace string, id ksuid.KSUID) []byte {
+	return []byte(fmt.Sprintf("%s#task#%s", namespace, id.String()))
+}
+
+func (bc *BadgerClient) getConfigFQN(namespace string) []byte {
+	return []byte(fmt.Sprintf("%s#config", namespace))
 }
