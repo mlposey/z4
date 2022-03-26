@@ -13,7 +13,9 @@ type QueueConfig struct {
 }
 
 type Queue struct {
-	db        *BadgerClient
+	// TODO: Separate config and task logic into different types.
+	tasks     *TaskStore
+	configs   *ConfigStore
 	config    QueueConfig
 	feed      chan Task
 	namespace string
@@ -22,7 +24,8 @@ type Queue struct {
 
 func New(namespace string, db *BadgerClient) *Queue {
 	q := &Queue{
-		db:        db,
+		tasks:     &TaskStore{Client: db},
+		configs:   &ConfigStore{Client: db},
 		namespace: namespace,
 		feed:      make(chan Task),
 	}
@@ -34,7 +37,7 @@ func New(namespace string, db *BadgerClient) *Queue {
 
 func (t *Queue) loadConfig() {
 	// TODO: Return error instead of fatal logging.
-	config, err := t.db.GetConfig(t.namespace)
+	config, err := t.configs.Get(t.namespace)
 	if err != nil {
 		if !errors.Is(err, badger.ErrKeyNotFound) {
 			telemetry.Logger.Fatal("failed to load namespace config from database",
@@ -42,7 +45,7 @@ func (t *Queue) loadConfig() {
 		}
 
 		config = QueueConfig{LastRun: time.Now().Add(-time.Minute)}
-		err = t.db.SaveConfig(t.namespace, config)
+		err = t.configs.Save(t.namespace, config)
 		if err != nil {
 			telemetry.Logger.Fatal("failed to save config to database",
 				zap.Error(err))
@@ -53,7 +56,7 @@ func (t *Queue) loadConfig() {
 
 func (t *Queue) startConfigSync() {
 	for !t.closed {
-		err := t.db.SaveConfig(t.namespace, t.config)
+		err := t.configs.Save(t.namespace, t.config)
 		if err != nil {
 			telemetry.Logger.Error("failed to save config to database",
 				zap.Error(err))
@@ -67,13 +70,13 @@ func (t *Queue) startFeed() {
 	for !t.closed {
 		now := time.Now()
 		// TODO: Add timeout when fetching tasks from store.
-		tasks, err := t.db.GetTask(TaskRange{
+		tasks, err := t.tasks.Get(TaskRange{
 			Namespace: t.namespace,
 			Min:       t.config.LastRun,
 			Max:       now,
 		})
 		if len(tasks) > 0 {
-			telemetry.Logger.Debug("got tasks from db", zap.Int("count", len(tasks)))
+			telemetry.Logger.Debug("got tasks from DB", zap.Int("count", len(tasks)))
 		}
 		t.config.LastRun = now
 
@@ -99,7 +102,7 @@ func (t *Queue) Feed() <-chan Task {
 }
 
 func (t *Queue) Add(task Task) error {
-	return t.db.SaveTask(task)
+	return t.tasks.Save(task)
 }
 
 func (t *Queue) Namespace() string {
