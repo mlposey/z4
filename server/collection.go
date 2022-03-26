@@ -29,8 +29,7 @@ func (c *collection) CreateTask(ctx context.Context, req *proto.CreateTaskReques
 	defer lease.Release()
 
 	task := storage.NewTask(storage.TaskDefinition{
-		//RunTime:  req.GetDeliverAt().AsTime(),
-		RunTime:  time.Now().Add(time.Duration(req.GetTtsSeconds()) * time.Second),
+		RunTime:  c.getRunTime(req),
 		Metadata: req.GetMetadata(),
 		Payload:  req.GetPayload(),
 	})
@@ -72,4 +71,11 @@ func (c *collection) StreamTasks(req *proto.StreamTasksRequest, stream proto.Col
 	telemetry.Logger.Info("client closed storage stream",
 		telemetry.LogRequestID(req.GetRequestId()))
 	return nil
+}
+
+func (c *collection) getRunTime(req *proto.CreateTaskRequest) time.Time {
+	if req.GetTtsSeconds() > 0 {
+		return time.Now().Add(time.Duration(req.GetTtsSeconds()) * time.Second)
+	}
+	return req.GetDeliverAt().AsTime()
 }
