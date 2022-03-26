@@ -14,17 +14,20 @@ import (
 // collection implements the gRPC Collection service.
 type collection struct {
 	proto.UnimplementedCollectionServer
-	tasks *storage.Queue
+	qm *storage.QueueManager
 }
 
 func newCollection() proto.CollectionServer {
 	return &collection{
-		tasks: storage.New(),
+		qm: storage.NewQueueManager(new(storage.SimpleStore)),
 	}
 }
 
 func (c *collection) CreateTask(ctx context.Context, req *proto.CreateTaskRequest) (*proto.Task, error) {
-	t, err := c.tasks.Add(ctx, storage.TaskDefinition{
+	lease := c.qm.Lease(req.GetNamespace())
+	defer lease.Release()
+
+	t, err := lease.Queue().Add(ctx, storage.TaskDefinition{
 		RunTime:  req.GetDeliverAt().AsTime(),
 		Metadata: req.GetMetadata(),
 		Payload:  req.GetPayload(),
@@ -42,7 +45,10 @@ func (c *collection) CreateTask(ctx context.Context, req *proto.CreateTaskReques
 }
 
 func (c *collection) StreamTasks(req *proto.StreamTasksRequest, stream proto.Collection_StreamTasksServer) error {
-	tasks := c.tasks.Feed(stream.Context())
+	lease := c.qm.Lease(req.GetNamespace())
+	defer lease.Release()
+
+	tasks := lease.Queue().Feed()
 	for task := range tasks {
 		telemetry.Logger.Debug("sending task to client",
 			zap.Any("task", task),
