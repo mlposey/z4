@@ -29,6 +29,14 @@ type taskStreams struct {
 }
 
 func (ts *taskStreams) setupSuite() error {
+	ts.dataDir = ""
+	ts.server = nil
+	ts.serverPort = 6355
+	ts.client = nil
+	ts.taskRequest = nil
+	ts.createdTask = nil
+	ts.receivedTasks = nil
+
 	err := new(error)
 	ts.doIfOK(err, ts.createNewDBFolder)
 	ts.doIfOK(err, ts.startServer)
@@ -195,7 +203,7 @@ func (ts *taskStreams) iHaveCreatedTheTask(arg1 *godog.DocString) error {
 }
 
 func InitializeScenario(sc *godog.ScenarioContext) {
-	ts := &taskStreams{serverPort: 6355}
+	ts := &taskStreams{}
 
 	sc.Before(func(ctx context.Context, sc *godog.Scenario) (context.Context, error) {
 		return ctx, ts.setupSuite()
