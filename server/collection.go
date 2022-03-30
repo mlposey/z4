@@ -25,6 +25,7 @@ func newCollection(db *storage.BadgerClient) proto.CollectionServer {
 }
 
 func (c *collection) CreateTask(ctx context.Context, req *proto.CreateTaskRequest) (*proto.Task, error) {
+	telemetry.Logger.Debug("got CreateTask rpc request")
 	lease := c.qm.Lease(req.GetNamespace())
 	defer lease.Release()
 
@@ -50,6 +51,7 @@ func (c *collection) CreateTask(ctx context.Context, req *proto.CreateTaskReques
 }
 
 func (c *collection) StreamTasks(req *proto.StreamTasksRequest, stream proto.Collection_StreamTasksServer) error {
+	telemetry.Logger.Debug("got StreamTasks rpc request")
 	lease := c.qm.Lease(req.GetNamespace())
 	defer lease.Release()
 
