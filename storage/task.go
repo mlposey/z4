@@ -26,24 +26,6 @@ func NewTaskID(runTime time.Time) string {
 // TaskRange is a query for tasks within a time range.
 type TaskRange struct {
 	Namespace string
-	Min       time.Time
-	Max       time.Time
-}
-
-// MinID returns the id that would theoretically be at the start of the range.
-func (tr TaskRange) MinID() string {
-	return tr.idFromTime(tr.Min)
-}
-
-// MaxID returns the id that would theoretically be at the end of the range.
-func (tr TaskRange) MaxID() string {
-	return tr.idFromTime(tr.Max)
-}
-
-func (tr TaskRange) idFromTime(ts time.Time) string {
-	id, err := ksuid.NewRandomWithTime(ts)
-	if err != nil {
-		panic(err)
-	}
-	return id.String()
+	StartID   string
+	EndID     string
 }

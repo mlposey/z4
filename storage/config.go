@@ -9,7 +9,7 @@ import (
 )
 
 type QueueConfig struct {
-	LastRun time.Time
+	LastDeliveredTask string // The ID of the last delivered task
 }
 
 type SyncedConfig struct {
@@ -46,7 +46,9 @@ func (sc *SyncedConfig) loadConfig() {
 				zap.Error(err))
 		}
 
-		config = QueueConfig{LastRun: time.Now().Add(-time.Minute)}
+		config = QueueConfig{
+			LastDeliveredTask: NewTaskID(time.Now().Add(-time.Minute)),
+		}
 		err = sc.configs.Save(sc.namespace, config)
 		if err != nil {
 			telemetry.Logger.Fatal("failed to save config to database",

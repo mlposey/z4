@@ -28,32 +28,39 @@ func New(namespace string, db *storage.BadgerClient) *Feed {
 }
 
 func (t *Feed) startFeed() {
-	delay := time.Second
+	config := t.config.C
+
 	for !t.closed {
-		now := time.Now()
 		// TODO: Add timeout when fetching tasks from store.
 		tasks, err := t.tasks.Get(storage.TaskRange{
 			Namespace: t.namespace,
-			Min:       t.config.C.LastRun,
-			Max:       now,
+			StartID:   config.LastDeliveredTask,
+			EndID:     storage.NewTaskID(time.Now()),
 		})
-		if len(tasks) > 0 {
-			telemetry.Logger.Debug("got tasks from DB", zap.Int("count", len(tasks)))
-		}
-		t.config.C.LastRun = now
-
 		if err != nil {
 			telemetry.Logger.Error("failed to fetch tasks",
 				zap.Error(err))
+			time.Sleep(time.Second)
+			continue
+		}
+
+		if len(tasks) > 0 {
+			if tasks[0].ID == config.LastDeliveredTask {
+				// TODO: Determine if we should optimize this.
+				tasks = tasks[1:]
+			}
+		}
+
+		if len(tasks) == 0 {
+			time.Sleep(time.Millisecond * 50)
+			continue
+		} else {
+			telemetry.Logger.Debug("got tasks from DB", zap.Int("count", len(tasks)))
 		}
 
 		for _, task := range tasks {
 			t.feed <- task
-		}
-
-		sleep := time.Now().Sub(t.config.C.LastRun)
-		if sleep < delay {
-			time.Sleep(delay - sleep)
+			t.config.C.LastDeliveredTask = task.ID
 		}
 	}
 	close(t.feed)

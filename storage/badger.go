@@ -100,8 +100,8 @@ func (ts *TaskStore) Get(query TaskRange) ([]Task, error) {
 	err := ts.Client.DB.View(func(txn *badger.Txn) error {
 		it := txn.NewIterator(badger.DefaultIteratorOptions)
 		defer it.Close()
-		startID := ts.getTaskFQN(query.Namespace, query.MinID())
-		endID := ts.getTaskFQN(query.Namespace, query.MaxID())
+		startID := ts.getTaskFQN(query.Namespace, query.StartID)
+		endID := ts.getTaskFQN(query.Namespace, query.EndID)
 
 		it.Seek(startID)
 		for ; it.Valid(); it.Next() {
