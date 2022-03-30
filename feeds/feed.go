@@ -79,6 +79,10 @@ func (t *Feed) Namespace() string {
 }
 
 func (t *Feed) Close() error {
+	// TODO: Call this method before closing app.
+	// Important because failing to save the config to disk
+	// could cause duplicate deliveries.
+
 	// TODO: Find a better way to do this.
 	// This won't immediately close the feed, and it is likely the feed
 	// won't close at all. This is because the goroutine blocks until

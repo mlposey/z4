@@ -63,6 +63,11 @@ func (sc *SyncedConfig) startConfigSync() {
 	for {
 		select {
 		case <-sc.closed:
+			err := sc.configs.Save(sc.namespace, *sc.C)
+			if err != nil {
+				telemetry.Logger.Error("failed to save config to database",
+					zap.Error(err))
+			}
 			return
 
 		// TODO: Consider syncing after X number of changes if before tick.
