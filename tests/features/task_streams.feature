@@ -1,4 +1,5 @@
 Feature: Task Streaming
+
   Scenario: Streaming endpoint accepts connections
     When I begin streaming after a 0 second delay
     Then after 1 seconds I should receive 0 tasks
