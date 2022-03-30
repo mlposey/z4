@@ -6,22 +6,22 @@ import (
 	"sync"
 )
 
-// FeedManager ensures that only one feed is active per requested namespace.
-type FeedManager struct {
+// Manager ensures that only one feed is active per requested namespace.
+type Manager struct {
 	queues map[string]*managedFeed
 	db     *storage.BadgerClient
 	mu     sync.Mutex
 }
 
-func NewFeedManager(db *storage.BadgerClient) *FeedManager {
-	return &FeedManager{
+func NewManager(db *storage.BadgerClient) *Manager {
+	return &Manager{
 		queues: make(map[string]*managedFeed),
 		db:     db,
 	}
 }
 
 // Lease grants access to the feed for the requested namespace.
-func (qm *FeedManager) Lease(namespace string) *Lease {
+func (qm *Manager) Lease(namespace string) *Lease {
 	qm.mu.Lock()
 	defer qm.mu.Unlock()
 
@@ -64,7 +64,7 @@ func (mq *managedFeed) release(l *Lease) {
 	defer mq.mu.Unlock()
 
 	delete(mq.leases, l.ID)
-	// TODO: Delete managedFeed from the FeedManager if no leases are outstanding.
+	// TODO: Delete managedFeed from the Manager if no leases are outstanding.
 }
 
 // Lease is a handle on a task feed.

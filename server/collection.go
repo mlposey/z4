@@ -16,12 +16,12 @@ import (
 // collection implements the gRPC Collection service.
 type collection struct {
 	proto.UnimplementedCollectionServer
-	fm *feeds.FeedManager
+	fm *feeds.Manager
 }
 
 func newCollection(db *storage.BadgerClient) proto.CollectionServer {
 	return &collection{
-		fm: feeds.NewFeedManager(db),
+		fm: feeds.NewManager(db),
 	}
 }
 
