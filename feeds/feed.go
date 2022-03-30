@@ -1,38 +1,39 @@
-package storage
+package feeds
 
 import (
+	"github.com/mlposey/z4/storage"
 	"github.com/mlposey/z4/telemetry"
 	"go.uber.org/zap"
 	"time"
 )
 
-type Queue struct {
+type Feed struct {
 	// TODO: Separate config and task logic into different types.
-	tasks     *TaskStore
-	config    *SyncedConfig
-	feed      chan Task
+	tasks     *storage.TaskStore
+	config    *storage.SyncedConfig
+	feed      chan storage.Task
 	namespace string
 	closed    bool
 }
 
-func New(namespace string, db *BadgerClient) *Queue {
-	q := &Queue{
-		tasks:     &TaskStore{Client: db},
-		config:    NewSyncedConfig(&ConfigStore{Client: db}, namespace),
+func New(namespace string, db *storage.BadgerClient) *Feed {
+	q := &Feed{
+		tasks:     &storage.TaskStore{Client: db},
+		config:    storage.NewSyncedConfig(&storage.ConfigStore{Client: db}, namespace),
 		namespace: namespace,
-		feed:      make(chan Task),
+		feed:      make(chan storage.Task),
 	}
 	q.config.StartSync()
 	go q.startFeed()
 	return q
 }
 
-func (t *Queue) startFeed() {
+func (t *Feed) startFeed() {
 	delay := time.Second
 	for !t.closed {
 		now := time.Now()
 		// TODO: Add timeout when fetching tasks from store.
-		tasks, err := t.tasks.Get(TaskRange{
+		tasks, err := t.tasks.Get(storage.TaskRange{
 			Namespace: t.namespace,
 			Min:       t.config.C.LastRun,
 			Max:       now,
@@ -59,19 +60,19 @@ func (t *Queue) startFeed() {
 	close(t.feed)
 }
 
-func (t *Queue) Feed() <-chan Task {
+func (t *Feed) Tasks() <-chan storage.Task {
 	return t.feed
 }
 
-func (t *Queue) Add(task Task) error {
+func (t *Feed) Add(task storage.Task) error {
 	return t.tasks.Save(task)
 }
 
-func (t *Queue) Namespace() string {
+func (t *Feed) Namespace() string {
 	return t.namespace
 }
 
-func (t *Queue) Close() error {
+func (t *Feed) Close() error {
 	// TODO: Find a better way to do this.
 	// This won't immediately close the feed, and it is likely the feed
 	// won't close at all. This is because the goroutine blocks until
