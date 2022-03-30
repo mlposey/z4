@@ -1,22 +1,15 @@
 package storage
 
 import (
-	"errors"
-	"github.com/dgraph-io/badger/v3"
 	"github.com/mlposey/z4/telemetry"
 	"go.uber.org/zap"
 	"time"
 )
 
-type QueueConfig struct {
-	LastRun time.Time
-}
-
 type Queue struct {
 	// TODO: Separate config and task logic into different types.
 	tasks     *TaskStore
-	configs   *ConfigStore
-	config    QueueConfig
+	config    *SyncedConfig
 	feed      chan Task
 	namespace string
 	closed    bool
@@ -25,44 +18,13 @@ type Queue struct {
 func New(namespace string, db *BadgerClient) *Queue {
 	q := &Queue{
 		tasks:     &TaskStore{Client: db},
-		configs:   &ConfigStore{Client: db},
+		config:    NewSyncedConfig(&ConfigStore{Client: db}, namespace),
 		namespace: namespace,
 		feed:      make(chan Task),
 	}
-	q.loadConfig()
-	go q.startConfigSync()
+	q.config.StartSync()
 	go q.startFeed()
 	return q
-}
-
-func (t *Queue) loadConfig() {
-	// TODO: Return error instead of fatal logging.
-	config, err := t.configs.Get(t.namespace)
-	if err != nil {
-		if !errors.Is(err, badger.ErrKeyNotFound) {
-			telemetry.Logger.Fatal("failed to load namespace config from database",
-				zap.Error(err))
-		}
-
-		config = QueueConfig{LastRun: time.Now().Add(-time.Minute)}
-		err = t.configs.Save(t.namespace, config)
-		if err != nil {
-			telemetry.Logger.Fatal("failed to save config to database",
-				zap.Error(err))
-		}
-	}
-	t.config = config
-}
-
-func (t *Queue) startConfigSync() {
-	for !t.closed {
-		err := t.configs.Save(t.namespace, t.config)
-		if err != nil {
-			telemetry.Logger.Error("failed to save config to database",
-				zap.Error(err))
-		}
-		time.Sleep(time.Second * 5)
-	}
 }
 
 func (t *Queue) startFeed() {
@@ -72,13 +34,13 @@ func (t *Queue) startFeed() {
 		// TODO: Add timeout when fetching tasks from store.
 		tasks, err := t.tasks.Get(TaskRange{
 			Namespace: t.namespace,
-			Min:       t.config.LastRun,
+			Min:       t.config.C.LastRun,
 			Max:       now,
 		})
 		if len(tasks) > 0 {
 			telemetry.Logger.Debug("got tasks from DB", zap.Int("count", len(tasks)))
 		}
-		t.config.LastRun = now
+		t.config.C.LastRun = now
 
 		if err != nil {
 			telemetry.Logger.Error("failed to fetch tasks",
@@ -89,7 +51,7 @@ func (t *Queue) startFeed() {
 			t.feed <- task
 		}
 
-		sleep := time.Now().Sub(t.config.LastRun)
+		sleep := time.Now().Sub(t.config.C.LastRun)
 		if sleep < delay {
 			time.Sleep(delay - sleep)
 		}
@@ -115,5 +77,5 @@ func (t *Queue) Close() error {
 	// won't close at all. This is because the goroutine blocks until
 	// a consumer takes a storage from the channel.
 	t.closed = true
-	return nil
+	return t.config.Close()
 }
