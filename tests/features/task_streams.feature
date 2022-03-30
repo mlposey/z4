@@ -10,4 +10,4 @@ Feature: Task Streaming
       """
     When I begin streaming after a 1 second delay
     Then after 1 second I should receive the same task
-    And after 5 seconds I should receive 0 tasks
+    And after 5 seconds I should receive 1 tasks

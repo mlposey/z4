@@ -9,6 +9,7 @@ import (
 	"github.com/mlposey/z4/proto"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials/insecure"
+	"io"
 	"os"
 	"os/exec"
 	"strings"
@@ -17,10 +18,12 @@ import (
 )
 
 type taskStreams struct {
-	dataDir    string
-	server     *os.Process
-	serverPort int
-	client     proto.CollectionClient
+	dataDir       string
+	server        *os.Process
+	serverPort    int
+	client        proto.CollectionClient
+	taskRequest   *proto.CreateTaskRequest
+	receivedTasks []*proto.Task
 }
 
 func (ts *taskStreams) setupSuite() error {
@@ -127,6 +130,36 @@ func (ts *taskStreams) afterSecondsIShouldReceiveTasks(arg1, arg2 int) error {
 }
 
 func (ts *taskStreams) iBeginStreamingAfterASecondDelay(arg1 int) error {
+	time.Sleep(time.Duration(arg1) * time.Second)
+	return ts.consumeTaskStream()
+}
+
+func (ts *taskStreams) consumeTaskStream() error {
+	stream, err := ts.client.StreamTasks(context.Background(), &proto.StreamTasksRequest{
+		// TODO: Generate this or take it from the gherkin.
+		RequestId: ts.taskRequest.GetRequestId() + "_stream",
+		// TODO: Supply namespace in gherkin so we can test failure scenarios.
+		Namespace: ts.taskRequest.GetNamespace(),
+	})
+	if err != nil {
+		return err
+	}
+	go func() {
+		for {
+			task, err := stream.Recv()
+			if err == io.EOF {
+				fmt.Println("stream closed by server")
+				break
+			}
+			if err != nil {
+				// this is expected when we send the kill signal to the server
+				fmt.Printf("stream error: %v\n", err)
+				break
+			}
+
+			ts.receivedTasks = append(ts.receivedTasks, task)
+		}
+	}()
 	return nil
 }
 
@@ -137,12 +170,12 @@ func (ts *taskStreams) iHaveCreatedTheTask(arg1 *godog.DocString) error {
 		return err
 	}
 
-	req := &proto.CreateTaskRequest{
+	ts.taskRequest = &proto.CreateTaskRequest{
 		RequestId:  taskDef["request_id"].(string),
 		Namespace:  taskDef["namespace"].(string),
 		TtsSeconds: int64(taskDef["tts_seconds"].(float64)),
 	}
-	_, err = ts.client.CreateTask(context.Background(), req)
+	_, err = ts.client.CreateTask(context.Background(), ts.taskRequest)
 	return err
 }
 
