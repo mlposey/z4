@@ -1,5 +1,9 @@
 Feature: Task Streaming
-  Scenario: Process task when ready
+  Scenario: Streaming endpoint accepts connections
+    When I begin streaming after a 0 second delay
+    Then after 1 seconds I should receive 0 tasks
+
+  Scenario: Stream returns created task when runtime reached
     Given I have created the task:
       """
       {
