@@ -22,7 +22,7 @@ type taskStreams struct {
 	client     proto.CollectionClient
 }
 
-func (ts *taskStreams) reset() error {
+func (ts *taskStreams) setupSuite() error {
 	err := new(error)
 	ts.doIfOK(err, ts.createNewDBFolder)
 	ts.doIfOK(err, ts.startServer)
@@ -94,7 +94,17 @@ func (ts *taskStreams) startServer() error {
 	return nil
 }
 
-func (ts *taskStreams) stopServer() error {
+func (ts *taskStreams) createClient() error {
+	opts := []grpc.DialOption{grpc.WithTransportCredentials(insecure.NewCredentials())}
+	conn, err := grpc.Dial(fmt.Sprintf("localhost:%d", ts.serverPort), opts...)
+	if err != nil {
+		return err
+	}
+	ts.client = proto.NewCollectionClient(conn)
+	return nil
+}
+
+func (ts *taskStreams) teardownSuite() error {
 	if ts.server != nil {
 		err := syscall.Kill(-ts.server.Pid, syscall.SIGKILL)
 		if err != nil {
@@ -103,16 +113,6 @@ func (ts *taskStreams) stopServer() error {
 		_, err = ts.server.Wait()
 		return err
 	}
-	return nil
-}
-
-func (ts *taskStreams) createClient() error {
-	opts := []grpc.DialOption{grpc.WithTransportCredentials(insecure.NewCredentials())}
-	conn, err := grpc.Dial(fmt.Sprintf("localhost:%d", ts.serverPort), opts...)
-	if err != nil {
-		return err
-	}
-	ts.client = proto.NewCollectionClient(conn)
 	return nil
 }
 
@@ -136,10 +136,10 @@ func InitializeScenario(sc *godog.ScenarioContext) {
 	ts := &taskStreams{serverPort: 6355}
 
 	sc.Before(func(ctx context.Context, sc *godog.Scenario) (context.Context, error) {
-		return ctx, ts.reset()
+		return ctx, ts.setupSuite()
 	})
 	sc.After(func(ctx context.Context, sc *godog.Scenario, err error) (context.Context, error) {
-		return ctx, ts.stopServer()
+		return ctx, ts.teardownSuite()
 	})
 
 	sc.Step(`^after (\d+) second I should receive the same task$`, ts.afterSecondIShouldReceiveTheSameTask)
