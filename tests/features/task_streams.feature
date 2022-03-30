@@ -1,4 +1,8 @@
 Feature: Task Streaming
+  Clients can connect to the streaming RPC to receive
+  tasks as they become ready to process.
+
+  # All scenarios start with a new and empty database.
 
   Scenario: Streaming endpoint accepts connections
     When I begin streaming after a 0 second delay
