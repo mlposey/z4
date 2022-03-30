@@ -2,6 +2,7 @@ package server
 
 import (
 	"context"
+	"github.com/mlposey/z4/feeds"
 	"github.com/mlposey/z4/proto"
 	"github.com/mlposey/z4/storage"
 	"github.com/mlposey/z4/telemetry"
@@ -15,18 +16,18 @@ import (
 // collection implements the gRPC Collection service.
 type collection struct {
 	proto.UnimplementedCollectionServer
-	qm *storage.QueueManager
+	fm *feeds.Manager
 }
 
 func newCollection(db *storage.BadgerClient) proto.CollectionServer {
 	return &collection{
-		qm: storage.NewQueueManager(db),
+		fm: feeds.NewManager(db),
 	}
 }
 
 func (c *collection) CreateTask(ctx context.Context, req *proto.CreateTaskRequest) (*proto.Task, error) {
 	telemetry.Logger.Debug("got CreateTask rpc request")
-	lease := c.qm.Lease(req.GetNamespace())
+	lease := c.fm.Lease(req.GetNamespace())
 	defer lease.Release()
 
 	task := storage.Task{
@@ -36,7 +37,7 @@ func (c *collection) CreateTask(ctx context.Context, req *proto.CreateTaskReques
 		Metadata:  req.GetMetadata(),
 		Payload:   req.GetPayload(),
 	}
-	err := lease.Queue().Add(task)
+	err := lease.Feed().Add(task)
 
 	if err != nil {
 		return nil, status.Errorf(codes.Internal, "failed to save storage: %v", err)
@@ -52,10 +53,10 @@ func (c *collection) CreateTask(ctx context.Context, req *proto.CreateTaskReques
 
 func (c *collection) StreamTasks(req *proto.StreamTasksRequest, stream proto.Collection_StreamTasksServer) error {
 	telemetry.Logger.Debug("got StreamTasks rpc request")
-	lease := c.qm.Lease(req.GetNamespace())
+	lease := c.fm.Lease(req.GetNamespace())
 	defer lease.Release()
 
-	tasks := lease.Queue().Feed()
+	tasks := lease.Feed().Tasks()
 	for task := range tasks {
 		telemetry.Logger.Debug("sending task to client",
 			zap.Any("task", task),
