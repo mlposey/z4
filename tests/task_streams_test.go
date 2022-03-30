@@ -2,6 +2,7 @@ package tests
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"github.com/cucumber/godog"
@@ -48,6 +49,7 @@ func (ts *taskStreams) createNewDBFolder() error {
 func (ts *taskStreams) startServer() error {
 	os.Setenv("Z4_DB_DATA_DIR", ts.dataDir)
 	os.Setenv("Z4_PORT", fmt.Sprint(ts.serverPort))
+	os.Setenv("Z4_DEBUG_LOGGING_ENABLED", "true")
 
 	cmd := exec.Command("bash", "-c", "go run ../cmd/server/*.go")
 
@@ -72,7 +74,7 @@ func (ts *taskStreams) startServer() error {
 		for {
 			tmp := make([]byte, 1024)
 			_, e := stdout.Read(tmp)
-			fmt.Print(string(tmp))
+			fmt.Print("[server]: " + string(tmp))
 			if e != nil {
 				break
 			}
@@ -129,7 +131,19 @@ func (ts *taskStreams) iBeginStreamingAfterASecondDelay(arg1 int) error {
 }
 
 func (ts *taskStreams) iHaveCreatedTheTask(arg1 *godog.DocString) error {
-	return nil
+	var taskDef map[string]interface{}
+	err := json.Unmarshal([]byte(arg1.Content), &taskDef)
+	if err != nil {
+		return err
+	}
+
+	req := &proto.CreateTaskRequest{
+		RequestId:  taskDef["request_id"].(string),
+		Namespace:  taskDef["namespace"].(string),
+		TtsSeconds: int64(taskDef["tts_seconds"].(float64)),
+	}
+	_, err = ts.client.CreateTask(context.Background(), req)
+	return err
 }
 
 func InitializeScenario(sc *godog.ScenarioContext) {

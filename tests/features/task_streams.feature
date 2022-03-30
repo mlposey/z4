@@ -3,9 +3,7 @@ Feature: Task Streaming
     Given I have created the task:
       """
       {
-        "metadata": {
-          "request_id": "task_streaming_process_task_when_ready"
-        },
+        "request_id": "task_streaming_process_task_when_ready",
         "tts_seconds": 2,
         "namespace": "campaigns"
       }
