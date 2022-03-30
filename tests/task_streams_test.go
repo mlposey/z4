@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"github.com/cucumber/godog"
 	"github.com/mlposey/z4/proto"
+	"github.com/segmentio/ksuid"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials/insecure"
 	pb "google.golang.org/protobuf/proto"
@@ -29,7 +30,7 @@ type taskStreams struct {
 }
 
 func (ts *taskStreams) setupSuite() error {
-	ts.dataDir = ""
+	ts.dataDir = "/tmp/" + ksuid.New().String()
 	ts.server = nil
 	ts.serverPort = 6355
 	ts.client = nil
@@ -38,7 +39,6 @@ func (ts *taskStreams) setupSuite() error {
 	ts.receivedTasks = nil
 
 	err := new(error)
-	ts.doIfOK(err, ts.createNewDBFolder)
 	ts.doIfOK(err, ts.startServer)
 	ts.doIfOK(err, ts.createClient)
 	return *err
@@ -48,15 +48,6 @@ func (ts *taskStreams) doIfOK(err *error, do func() error) {
 	if *err == nil {
 		*err = do()
 	}
-}
-
-func (ts *taskStreams) createNewDBFolder() error {
-	ts.dataDir = "test_task_streams_datadir"
-	err := os.RemoveAll(ts.dataDir)
-	if err != nil {
-		return err
-	}
-	return os.MkdirAll(ts.dataDir, os.ModePerm)
 }
 
 func (ts *taskStreams) startServer() error {

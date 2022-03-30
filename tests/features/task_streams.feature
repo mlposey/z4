@@ -9,10 +9,10 @@ Feature: Task Streaming
       """
       {
         "request_id": "task_streaming_process_task_when_ready",
-        "tts_seconds": 5,
+        "tts_seconds": 2,
         "namespace": "campaigns"
       }
       """
-    When I begin streaming after a 1 second delay
-    Then after 6 seconds I should receive the same task
+    When I begin streaming after a 0 second delay
+    Then after 5 seconds I should receive the same task
     And after 10 seconds I should receive 1 tasks
