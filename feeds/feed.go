@@ -8,7 +8,6 @@ import (
 )
 
 type Feed struct {
-	// TODO: Separate config and task logic into different types.
 	tasks     *storage.TaskStore
 	config    *storage.SyncedConfig
 	feed      chan storage.Task
