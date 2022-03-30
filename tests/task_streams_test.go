@@ -9,6 +9,7 @@ import (
 	"github.com/mlposey/z4/proto"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials/insecure"
+	pb "google.golang.org/protobuf/proto"
 	"io"
 	"os"
 	"os/exec"
@@ -23,6 +24,7 @@ type taskStreams struct {
 	serverPort    int
 	client        proto.CollectionClient
 	taskRequest   *proto.CreateTaskRequest
+	createdTask   *proto.Task
 	receivedTasks []*proto.Task
 }
 
@@ -121,11 +123,23 @@ func (ts *taskStreams) teardownSuite() error {
 	return nil
 }
 
-func (ts *taskStreams) afterSecondIShouldReceiveTheSameTask(arg1 int) error {
+func (ts *taskStreams) afterSecondsIShouldReceiveTheSameTask(arg1 int) error {
+	time.Sleep(time.Duration(arg1) * time.Second)
+	if len(ts.receivedTasks) != 1 {
+		return fmt.Errorf("expected to receive the input task back; got %d tasks", len(ts.receivedTasks))
+	}
+	ok := pb.Equal(ts.receivedTasks[0], ts.createdTask)
+	if !ok {
+		return fmt.Errorf("tasks not equal; expected %v; got %v", ts.createdTask, ts.receivedTasks[0])
+	}
 	return nil
 }
 
 func (ts *taskStreams) afterSecondsIShouldReceiveTasks(arg1, arg2 int) error {
+	time.Sleep(time.Duration(arg1) * time.Second)
+	if len(ts.receivedTasks) != arg2 {
+		return fmt.Errorf("expected %d tasks; got %d", arg2, len(ts.receivedTasks))
+	}
 	return nil
 }
 
@@ -175,7 +189,8 @@ func (ts *taskStreams) iHaveCreatedTheTask(arg1 *godog.DocString) error {
 		Namespace:  taskDef["namespace"].(string),
 		TtsSeconds: int64(taskDef["tts_seconds"].(float64)),
 	}
-	_, err = ts.client.CreateTask(context.Background(), ts.taskRequest)
+	task, err := ts.client.CreateTask(context.Background(), ts.taskRequest)
+	ts.createdTask = task
 	return err
 }
 
@@ -189,7 +204,7 @@ func InitializeScenario(sc *godog.ScenarioContext) {
 		return ctx, ts.teardownSuite()
 	})
 
-	sc.Step(`^after (\d+) second I should receive the same task$`, ts.afterSecondIShouldReceiveTheSameTask)
+	sc.Step(`^after (\d+) seconds I should receive the same task$`, ts.afterSecondsIShouldReceiveTheSameTask)
 	sc.Step(`^after (\d+) seconds I should receive (\d+) tasks$`, ts.afterSecondsIShouldReceiveTasks)
 	sc.Step(`^I begin streaming after a (\d+) second delay$`, ts.iBeginStreamingAfterASecondDelay)
 	sc.Step(`^I have created the task:$`, ts.iHaveCreatedTheTask)
