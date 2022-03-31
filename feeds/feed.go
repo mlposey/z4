@@ -27,13 +27,13 @@ func New(namespace string, db *storage.BadgerClient) *Feed {
 	return q
 }
 
-func (t *Feed) startFeed() {
-	config := t.config.C
+func (f *Feed) startFeed() {
+	config := f.config.C
 
-	for !t.closed {
+	for !f.closed {
 		// TODO: Add timeout when fetching tasks from store.
-		tasks, err := t.tasks.Get(storage.TaskRange{
-			Namespace: t.namespace,
+		tasks, err := f.tasks.Get(storage.TaskRange{
+			Namespace: f.namespace,
 			StartID:   config.LastDeliveredTask,
 			EndID:     storage.NewTaskID(time.Now()),
 		})
@@ -59,31 +59,31 @@ func (t *Feed) startFeed() {
 		}
 
 		for _, task := range tasks {
-			t.feed <- task
-			t.config.C.LastDeliveredTask = task.ID
+			f.feed <- task
+			f.config.C.LastDeliveredTask = task.ID
 		}
 	}
-	close(t.feed)
+	close(f.feed)
 }
 
-func (t *Feed) Tasks() <-chan storage.Task {
-	return t.feed
+func (f *Feed) Tasks() <-chan storage.Task {
+	return f.feed
 }
 
-func (t *Feed) Add(task storage.Task) error {
-	return t.tasks.Save(task)
+func (f *Feed) Add(task storage.Task) error {
+	return f.tasks.Save(task)
 }
 
-func (t *Feed) AddAsync(task storage.Task) {
-	// TODO: Rename Feed receiver from t to s.
-	t.tasks.SaveAsync(task)
+func (f *Feed) AddAsync(task storage.Task) {
+	// TODO: Rename Feed receiver from f to s.
+	f.tasks.SaveAsync(task)
 }
 
-func (t *Feed) Namespace() string {
-	return t.namespace
+func (f *Feed) Namespace() string {
+	return f.namespace
 }
 
-func (t *Feed) Close() error {
+func (f *Feed) Close() error {
 	// TODO: Call this method before closing app.
 	// Important because failing to save the config to disk
 	// could cause duplicate deliveries.
@@ -92,6 +92,6 @@ func (t *Feed) Close() error {
 	// This won't immediately close the feed, and it is likely the feed
 	// won't close at all. This is because the goroutine blocks until
 	// a consumer takes a storage from the channel.
-	t.closed = true
-	return t.config.Close()
+	f.closed = true
+	return f.config.Close()
 }
