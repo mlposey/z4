@@ -17,7 +17,7 @@ type Feed struct {
 
 func New(namespace string, db *storage.BadgerClient) *Feed {
 	q := &Feed{
-		tasks:     &storage.TaskStore{Client: db},
+		tasks:     storage.NewTaskStore(db),
 		config:    storage.NewSyncedConfig(&storage.ConfigStore{Client: db}, namespace),
 		namespace: namespace,
 		feed:      make(chan storage.Task),
@@ -72,6 +72,11 @@ func (t *Feed) Tasks() <-chan storage.Task {
 
 func (t *Feed) Add(task storage.Task) error {
 	return t.tasks.Save(task)
+}
+
+func (t *Feed) AddAsync(task storage.Task) {
+	// TODO: Rename Feed receiver from t to s.
+	t.tasks.SaveAsync(task)
 }
 
 func (t *Feed) Namespace() string {

@@ -80,6 +80,21 @@ func (cs *ConfigStore) getConfigFQN(namespace string) []byte {
 
 type TaskStore struct {
 	Client *BadgerClient
+	buffer *taskBuffer
+}
+
+func NewTaskStore(db *BadgerClient) *TaskStore {
+	store := &TaskStore{Client: db}
+	// TODO: Make buffer params configurable using synced config.
+	store.buffer = newTaskBuffer(100*time.Millisecond, 1000, func(tasks []Task) error {
+		return store.SaveBatch(tasks)
+	})
+	return store
+}
+
+func (ts *TaskStore) Close() error {
+	// TODO: Ensure this method is called when app is terminated.
+	return ts.buffer.Close()
 }
 
 func (ts *TaskStore) Save(task Task) error {
@@ -93,6 +108,30 @@ func (ts *TaskStore) Save(task Task) error {
 		key := ts.getTaskFQN(task.Namespace, task.ID)
 		return txn.Set(key, payload)
 	})
+}
+
+func (ts *TaskStore) SaveAsync(task Task) {
+	ts.buffer.Add(task)
+}
+
+func (ts *TaskStore) SaveBatch(tasks []Task) error {
+	telemetry.Logger.Debug("writing task batch to DB", zap.Any("count", len(tasks)))
+	batch := ts.Client.DB.NewWriteBatch()
+	defer batch.Cancel()
+
+	for _, task := range tasks {
+		payload, err := json.Marshal(task)
+		if err != nil {
+			return fmt.Errorf("count not encode task '%s': %w", task.ID, err)
+		}
+		// TODO: Determine if grouping tasks by namespace before writing is beneficial.
+		key := ts.getTaskFQN(task.Namespace, task.ID)
+		err = batch.Set(key, payload)
+		if err != nil {
+			return fmt.Errorf("failed to write task '%s' from batch: %w", task.ID, err)
+		}
+	}
+	return batch.Flush()
 }
 
 func (ts *TaskStore) Get(query TaskRange) ([]Task, error) {

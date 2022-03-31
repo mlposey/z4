@@ -37,11 +37,13 @@ func (c *collection) CreateTask(ctx context.Context, req *proto.CreateTaskReques
 		Metadata:  req.GetMetadata(),
 		Payload:   req.GetPayload(),
 	}
-	err := lease.Feed().Add(task)
+	// TODO: Create separate endpoint for async creation.
+	/*err := lease.Feed().Add(task)
 
 	if err != nil {
 		return nil, status.Errorf(codes.Internal, "failed to save storage: %v", err)
-	}
+	}*/
+	lease.Feed().AddAsync(task)
 	return &proto.Task{
 		Metadata:  task.Metadata,
 		Payload:   task.Payload,
