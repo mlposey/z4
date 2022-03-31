@@ -36,6 +36,7 @@ func main() {
 	}()
 
 	<-sig
+	// TODO: Gracefully stop server.
 }
 
 func initLogger(debugEnabled bool) {
