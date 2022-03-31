@@ -6,13 +6,36 @@ import (
 	"github.com/mlposey/z4/telemetry"
 	"go.uber.org/zap"
 	"log"
+	"os"
+	"os/signal"
+	"runtime/pprof"
+	"syscall"
 )
 
 func main() {
-	config := configFromEnv()
-	initLogger(config.DebugLoggingEnabled)
-	db := initDB(config.DBDataDir)
-	startServer(config.Port, db)
+	f, err := os.Create("./cpuprofile")
+	if err != nil {
+		log.Fatal(err)
+	}
+	pprof.StartCPUProfile(f)
+	defer pprof.StopCPUProfile()
+
+	sig := make(chan os.Signal, 1)
+	signal.Notify(sig,
+		syscall.SIGHUP,
+		syscall.SIGINT,
+		syscall.SIGTERM,
+		syscall.SIGQUIT)
+
+	go func() {
+		config := configFromEnv()
+		initLogger(config.DebugLoggingEnabled)
+		db := initDB(config.DBDataDir)
+		startServer(config.Port, db)
+		sig <- syscall.SIGQUIT
+	}()
+
+	<-sig
 }
 
 func initLogger(debugEnabled bool) {
