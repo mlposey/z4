@@ -10,6 +10,7 @@ import (
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 	"google.golang.org/protobuf/types/known/timestamppb"
+	"io"
 	"time"
 )
 
@@ -33,6 +34,38 @@ const (
 func (c *collection) CreateTask(ctx context.Context, req *proto.CreateTaskRequest) (*proto.Task, error) {
 	telemetry.Logger.Debug("got CreateTask rpc request")
 	return c.createTask(ctx, req, syncCreation)
+}
+
+func (c *collection) CreateTaskStreamAsync(stream proto.Collection_CreateTaskStreamAsyncServer) error {
+	for {
+		req, err := stream.Recv()
+		if err == io.EOF {
+			telemetry.Logger.Info("client closed CreateTaskStreamAsync stream")
+			return nil
+		}
+		if err != nil {
+			return status.Errorf(codes.Internal, "failed to get tasks from client: %v", err)
+		}
+
+		task, err := c.CreateTaskAsync(stream.Context(), req)
+		var sendErr error
+		if err != nil {
+			sendErr = stream.Send(&proto.TaskStreamResponse{
+				Status:  uint32(codes.Internal),
+				Message: err.Error(),
+			})
+		} else {
+			sendErr = stream.Send(&proto.TaskStreamResponse{
+				Task:   task,
+				Status: uint32(codes.OK),
+			})
+		}
+
+		if err != nil {
+			telemetry.Logger.Error("failed to send task to client", zap.Error(sendErr))
+			return status.Errorf(codes.Internal, "failed to send task to client")
+		}
+	}
 }
 
 func (c *collection) CreateTaskAsync(ctx context.Context, req *proto.CreateTaskRequest) (*proto.Task, error) {
@@ -69,7 +102,7 @@ func (c *collection) createTask(ctx context.Context, req *proto.CreateTaskReques
 	return task, nil
 }
 
-func (c *collection) StreamTasks(req *proto.StreamTasksRequest, stream proto.Collection_StreamTasksServer) error {
+func (c *collection) GetTaskStream(req *proto.StreamTasksRequest, stream proto.Collection_GetTaskStreamServer) error {
 	telemetry.Logger.Debug("got StreamTasks rpc request")
 	lease := c.fm.Lease(req.GetNamespace())
 	defer lease.Release()
@@ -87,7 +120,7 @@ func (c *collection) StreamTasks(req *proto.StreamTasksRequest, stream proto.Col
 		}
 	}
 
-	telemetry.Logger.Info("client closed storage stream",
+	telemetry.Logger.Info("client closed GetTaskStream stream",
 		telemetry.LogRequestID(req.GetRequestId()))
 	return nil
 }

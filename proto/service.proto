@@ -20,8 +20,12 @@ message Status {
 // The Collection service manages tasks.
 service Collection {
   rpc CreateTask(CreateTaskRequest) returns (Task) {};
+  // TODO: Consider building CreateTaskStream
+
   rpc CreateTaskAsync(CreateTaskRequest) returns (Task) {};
-  rpc StreamTasks(StreamTasksRequest) returns (stream Task) {};
+  rpc CreateTaskStreamAsync(stream CreateTaskRequest) returns (stream TaskStreamResponse) {};
+
+  rpc GetTaskStream(StreamTasksRequest) returns (stream Task) {};
 }
 
 message CreateTaskRequest {
@@ -31,6 +35,12 @@ message CreateTaskRequest {
   bytes payload = 4;
   google.protobuf.Timestamp deliver_at = 5;
   int64 tts_seconds = 6;
+}
+
+message TaskStreamResponse {
+  Task task = 1;
+  uint32 status = 2;
+  string message = 3;
 }
 
 message StreamTasksRequest {

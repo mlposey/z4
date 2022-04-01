@@ -148,7 +148,7 @@ func (ts *taskStreams) iBeginStreamingAfterASecondDelay(arg1 int) error {
 }
 
 func (ts *taskStreams) consumeTaskStream() error {
-	stream, err := ts.client.StreamTasks(context.Background(), &proto.StreamTasksRequest{
+	stream, err := ts.client.GetTaskStream(context.Background(), &proto.StreamTasksRequest{
 		// TODO: Generate this or take it from the gherkin.
 		RequestId: ts.taskRequest.GetRequestId() + "_stream",
 		// TODO: Supply namespace in gherkin so we can test failure scenarios.
