@@ -2,3 +2,6 @@
 z4_server
 proto/*.pb.go
 z4data
+cpuprofile
+cmd/load/load
+z4_cpu.profile
