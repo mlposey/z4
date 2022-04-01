@@ -44,10 +44,10 @@ func (c *collection) createTask(ctx context.Context, req *proto.CreateTaskReques
 	lease := c.fm.Lease(req.GetNamespace())
 	defer lease.Release()
 
-	task := storage.Task{
-		ID:        storage.NewTaskID(c.getRunTime(req)),
+	task := &proto.Task{
+		Id:        storage.NewTaskID(c.getRunTime(req)),
 		Namespace: req.GetNamespace(),
-		RunTime:   c.getRunTime(req),
+		DeliverAt: timestamppb.New(c.getRunTime(req)),
 		Metadata:  req.GetMetadata(),
 		Payload:   req.GetPayload(),
 	}
@@ -66,13 +66,7 @@ func (c *collection) createTask(ctx context.Context, req *proto.CreateTaskReques
 		return nil, status.Errorf(codes.Internal, "invalid creation type %v", ct)
 	}
 
-	return &proto.Task{
-		Metadata:  task.Metadata,
-		Payload:   task.Payload,
-		DeliverAt: timestamppb.New(task.RunTime),
-		Id:        task.ID,
-		Namespace: task.Namespace,
-	}, nil
+	return task, nil
 }
 
 func (c *collection) StreamTasks(req *proto.StreamTasksRequest, stream proto.Collection_StreamTasksServer) error {
@@ -86,13 +80,7 @@ func (c *collection) StreamTasks(req *proto.StreamTasksRequest, stream proto.Col
 			zap.Any("task", task),
 			telemetry.LogRequestID(req.GetRequestId()))
 
-		err := stream.Send(&proto.Task{
-			Metadata:  task.Metadata,
-			Payload:   task.Payload,
-			DeliverAt: timestamppb.New(task.RunTime),
-			Id:        task.ID,
-			Namespace: task.Namespace,
-		})
+		err := stream.Send(task)
 
 		if err != nil {
 			return status.Errorf(codes.Internal, "failed to send tasks to client: %v", err)

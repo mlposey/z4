@@ -7,14 +7,6 @@ import (
 	"time"
 )
 
-type Task struct {
-	ID        string
-	Namespace string
-	RunTime   time.Time
-	Metadata  map[string]string
-	Payload   []byte
-}
-
 func NewTaskID(runTime time.Time) string {
 	id, err := ksuid.NewRandomWithTime(runTime)
 	if err != nil {

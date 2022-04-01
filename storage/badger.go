@@ -5,8 +5,10 @@ import (
 	"encoding/json"
 	"fmt"
 	"github.com/dgraph-io/badger/v3"
+	"github.com/mlposey/z4/proto"
 	"github.com/mlposey/z4/telemetry"
 	"go.uber.org/zap"
+	pb "google.golang.org/protobuf/proto"
 	"time"
 )
 
@@ -86,7 +88,7 @@ type TaskStore struct {
 func NewTaskStore(db *BadgerClient) *TaskStore {
 	store := &TaskStore{Client: db}
 	// TODO: Make buffer params configurable using synced config.
-	store.buffer = newTaskBuffer(100*time.Millisecond, 1000, func(tasks []Task) error {
+	store.buffer = newTaskBuffer(100*time.Millisecond, 1000, func(tasks []*proto.Task) error {
 		return store.SaveBatch(tasks)
 	})
 	return store
@@ -97,45 +99,44 @@ func (ts *TaskStore) Close() error {
 	return ts.buffer.Close()
 }
 
-func (ts *TaskStore) Save(task Task) error {
+func (ts *TaskStore) Save(task *proto.Task) error {
 	telemetry.Logger.Debug("writing task to DB", zap.Any("task", task))
 	return ts.Client.DB.Update(func(txn *badger.Txn) error {
-		// TODO: Use protobuf for task encode/decode.
-		payload, err := json.Marshal(task)
+		payload, err := pb.Marshal(task)
 		if err != nil {
 			return fmt.Errorf("could not encode task: %w", err)
 		}
-		key := ts.getTaskFQN(task.Namespace, task.ID)
+		key := ts.getTaskFQN(task.Namespace, task.GetId())
 		return txn.Set(key, payload)
 	})
 }
 
-func (ts *TaskStore) SaveAsync(task Task) {
+func (ts *TaskStore) SaveAsync(task *proto.Task) {
 	ts.buffer.Add(task)
 }
 
-func (ts *TaskStore) SaveBatch(tasks []Task) error {
+func (ts *TaskStore) SaveBatch(tasks []*proto.Task) error {
 	telemetry.Logger.Debug("writing task batch to DB", zap.Any("count", len(tasks)))
 	batch := ts.Client.DB.NewWriteBatch()
 	defer batch.Cancel()
 
 	for _, task := range tasks {
-		payload, err := json.Marshal(task)
+		payload, err := pb.Marshal(task)
 		if err != nil {
-			return fmt.Errorf("count not encode task '%s': %w", task.ID, err)
+			return fmt.Errorf("count not encode task '%s': %w", task.GetId(), err)
 		}
 		// TODO: Determine if grouping tasks by namespace before writing is beneficial.
-		key := ts.getTaskFQN(task.Namespace, task.ID)
+		key := ts.getTaskFQN(task.Namespace, task.GetId())
 		err = batch.Set(key, payload)
 		if err != nil {
-			return fmt.Errorf("failed to write task '%s' from batch: %w", task.ID, err)
+			return fmt.Errorf("failed to write task '%s' from batch: %w", task.GetId(), err)
 		}
 	}
 	return batch.Flush()
 }
 
-func (ts *TaskStore) Get(query TaskRange) ([]Task, error) {
-	var tasks []Task
+func (ts *TaskStore) Get(query TaskRange) ([]*proto.Task, error) {
+	var tasks []*proto.Task
 	err := ts.Client.DB.View(func(txn *badger.Txn) error {
 		it := txn.NewIterator(badger.DefaultIteratorOptions)
 		defer it.Close()
@@ -150,13 +151,13 @@ func (ts *TaskStore) Get(query TaskRange) ([]Task, error) {
 			}
 
 			err := item.Value(func(val []byte) error {
-				var task Task
-				err := json.Unmarshal(val, &task)
+				task := new(proto.Task)
+				err := pb.Unmarshal(val, task)
 				if err != nil {
 					return err
 				}
 
-				if task.ID != "" {
+				if task.GetId() != "" {
 					tasks = append(tasks, task)
 				}
 				return nil

@@ -2,6 +2,7 @@ package feeds
 
 import (
 	"fmt"
+	"github.com/mlposey/z4/proto"
 	"github.com/mlposey/z4/storage"
 	"github.com/mlposey/z4/telemetry"
 	"go.uber.org/multierr"
@@ -12,7 +13,7 @@ import (
 type Feed struct {
 	tasks     *storage.TaskStore
 	config    *storage.SyncedConfig
-	feed      chan storage.Task
+	feed      chan *proto.Task
 	namespace string
 	closed    bool
 }
@@ -22,7 +23,7 @@ func New(namespace string, db *storage.BadgerClient) *Feed {
 		tasks:     storage.NewTaskStore(db),
 		config:    storage.NewSyncedConfig(&storage.ConfigStore{Client: db}, namespace),
 		namespace: namespace,
-		feed:      make(chan storage.Task),
+		feed:      make(chan *proto.Task),
 	}
 	q.config.StartSync()
 	go q.startFeed()
@@ -47,7 +48,7 @@ func (f *Feed) startFeed() {
 		}
 
 		if len(tasks) > 0 {
-			if tasks[0].ID == config.LastDeliveredTask {
+			if tasks[0].GetId() == config.LastDeliveredTask {
 				// TODO: Determine if we should optimize this.
 				tasks = tasks[1:]
 			}
@@ -62,21 +63,21 @@ func (f *Feed) startFeed() {
 
 		for _, task := range tasks {
 			f.feed <- task
-			f.config.C.LastDeliveredTask = task.ID
+			f.config.C.LastDeliveredTask = task.GetId()
 		}
 	}
 	close(f.feed)
 }
 
-func (f *Feed) Tasks() <-chan storage.Task {
+func (f *Feed) Tasks() <-chan *proto.Task {
 	return f.feed
 }
 
-func (f *Feed) Add(task storage.Task) error {
+func (f *Feed) Add(task *proto.Task) error {
 	return f.tasks.Save(task)
 }
 
-func (f *Feed) AddAsync(task storage.Task) {
+func (f *Feed) AddAsync(task *proto.Task) {
 	// TODO: Rename Feed receiver from f to s.
 	f.tasks.SaveAsync(task)
 }

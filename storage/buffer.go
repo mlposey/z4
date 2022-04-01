@@ -1,6 +1,7 @@
 package storage
 
 import (
+	"github.com/mlposey/z4/proto"
 	"github.com/mlposey/z4/telemetry"
 	"go.uber.org/zap"
 	"sync"
@@ -10,21 +11,21 @@ import (
 type taskBuffer struct {
 	flushInterval time.Duration
 	batchSize     int
-	tasks         []Task
+	tasks         []*proto.Task
 	idx           int
-	handler       func([]Task) error
-	incTasks      chan Task
+	handler       func([]*proto.Task) error
+	incTasks      chan *proto.Task
 	closeReq      chan interface{}
 	closeRes      chan error
 }
 
-func newTaskBuffer(flushInterval time.Duration, size int, handler func([]Task) error) *taskBuffer {
+func newTaskBuffer(flushInterval time.Duration, size int, handler func([]*proto.Task) error) *taskBuffer {
 	buffer := &taskBuffer{
 		flushInterval: flushInterval,
 		batchSize:     size,
-		tasks:         make([]Task, size),
+		tasks:         make([]*proto.Task, size),
 		handler:       handler,
-		incTasks:      make(chan Task),
+		incTasks:      make(chan *proto.Task),
 		closeReq:      make(chan interface{}),
 		closeRes:      make(chan error),
 	}
@@ -54,12 +55,12 @@ func (tb *taskBuffer) startFlushHandler() {
 				continue
 			}
 
-			tasks := make([]Task, tb.idx)
+			tasks := make([]*proto.Task, tb.idx)
 			copy(tasks, tb.tasks[0:tb.idx])
 			tb.idx = 0
 
 			outstandingFlushes.Add(1)
-			go func(t []Task) {
+			go func(t []*proto.Task) {
 				defer outstandingFlushes.Done()
 
 				err := tb.handler(t)
@@ -77,7 +78,7 @@ func (tb *taskBuffer) Close() error {
 	return <-tb.closeRes
 }
 
-func (tb *taskBuffer) Add(task Task) {
+func (tb *taskBuffer) Add(task *proto.Task) {
 	// TODO: Consider performance enhancements.
 	// This will block if the buffer reaches the max count.
 	// We may not want to block ever; something to consider.
