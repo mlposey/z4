@@ -9,14 +9,15 @@ import (
 )
 
 type taskBuffer struct {
-	flushInterval time.Duration
-	batchSize     int
-	tasks         []*proto.Task
-	idx           int
-	handler       func([]*proto.Task) error
-	incTasks      chan *proto.Task
-	closeReq      chan interface{}
-	closeRes      chan error
+	flushInterval      time.Duration
+	batchSize          int
+	tasks              []*proto.Task
+	idx                int
+	handler            func([]*proto.Task) error
+	incTasks           chan *proto.Task
+	closeReq           chan interface{}
+	closeRes           chan error
+	outstandingFlushes sync.WaitGroup
 }
 
 func newTaskBuffer(flushInterval time.Duration, size int, handler func([]*proto.Task) error) *taskBuffer {
@@ -34,43 +35,48 @@ func newTaskBuffer(flushInterval time.Duration, size int, handler func([]*proto.
 }
 
 func (tb *taskBuffer) startFlushHandler() {
-	var outstandingFlushes sync.WaitGroup
+	interval := time.NewTicker(tb.flushInterval)
 	for {
 		select {
 		case <-tb.closeReq:
-			outstandingFlushes.Wait()
-
-			var err error
 			if tb.idx > 0 {
-				err = tb.handler(tb.tasks[0:tb.idx])
-				tb.idx = 0
+				tb.flush()
 			}
-			tb.closeRes <- err
+			tb.outstandingFlushes.Wait()
+			tb.closeRes <- nil
 			return
+
+		case <-interval.C:
+			if tb.idx > 0 {
+				tb.flush()
+			}
 
 		case task := <-tb.incTasks:
 			tb.tasks[tb.idx] = task
 			tb.idx++
-			if tb.idx < len(tb.tasks) {
-				continue
+			if tb.idx == len(tb.tasks) {
+				tb.flush()
 			}
-
-			tasks := make([]*proto.Task, tb.idx)
-			copy(tasks, tb.tasks[0:tb.idx])
-			tb.idx = 0
-
-			outstandingFlushes.Add(1)
-			go func(t []*proto.Task) {
-				defer outstandingFlushes.Done()
-
-				err := tb.handler(t)
-				if err != nil {
-					// TODO: Retry flush.
-					telemetry.Logger.Error("failed to flush tasks", zap.Error(err))
-				}
-			}(tasks)
+			interval.Reset(tb.flushInterval)
 		}
 	}
+}
+
+func (tb *taskBuffer) flush() {
+	tasks := make([]*proto.Task, tb.idx)
+	copy(tasks, tb.tasks[0:tb.idx])
+	tb.idx = 0
+
+	tb.outstandingFlushes.Add(1)
+	go func(t []*proto.Task) {
+		defer tb.outstandingFlushes.Done()
+
+		err := tb.handler(t)
+		if err != nil {
+			// TODO: Retry flush.
+			telemetry.Logger.Error("failed to flush tasks", zap.Error(err))
+		}
+	}(tasks)
 }
 
 func (tb *taskBuffer) Close() error {
