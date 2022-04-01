@@ -3,20 +3,21 @@ package feeds
 import (
 	"github.com/mlposey/z4/storage"
 	"github.com/segmentio/ksuid"
+	"go.uber.org/multierr"
 	"sync"
 )
 
 // Manager ensures that only one feed is active per requested namespace.
 type Manager struct {
-	queues map[string]*managedFeed
-	db     *storage.BadgerClient
-	mu     sync.Mutex
+	feeds map[string]*managedFeed
+	db    *storage.BadgerClient
+	mu    sync.Mutex
 }
 
 func NewManager(db *storage.BadgerClient) *Manager {
 	return &Manager{
-		queues: make(map[string]*managedFeed),
-		db:     db,
+		feeds: make(map[string]*managedFeed),
+		db:    db,
 	}
 }
 
@@ -25,12 +26,24 @@ func (qm *Manager) Lease(namespace string) *Lease {
 	qm.mu.Lock()
 	defer qm.mu.Unlock()
 
-	feed, exists := qm.queues[namespace]
+	feed, exists := qm.feeds[namespace]
 	if !exists {
 		feed = newManagedFeed(namespace, qm.db)
-		qm.queues[namespace] = feed
+		qm.feeds[namespace] = feed
 	}
 	return feed.Lease()
+}
+
+func (qm *Manager) Close() error {
+	// TODO: Understand implication of having leases still open.
+
+	qm.mu.Lock()
+	defer qm.mu.Unlock()
+	var errs []error
+	for _, feed := range qm.feeds {
+		errs = append(errs, feed.F.Close())
+	}
+	return multierr.Combine(errs...)
 }
 
 type managedFeed struct {

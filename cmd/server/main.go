@@ -6,13 +6,49 @@ import (
 	"github.com/mlposey/z4/telemetry"
 	"go.uber.org/zap"
 	"log"
+	"os"
+	"os/signal"
+	"runtime/pprof"
+	"syscall"
 )
 
 func main() {
+	f, err := os.Create("./cpuprofile")
+	if err != nil {
+		log.Fatal(err)
+	}
+	pprof.StartCPUProfile(f)
+	defer pprof.StopCPUProfile()
+
+	sig := make(chan os.Signal, 1)
+	signal.Notify(sig,
+		syscall.SIGHUP,
+		syscall.SIGINT,
+		syscall.SIGTERM,
+		syscall.SIGQUIT)
+
 	config := configFromEnv()
 	initLogger(config.DebugLoggingEnabled)
 	db := initDB(config.DBDataDir)
-	startServer(config.Port, db)
+
+	srv := server.NewServer(server.Config{
+		DB:   db,
+		Port: config.Port,
+	})
+	go func() {
+		e := srv.Start()
+		if e != nil {
+			telemetry.Logger.Error("server failed", zap.Error(e))
+			sig <- syscall.SIGQUIT
+		}
+	}()
+
+	<-sig
+
+	err = srv.Close()
+	if err != nil {
+		telemetry.Logger.Error("error stopping server", zap.Error(err))
+	}
 }
 
 func initLogger(debugEnabled bool) {
@@ -28,17 +64,4 @@ func initDB(dataDir string) *storage.BadgerClient {
 		log.Fatalf("error initializing database client: %v", err)
 	}
 	return db
-}
-
-func startServer(port int, db *storage.BadgerClient) {
-	telemetry.Logger.Info("starting server")
-
-	err := server.Start(server.Config{
-		DB:   db,
-		Port: port,
-	})
-	if err != nil {
-		telemetry.Logger.Error("server stopped",
-			zap.Error(err))
-	}
 }
