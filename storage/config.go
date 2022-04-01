@@ -16,14 +16,16 @@ type SyncedConfig struct {
 	configs   *ConfigStore
 	C         *QueueConfig
 	namespace string
-	closed    chan bool
+	closeReq  chan interface{}
+	closeRes  chan interface{}
 }
 
 func NewSyncedConfig(configs *ConfigStore, namespace string) *SyncedConfig {
 	return &SyncedConfig{
 		configs:   configs,
 		namespace: namespace,
-		closed:    make(chan bool),
+		closeReq:  make(chan interface{}),
+		closeRes:  make(chan interface{}),
 	}
 }
 
@@ -33,7 +35,8 @@ func (sc *SyncedConfig) StartSync() {
 }
 
 func (sc *SyncedConfig) Close() error {
-	sc.closed <- true
+	sc.closeReq <- nil
+	<-sc.closeRes
 	return nil
 }
 
@@ -62,12 +65,13 @@ func (sc *SyncedConfig) startConfigSync() {
 	ticker := time.NewTicker(time.Second * 1)
 	for {
 		select {
-		case <-sc.closed:
+		case <-sc.closeReq:
 			err := sc.configs.Save(sc.namespace, *sc.C)
 			if err != nil {
 				telemetry.Logger.Error("failed to save config to database",
 					zap.Error(err))
 			}
+			sc.closeRes <- nil
 			return
 
 		// TODO: Consider syncing after X number of changes if before tick.
