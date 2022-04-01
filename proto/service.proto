@@ -20,6 +20,7 @@ message Status {
 // The Collection service manages tasks.
 service Collection {
   rpc CreateTask(CreateTaskRequest) returns (Task) {};
+  rpc CreateTaskAsync(CreateTaskRequest) returns (Task) {};
   rpc StreamTasks(StreamTasksRequest) returns (stream Task) {};
 }
 

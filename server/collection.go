@@ -23,8 +23,24 @@ func newCollection(fm *feeds.Manager) proto.CollectionServer {
 	return &collection{fm: fm}
 }
 
+type taskCreationType int
+
+const (
+	asyncCreation taskCreationType = iota
+	syncCreation
+)
+
 func (c *collection) CreateTask(ctx context.Context, req *proto.CreateTaskRequest) (*proto.Task, error) {
 	telemetry.Logger.Debug("got CreateTask rpc request")
+	return c.createTask(ctx, req, syncCreation)
+}
+
+func (c *collection) CreateTaskAsync(ctx context.Context, req *proto.CreateTaskRequest) (*proto.Task, error) {
+	telemetry.Logger.Debug("got CreateTaskAsync rpc request")
+	return c.createTask(ctx, req, asyncCreation)
+}
+
+func (c *collection) createTask(ctx context.Context, req *proto.CreateTaskRequest, ct taskCreationType) (*proto.Task, error) {
 	lease := c.fm.Lease(req.GetNamespace())
 	defer lease.Release()
 
@@ -35,13 +51,21 @@ func (c *collection) CreateTask(ctx context.Context, req *proto.CreateTaskReques
 		Metadata:  req.GetMetadata(),
 		Payload:   req.GetPayload(),
 	}
-	// TODO: Create separate endpoint for async creation.
-	/*err := lease.Feed().Add(task)
 
-	if err != nil {
-		return nil, status.Errorf(codes.Internal, "failed to save storage: %v", err)
-	}*/
-	lease.Feed().AddAsync(task)
+	switch ct {
+	case asyncCreation:
+		lease.Feed().AddAsync(task)
+
+	case syncCreation:
+		err := lease.Feed().Add(task)
+		if err != nil {
+			return nil, status.Errorf(codes.Internal, "failed to save storage: %v", err)
+		}
+
+	default:
+		return nil, status.Errorf(codes.Internal, "invalid creation type %v", ct)
+	}
+
 	return &proto.Task{
 		Metadata:  task.Metadata,
 		Payload:   task.Payload,
