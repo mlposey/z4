@@ -78,7 +78,6 @@ func (f *Feed) Add(task *proto.Task) error {
 }
 
 func (f *Feed) AddAsync(task *proto.Task) {
-	// TODO: Rename Feed receiver from f to s.
 	f.tasks.SaveAsync(task)
 }
 
