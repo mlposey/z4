@@ -13,7 +13,8 @@ type taskBuffer struct {
 	idx           int
 	handler       func([]Task) error
 	incTasks      chan Task
-	closer        chan interface{}
+	closeReq      chan interface{}
+	closeRes      chan error
 }
 
 func newTaskBuffer(flushInterval time.Duration, size int, handler func([]Task) error) *taskBuffer {
@@ -23,7 +24,8 @@ func newTaskBuffer(flushInterval time.Duration, size int, handler func([]Task) e
 		tasks:         make([]Task, size),
 		handler:       handler,
 		incTasks:      make(chan Task),
-		closer:        make(chan interface{}),
+		closeReq:      make(chan interface{}),
+		closeRes:      make(chan error),
 	}
 	go buffer.startFlushHandler()
 	return buffer
@@ -32,13 +34,13 @@ func newTaskBuffer(flushInterval time.Duration, size int, handler func([]Task) e
 func (tb *taskBuffer) startFlushHandler() {
 	for {
 		select {
-		case <-tb.closer:
+		case <-tb.closeReq:
 			var err error
 			if tb.idx > 0 {
 				err = tb.handler(tb.tasks[0:tb.idx])
 				tb.idx = 0
 			}
-			tb.closer <- err
+			tb.closeRes <- err
 			return
 
 		case task := <-tb.incTasks:
@@ -57,8 +59,8 @@ func (tb *taskBuffer) startFlushHandler() {
 }
 
 func (tb *taskBuffer) Close() error {
-	tb.closer <- nil
-	return (<-tb.closer).(error)
+	tb.closeReq <- nil
+	return <-tb.closeRes
 }
 
 func (tb *taskBuffer) Add(task Task) {
