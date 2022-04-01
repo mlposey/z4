@@ -2,7 +2,6 @@ package feeds
 
 import (
 	"github.com/mlposey/z4/storage"
-	"github.com/segmentio/ksuid"
 	"go.uber.org/multierr"
 	"sync"
 )
@@ -47,28 +46,31 @@ func (qm *Manager) Close() error {
 }
 
 type managedFeed struct {
-	F      *Feed
-	leases map[string]*Lease
-	mu     sync.Mutex
+	F       *Feed
+	leases  map[int]*Lease
+	mu      sync.Mutex
+	counter int
 }
 
 func newManagedFeed(namespace string, db *storage.BadgerClient) *managedFeed {
 	return &managedFeed{
 		F:      New(namespace, db),
-		leases: make(map[string]*Lease),
+		leases: make(map[int]*Lease),
 	}
 }
 
 func (mq *managedFeed) Lease() *Lease {
+	mq.mu.Lock()
+	defer mq.mu.Unlock()
+
 	lease := &Lease{
-		ID:      ksuid.New().String(),
+		ID:      mq.counter,
 		feed:    mq,
 		release: mq.release,
 	}
-
-	mq.mu.Lock()
 	mq.leases[lease.ID] = lease
-	mq.mu.Unlock()
+	mq.counter++
+
 	return lease
 }
 
@@ -84,7 +86,7 @@ func (mq *managedFeed) release(l *Lease) {
 //
 // Release should be called as soon as the lease is no longer needed.
 type Lease struct {
-	ID      string
+	ID      int
 	feed    *managedFeed
 	release func(lease *Lease)
 }
