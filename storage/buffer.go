@@ -3,6 +3,7 @@ package storage
 import (
 	"github.com/mlposey/z4/telemetry"
 	"go.uber.org/zap"
+	"sync"
 	"time"
 )
 
@@ -32,9 +33,12 @@ func newTaskBuffer(flushInterval time.Duration, size int, handler func([]Task) e
 }
 
 func (tb *taskBuffer) startFlushHandler() {
+	var outstandingFlushes sync.WaitGroup
 	for {
 		select {
 		case <-tb.closeReq:
+			outstandingFlushes.Wait()
+
 			var err error
 			if tb.idx > 0 {
 				err = tb.handler(tb.tasks[0:tb.idx])
@@ -46,14 +50,24 @@ func (tb *taskBuffer) startFlushHandler() {
 		case task := <-tb.incTasks:
 			tb.tasks[tb.idx] = task
 			tb.idx++
-			if tb.idx == len(tb.tasks) {
-				err := tb.handler(tb.tasks[0:tb.idx])
+			if tb.idx < len(tb.tasks) {
+				continue
+			}
+
+			tasks := make([]Task, tb.idx)
+			copy(tasks, tb.tasks[0:tb.idx])
+			tb.idx = 0
+
+			outstandingFlushes.Add(1)
+			go func(t []Task) {
+				defer outstandingFlushes.Done()
+
+				err := tb.handler(t)
 				if err != nil {
 					// TODO: Retry flush.
 					telemetry.Logger.Error("failed to flush tasks", zap.Error(err))
 				}
-				tb.idx = 0
-			}
+			}(tasks)
 		}
 	}
 }
