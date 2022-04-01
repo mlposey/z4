@@ -8,6 +8,7 @@ build_and_run_m1: build_m1
 	Z4_DEBUG_LOGGING_ENABLED=true \
 	Z4_PORT=6355 \
 	Z4_DB_DATA_DIR=./z4data \
+	Z4_PROFILER_ENABLED=true \
 	./z4_server
 
 build_m1: proto

@@ -9,6 +9,7 @@ type Config struct {
 	DBDataDir           string `envconfig:"DB_DATA_DIR" default:"./z4data"`
 	DebugLoggingEnabled bool   `envconfig:"DEBUG_LOGGING_ENABLED" default:"false"`
 	Port                int    `envconfig:"PORT" default:"6355"`
+	ProfilerEnabled     bool   `envconfig:"PROFILER_ENABLED" default:"false"`
 }
 
 func configFromEnv() *Config {

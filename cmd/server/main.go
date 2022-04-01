@@ -13,13 +13,6 @@ import (
 )
 
 func main() {
-	f, err := os.Create("./cpuprofile")
-	if err != nil {
-		log.Fatal(err)
-	}
-	pprof.StartCPUProfile(f)
-	defer pprof.StopCPUProfile()
-
 	sig := make(chan os.Signal, 1)
 	signal.Notify(sig,
 		syscall.SIGHUP,
@@ -28,6 +21,15 @@ func main() {
 		syscall.SIGQUIT)
 
 	config := configFromEnv()
+	if config.ProfilerEnabled {
+		f, err := os.Create("./z4_cpu.profile")
+		if err != nil {
+			log.Fatal(err)
+		}
+		pprof.StartCPUProfile(f)
+		defer pprof.StopCPUProfile()
+	}
+
 	initLogger(config.DebugLoggingEnabled)
 	db := initDB(config.DBDataDir)
 
@@ -45,7 +47,7 @@ func main() {
 
 	<-sig
 
-	err = srv.Close()
+	err := srv.Close()
 	if err != nil {
 		telemetry.Logger.Error("error stopping server", zap.Error(err))
 	}
