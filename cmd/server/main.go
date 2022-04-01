@@ -27,16 +27,28 @@ func main() {
 		syscall.SIGTERM,
 		syscall.SIGQUIT)
 
+	config := configFromEnv()
+	initLogger(config.DebugLoggingEnabled)
+	db := initDB(config.DBDataDir)
+
+	srv := server.NewServer(server.Config{
+		DB:   db,
+		Port: config.Port,
+	})
 	go func() {
-		config := configFromEnv()
-		initLogger(config.DebugLoggingEnabled)
-		db := initDB(config.DBDataDir)
-		startServer(config.Port, db)
-		sig <- syscall.SIGQUIT
+		e := srv.Start()
+		if e != nil {
+			telemetry.Logger.Error("server failed", zap.Error(e))
+			sig <- syscall.SIGQUIT
+		}
 	}()
 
 	<-sig
-	// TODO: Gracefully stop server.
+
+	err = srv.Close()
+	if err != nil {
+		telemetry.Logger.Error("error stopping server", zap.Error(err))
+	}
 }
 
 func initLogger(debugEnabled bool) {
@@ -52,17 +64,4 @@ func initDB(dataDir string) *storage.BadgerClient {
 		log.Fatalf("error initializing database client: %v", err)
 	}
 	return db
-}
-
-func startServer(port int, db *storage.BadgerClient) {
-	telemetry.Logger.Info("starting server")
-
-	err := server.Start(server.Config{
-		DB:   db,
-		Port: port,
-	})
-	if err != nil {
-		telemetry.Logger.Error("server stopped",
-			zap.Error(err))
-	}
 }

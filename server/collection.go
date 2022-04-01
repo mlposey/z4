@@ -19,10 +19,8 @@ type collection struct {
 	fm *feeds.Manager
 }
 
-func newCollection(db *storage.BadgerClient) proto.CollectionServer {
-	return &collection{
-		fm: feeds.NewManager(db),
-	}
+func newCollection(fm *feeds.Manager) proto.CollectionServer {
+	return &collection{fm: fm}
 }
 
 func (c *collection) CreateTask(ctx context.Context, req *proto.CreateTaskRequest) (*proto.Task, error) {

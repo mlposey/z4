@@ -1,6 +1,7 @@
 package feeds
 
 import (
+	"fmt"
 	"github.com/mlposey/z4/storage"
 	"github.com/mlposey/z4/telemetry"
 	"go.uber.org/multierr"
@@ -94,7 +95,9 @@ func (f *Feed) Close() error {
 	// won't close at all. This is because the goroutine blocks until
 	// a consumer takes a storage from the channel.
 	f.closed = true
-	configErr := f.config.Close()
-	taskErr := f.tasks.Close()
-	return multierr.Combine(configErr, taskErr)
+	err := multierr.Combine(f.config.Close(), f.tasks.Close())
+	if err != nil {
+		return fmt.Errorf("failed to close feed for namespace '%s': %w", f.namespace, err)
+	}
+	return nil
 }
