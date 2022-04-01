@@ -51,6 +51,11 @@ func main() {
 	if err != nil {
 		telemetry.Logger.Error("error stopping server", zap.Error(err))
 	}
+
+	err = db.Close()
+	if err != nil {
+		telemetry.Logger.Error("error closing database", zap.Error(err))
+	}
 }
 
 func initLogger(debugEnabled bool) {
