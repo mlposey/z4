@@ -63,8 +63,8 @@ func (tb *taskBuffer) startFlushHandler() {
 }
 
 func (tb *taskBuffer) flush() {
-	tasks := make([]*proto.Task, tb.idx)
-	copy(tasks, tb.tasks[0:tb.idx])
+	batch := tb.tasks[0:tb.idx]
+	tb.tasks = make([]*proto.Task, len(batch))
 	tb.idx = 0
 
 	tb.outstandingFlushes.Add(1)
@@ -76,7 +76,7 @@ func (tb *taskBuffer) flush() {
 			// TODO: Retry flush.
 			telemetry.Logger.Error("failed to flush tasks", zap.Error(err))
 		}
-	}(tasks)
+	}(batch)
 }
 
 func (tb *taskBuffer) Close() error {
