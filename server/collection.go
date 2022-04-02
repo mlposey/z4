@@ -2,6 +2,7 @@ package server
 
 import (
 	"context"
+	"github.com/hashicorp/raft"
 	"github.com/mlposey/z4/feeds"
 	"github.com/mlposey/z4/proto"
 	"github.com/mlposey/z4/storage"
@@ -9,6 +10,7 @@ import (
 	"go.uber.org/zap"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
+	pb "google.golang.org/protobuf/proto"
 	"google.golang.org/protobuf/types/known/timestamppb"
 	"io"
 	"time"
@@ -17,11 +19,12 @@ import (
 // collection implements the gRPC Collection service.
 type collection struct {
 	proto.UnimplementedCollectionServer
-	fm *feeds.Manager
+	fm   *feeds.Manager
+	raft *raft.Raft
 }
 
-func newCollection(fm *feeds.Manager) proto.CollectionServer {
-	return &collection{fm: fm}
+func newCollection(fm *feeds.Manager, raft *raft.Raft) proto.CollectionServer {
+	return &collection{fm: fm, raft: raft}
 }
 
 type taskCreationType int
@@ -34,6 +37,45 @@ const (
 func (c *collection) CreateTask(ctx context.Context, req *proto.CreateTaskRequest) (*proto.Task, error) {
 	telemetry.Logger.Debug("got CreateTask rpc request")
 	return c.createTask(ctx, req, syncCreation)
+}
+
+func (c *collection) CreateTaskStreamAsyncV2(stream proto.Collection_CreateTaskStreamAsyncV2Server) error {
+	for {
+		req, err := stream.Recv()
+		if err == io.EOF {
+			telemetry.Logger.Info("client closed CreateTaskStreamAsync stream")
+			return nil
+		}
+		if err != nil {
+			return status.Errorf(codes.Internal, "failed to get tasks from client: %v", err)
+		}
+
+		task := &proto.Task{
+			Id:        storage.NewTaskID(c.getRunTime(req)),
+			Namespace: req.GetNamespace(),
+			DeliverAt: timestamppb.New(c.getRunTime(req)),
+			Metadata:  req.GetMetadata(),
+			Payload:   req.GetPayload(),
+		}
+		cmd, err := pb.Marshal(task)
+		if err != nil {
+			// TODO: Status
+			return status.Errorf(codes.Internal, "failed to marshal task command: %v", err)
+		}
+
+		c.raft.Apply(cmd, 0)
+		// TODO: Test perf of blocking writes with f.Error()
+
+		err = stream.Send(&proto.TaskStreamResponse{
+			Task:   task,
+			Status: uint32(codes.OK),
+		})
+
+		if err != nil {
+			telemetry.Logger.Error("failed to send task to client", zap.Error(err))
+			return status.Errorf(codes.Internal, "failed to send task to client")
+		}
+	}
 }
 
 func (c *collection) CreateTaskStreamAsync(stream proto.Collection_CreateTaskStreamAsyncServer) error {

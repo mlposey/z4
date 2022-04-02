@@ -24,6 +24,7 @@ service Collection {
 
   rpc CreateTaskAsync(CreateTaskRequest) returns (Task) {};
   rpc CreateTaskStreamAsync(stream CreateTaskRequest) returns (stream TaskStreamResponse) {};
+  rpc CreateTaskStreamAsyncV2(stream CreateTaskRequest) returns (stream TaskStreamResponse) {};
 
   rpc GetTaskStream(StreamTasksRequest) returns (stream Task) {};
 }

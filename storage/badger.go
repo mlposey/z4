@@ -106,7 +106,7 @@ func (ts *TaskStore) Save(task *proto.Task) error {
 		if err != nil {
 			return fmt.Errorf("could not encode task: %w", err)
 		}
-		key := ts.getTaskFQN(task.Namespace, task.GetId())
+		key := ts.getTaskFQN(task.GetNamespace(), task.GetId())
 		return txn.Set(key, payload)
 	})
 }
@@ -126,7 +126,7 @@ func (ts *TaskStore) SaveBatch(tasks []*proto.Task) error {
 			return fmt.Errorf("count not encode task '%s': %w", task.GetId(), err)
 		}
 		// TODO: Determine if grouping tasks by namespace before writing is beneficial.
-		key := ts.getTaskFQN(task.Namespace, task.GetId())
+		key := ts.getTaskFQN(task.GetNamespace(), task.GetId())
 		err = batch.Set(key, payload)
 		if err != nil {
 			return fmt.Errorf("failed to write task '%s' from batch: %w", task.GetId(), err)

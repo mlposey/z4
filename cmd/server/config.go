@@ -7,8 +7,11 @@ import (
 
 type Config struct {
 	DBDataDir           string `envconfig:"DB_DATA_DIR" default:"./z4data"`
+	PeerDataDir         string `envconfig:"PEER_DATA_DIR" default:"./z4peer"`
+	BootstrapCluster    bool   `envconfig:"BOOTSTRAP_CLUSTER" default:"false"`
 	DebugLoggingEnabled bool   `envconfig:"DEBUG_LOGGING_ENABLED" default:"false"`
-	Port                int    `envconfig:"PORT" default:"6355"`
+	ServicePort         int    `envconfig:"SERVICE_PORT" default:"6355"`
+	PeerPort            int    `envconfig:"PEER_PORT" default:"6356"`
 	ProfilerEnabled     bool   `envconfig:"PROFILER_ENABLED" default:"false"`
 }
 

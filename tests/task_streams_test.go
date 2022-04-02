@@ -52,7 +52,7 @@ func (ts *taskStreams) doIfOK(err *error, do func() error) {
 
 func (ts *taskStreams) startServer() error {
 	os.Setenv("Z4_DB_DATA_DIR", ts.dataDir)
-	os.Setenv("Z4_PORT", fmt.Sprint(ts.serverPort))
+	os.Setenv("Z4_SERVICE_PORT", fmt.Sprint(ts.serverPort))
 	os.Setenv("Z4_DEBUG_LOGGING_ENABLED", "true")
 
 	cmd := exec.Command("bash", "-c", "go run ../cmd/server/*.go")

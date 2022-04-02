@@ -34,8 +34,11 @@ func main() {
 	db := initDB(config.DBDataDir)
 
 	srv := server.NewServer(server.Config{
-		DB:   db,
-		Port: config.Port,
+		DB:            db,
+		ServicePort:   config.ServicePort,
+		PeerPort:      config.PeerPort,
+		RaftDataDir:   config.PeerDataDir,
+		BootstrapRaft: config.BootstrapCluster,
 	})
 	go func() {
 		e := srv.Start()
