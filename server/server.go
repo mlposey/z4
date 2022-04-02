@@ -48,6 +48,7 @@ func (s *Server) Start() error {
 	telemetry.Logger.Info("listening for connections",
 		zap.Int("port", s.config.ServicePort))
 
+	s.fm = feeds.NewManager(s.config.DB)
 	s.raft, err = s.newRaft()
 	if err != nil {
 		return fmt.Errorf("failed to start raft server: %w", err)
@@ -56,7 +57,6 @@ func (s *Server) Start() error {
 	s.server = grpc.NewServer(s.config.Opts...)
 	proto.RegisterAdminServer(s.server, newAdmin(s.raft, s.config.PeerID))
 
-	s.fm = feeds.NewManager(s.config.DB)
 	proto.RegisterCollectionServer(s.server, newCollection(s.fm, s.raft))
 	return s.server.Serve(lis)
 }
