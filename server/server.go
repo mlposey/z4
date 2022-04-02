@@ -91,7 +91,7 @@ func (s *Server) newRaft() (*raft.Raft, error) {
 	}
 	s.peerNetwork = tm
 
-	s.fsm = newFSM(s.config.DB.DB)
+	s.fsm = newFSM(s.config.DB.DB, s.fm)
 	r, err := raft.NewRaft(c, s.fsm, ldb, sdb, fss, tm)
 	if err != nil {
 		return nil, fmt.Errorf("raft.NewRaft: %v", err)

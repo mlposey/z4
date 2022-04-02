@@ -43,7 +43,7 @@ func (c *collection) CreateTaskStreamAsyncV2(stream proto.Collection_CreateTaskS
 	for {
 		req, err := stream.Recv()
 		if err == io.EOF {
-			telemetry.Logger.Info("client closed CreateTaskStreamAsync stream")
+			telemetry.Logger.Info("client closed CreateTaskStreamAsyncV2 stream")
 			return nil
 		}
 		if err != nil {
@@ -63,8 +63,13 @@ func (c *collection) CreateTaskStreamAsyncV2(stream proto.Collection_CreateTaskS
 			return status.Errorf(codes.Internal, "failed to marshal task command: %v", err)
 		}
 
-		c.raft.Apply(cmd, 0)
-		// TODO: Test perf of blocking writes with f.Error()
+		l := c.raft.Apply(cmd, 0)
+		// TODO: Test performance of not blocking.
+		// Should not blocking be async? Different semantics for rpc names? Eh..
+		err = l.Error()
+		if err != nil {
+			return status.Errorf(codes.Internal, "could not replicate log: %v", err)
+		}
 
 		err = stream.Send(&proto.TaskStreamResponse{
 			Task:   task,
