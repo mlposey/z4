@@ -62,6 +62,8 @@ func (s *Server) Start() error {
 }
 
 func (s *Server) newRaft() (*raft.Raft, error) {
+	// TODO: Refactor this method into a new type for raft/peer logic.
+
 	c := raft.DefaultConfig()
 	// TODO: Generate serverID once; store in config and reuse later.
 	c.LocalID = raft.ServerID(s.config.PeerID)
@@ -98,6 +100,7 @@ func (s *Server) newRaft() (*raft.Raft, error) {
 	}
 
 	if s.config.BootstrapRaft {
+		telemetry.Logger.Info("bootstrapping cluster")
 		cfg := raft.Configuration{
 			Servers: []raft.Server{
 				{
