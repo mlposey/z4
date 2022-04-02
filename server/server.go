@@ -67,8 +67,6 @@ func (s *Server) newRaft() (*raft.Raft, error) {
 	serverID := ksuid.New().String()
 	c.LocalID = raft.ServerID(serverID)
 
-	//baseDir := filepath.Join(s.config.RaftDataDir, serverID)
-
 	ldb, err := boltdb.NewBoltStore(filepath.Join(s.config.RaftDataDir, "logs.dat"))
 	if err != nil {
 		return nil, fmt.Errorf(`boltdb.NewBoltStore(%q): %v`, filepath.Join(s.config.RaftDataDir, "logs.dat"), err)
