@@ -8,7 +8,6 @@ import (
 	"github.com/mlposey/z4/proto"
 	"github.com/mlposey/z4/storage"
 	"github.com/mlposey/z4/telemetry"
-	"github.com/segmentio/ksuid"
 	"go.uber.org/multierr"
 	"go.uber.org/zap"
 	"google.golang.org/grpc"
@@ -21,6 +20,7 @@ type Config struct {
 	DB            *storage.BadgerClient
 	ServicePort   int
 	PeerPort      int
+	PeerID        string
 	Opts          []grpc.ServerOption
 	RaftDataDir   string
 	BootstrapRaft bool
@@ -54,7 +54,7 @@ func (s *Server) Start() error {
 	}
 
 	s.server = grpc.NewServer(s.config.Opts...)
-	proto.RegisterAdminServer(s.server, &admin{})
+	proto.RegisterAdminServer(s.server, newAdmin(s.raft, s.config.PeerID))
 
 	s.fm = feeds.NewManager(s.config.DB)
 	proto.RegisterCollectionServer(s.server, newCollection(s.fm, s.raft))
@@ -64,8 +64,10 @@ func (s *Server) Start() error {
 func (s *Server) newRaft() (*raft.Raft, error) {
 	c := raft.DefaultConfig()
 	// TODO: Generate serverID once; store in config and reuse later.
-	serverID := ksuid.New().String()
-	c.LocalID = raft.ServerID(serverID)
+	c.LocalID = raft.ServerID(s.config.PeerID)
+
+	// TODO: Create z4peer folder if it does not exist.
+	// Bolt is creating the logs.dat and stable.dat files but not the parent folder.
 
 	ldb, err := boltdb.NewBoltStore(filepath.Join(s.config.RaftDataDir, "logs.dat"))
 	if err != nil {
@@ -100,7 +102,7 @@ func (s *Server) newRaft() (*raft.Raft, error) {
 			Servers: []raft.Server{
 				{
 					Suffrage: raft.Voter,
-					ID:       raft.ServerID(serverID),
+					ID:       raft.ServerID(s.config.PeerID),
 					Address:  raft.ServerAddress(addr),
 				},
 			},

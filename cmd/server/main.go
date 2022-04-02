@@ -37,6 +37,7 @@ func main() {
 		DB:            db,
 		ServicePort:   config.ServicePort,
 		PeerPort:      config.PeerPort,
+		PeerID:        config.PeerID,
 		RaftDataDir:   config.PeerDataDir,
 		BootstrapRaft: config.BootstrapCluster,
 	})

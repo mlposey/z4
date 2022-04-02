@@ -3,10 +3,13 @@ package z4;
 option go_package = "github.com/mlposey/z4/proto;proto";
 
 import "google/protobuf/timestamp.proto";
+import "google/protobuf/empty.proto";
 
 // The Admin service supports administrative/maintenance operations.
 service Admin {
   rpc CheckHealth(CheckHealthRequest) returns (Status) {};
+  rpc GetClusterInfo(GetClusterInfoRequest) returns (ClusterInfo) {};
+  rpc AddClusterMember(AddClusterMemberRequest) returns (google.protobuf.Empty) {};
 }
 
 message CheckHealthRequest {
@@ -15,6 +18,20 @@ message CheckHealthRequest {
 
 message Status {
 
+}
+
+message GetClusterInfoRequest {
+
+}
+
+message ClusterInfo {
+  string server_id = 1;
+  string leader_address = 2;
+}
+
+message AddClusterMemberRequest {
+  string member_address = 1;
+  string member_id = 2;
 }
 
 // The Collection service manages tasks.

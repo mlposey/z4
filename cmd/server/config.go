@@ -12,6 +12,7 @@ type Config struct {
 	DebugLoggingEnabled bool   `envconfig:"DEBUG_LOGGING_ENABLED" default:"false"`
 	ServicePort         int    `envconfig:"SERVICE_PORT" default:"6355"`
 	PeerPort            int    `envconfig:"PEER_PORT" default:"6356"`
+	PeerID              string `envconfig:"PEER_ID" required:"true"`
 	ProfilerEnabled     bool   `envconfig:"PROFILER_ENABLED" default:"false"`
 }
 
