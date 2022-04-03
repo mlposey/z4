@@ -48,10 +48,12 @@ func (f *stateMachine) Apply(log *raft.Log) interface{} {
 }
 
 func (f *stateMachine) Snapshot() (raft.FSMSnapshot, error) {
+	telemetry.Logger.Info("taking fsm snapshot")
 	return &snapshot{db: f.db}, nil
 }
 
 func (f *stateMachine) Restore(snapshot io.ReadCloser) error {
+	telemetry.Logger.Info("restoring fsm from snapshot")
 	// TODO: Freeze db writes
 	return f.db.Load(snapshot, 100)
 	// TODO: Resume db writes.
@@ -62,7 +64,13 @@ type snapshot struct {
 }
 
 func (s *snapshot) Persist(sink raft.SnapshotSink) error {
+	telemetry.Logger.Info("persisting fsm snapshot")
 	_, err := s.db.Backup(sink, 0)
+	if err != nil {
+		sink.Cancel()
+	} else {
+		sink.Close()
+	}
 	return err
 }
 
