@@ -69,8 +69,11 @@ func (a *admin) AddClusterMember(
 	addr := raft.ServerAddress(req.GetMemberAddress())
 	future := a.raft.AddVoter(id, addr, 0, 0)
 	err := future.Error()
-	return new(emptypb.Empty), status.Errorf(codes.Internal,
-		"could not add member to cluster: %v", err)
+	if err != nil {
+		return new(emptypb.Empty), status.Errorf(codes.Internal,
+			"could not add member to cluster: %v", err)
+	}
+	return new(emptypb.Empty), nil
 }
 
 func (a *admin) RemoveClusterMember(
@@ -84,6 +87,9 @@ func (a *admin) RemoveClusterMember(
 	id := raft.ServerID(req.GetMemberId())
 	future := a.raft.RemoveServer(id, 0, 0)
 	err := future.Error()
-	return new(emptypb.Empty), status.Errorf(codes.Internal,
-		"could not add member to cluster: %v", err)
+	if err != nil {
+		return new(emptypb.Empty), status.Errorf(codes.Internal,
+			"could not remove member to cluster: %v", err)
+	}
+	return new(emptypb.Empty), nil
 }
