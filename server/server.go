@@ -1,6 +1,7 @@
 package server
 
 import (
+	"errors"
 	"fmt"
 	"github.com/hashicorp/raft"
 	boltdb "github.com/hashicorp/raft-boltdb"
@@ -74,6 +75,12 @@ func (s *Server) newRaft() (*raft.Raft, error) {
 
 	// TODO: Create z4peer folder if it does not exist.
 	// Bolt is creating the logs.dat and stable.dat files but not the parent folder.
+	if _, err := os.Stat(s.config.RaftDataDir); errors.Is(err, os.ErrNotExist) {
+		err := os.Mkdir(s.config.RaftDataDir, os.ModePerm)
+		if err != nil {
+			return nil, fmt.Errorf("failed to create raft peer folder: %w", err)
+		}
+	}
 
 	ldb, err := boltdb.NewBoltStore(filepath.Join(s.config.RaftDataDir, "logs.dat"))
 	if err != nil {
