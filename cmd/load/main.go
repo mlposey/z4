@@ -29,7 +29,7 @@ func loadTestStreaming() {
 	}
 
 	const (
-		requestsToSend = 1_000_000
+		requestsToSend = 100_000
 	)
 
 	done := make(chan bool)

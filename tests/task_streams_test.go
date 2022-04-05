@@ -20,7 +20,8 @@ import (
 )
 
 type taskStreams struct {
-	dataDir       string
+	dbDataDir     string
+	peerDataDir   string
 	server        *os.Process
 	serverPort    int
 	client        proto.CollectionClient
@@ -30,7 +31,8 @@ type taskStreams struct {
 }
 
 func (ts *taskStreams) setupSuite() error {
-	ts.dataDir = "/tmp/" + ksuid.New().String()
+	ts.dbDataDir = "/tmp/" + ksuid.New().String()
+	ts.peerDataDir = "/tmp/" + ksuid.New().String()
 	ts.server = nil
 	ts.serverPort = 6355
 	ts.client = nil
@@ -51,9 +53,12 @@ func (ts *taskStreams) doIfOK(err *error, do func() error) {
 }
 
 func (ts *taskStreams) startServer() error {
-	os.Setenv("Z4_DB_DATA_DIR", ts.dataDir)
-	os.Setenv("Z4_PORT", fmt.Sprint(ts.serverPort))
+	os.Setenv("Z4_DB_DATA_DIR", ts.dbDataDir)
+	os.Setenv("Z4_SERVICE_PORT", fmt.Sprint(ts.serverPort))
 	os.Setenv("Z4_DEBUG_LOGGING_ENABLED", "true")
+	os.Setenv("Z4_PEER_ID", "godog")
+	os.Setenv("Z4_BOOTSTRAP_CLUSTER", "true")
+	os.Setenv("Z4_PEER_DATA_DIR", ts.peerDataDir)
 
 	cmd := exec.Command("bash", "-c", "go run ../cmd/server/*.go")
 
@@ -83,7 +88,7 @@ func (ts *taskStreams) startServer() error {
 				break
 			}
 
-			if strings.Contains(string(tmp), "listening for connections") {
+			if strings.Contains(string(tmp), "entering leader state") {
 				ready <- true
 			}
 		}

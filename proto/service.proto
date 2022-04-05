@@ -3,10 +3,16 @@ package z4;
 option go_package = "github.com/mlposey/z4/proto;proto";
 
 import "google/protobuf/timestamp.proto";
+import "google/protobuf/empty.proto";
 
 // The Admin service supports administrative/maintenance operations.
 service Admin {
   rpc CheckHealth(CheckHealthRequest) returns (Status) {};
+
+  // TODO: Consider moving cluster RPCs to dedicated Cluster service and removing cluster from names.
+  rpc GetClusterInfo(GetClusterInfoRequest) returns (ClusterInfo) {};
+  rpc AddClusterMember(AddClusterMemberRequest) returns (google.protobuf.Empty) {};
+  rpc RemoveClusterMember(RemoveClusterMemberRequest) returns (google.protobuf.Empty) {};
 }
 
 message CheckHealthRequest {
@@ -17,10 +23,34 @@ message Status {
 
 }
 
+message GetClusterInfoRequest {
+
+}
+
+message ClusterInfo {
+  string server_id = 1;
+  string leader_address = 2;
+  repeated Server members = 3;
+}
+
+message Server {
+  string id = 1;
+  string address = 2;
+}
+
+message AddClusterMemberRequest {
+  string member_address = 1;
+  string member_id = 2;
+}
+
+message RemoveClusterMemberRequest {
+  string member_id = 1;
+}
+
 // The Collection service manages tasks.
 service Collection {
   rpc CreateTask(CreateTaskRequest) returns (Task) {};
-  // TODO: Consider building CreateTaskStream
+  rpc CreateTaskStream(stream CreateTaskRequest) returns (stream TaskStreamResponse) {};
 
   rpc CreateTaskAsync(CreateTaskRequest) returns (Task) {};
   rpc CreateTaskStreamAsync(stream CreateTaskRequest) returns (stream TaskStreamResponse) {};

@@ -1,3 +1,9 @@
+# github.com/armon/go-metrics v0.3.8
+## explicit; go 1.12
+github.com/armon/go-metrics
+# github.com/boltdb/bolt v1.3.1
+## explicit
+github.com/boltdb/bolt
 # github.com/cespare/xxhash v1.1.0
 ## explicit
 github.com/cespare/xxhash
@@ -66,15 +72,27 @@ github.com/golang/snappy
 # github.com/google/flatbuffers v1.12.1
 ## explicit
 github.com/google/flatbuffers/go
+# github.com/hashicorp/go-hclog v0.9.1
+## explicit
+github.com/hashicorp/go-hclog
 # github.com/hashicorp/go-immutable-radix v1.3.0
 ## explicit
 github.com/hashicorp/go-immutable-radix
 # github.com/hashicorp/go-memdb v1.3.0
 ## explicit; go 1.12
 github.com/hashicorp/go-memdb
+# github.com/hashicorp/go-msgpack v0.5.5
+## explicit
+github.com/hashicorp/go-msgpack/codec
 # github.com/hashicorp/golang-lru v0.5.4
 ## explicit; go 1.12
 github.com/hashicorp/golang-lru/simplelru
+# github.com/hashicorp/raft v1.3.6
+## explicit; go 1.12
+github.com/hashicorp/raft
+# github.com/hashicorp/raft-boltdb v0.0.0-20220329195025-15018e9b97e0
+## explicit; go 1.16
+github.com/hashicorp/raft-boltdb
 # github.com/kelseyhightower/envconfig v1.4.0
 ## explicit
 github.com/kelseyhightower/envconfig
@@ -213,4 +231,5 @@ google.golang.org/protobuf/runtime/protoimpl
 google.golang.org/protobuf/types/descriptorpb
 google.golang.org/protobuf/types/known/anypb
 google.golang.org/protobuf/types/known/durationpb
+google.golang.org/protobuf/types/known/emptypb
 google.golang.org/protobuf/types/known/timestamppb

@@ -2,6 +2,7 @@ package server
 
 import (
 	"context"
+	"github.com/hashicorp/raft"
 	"github.com/mlposey/z4/feeds"
 	"github.com/mlposey/z4/proto"
 	"github.com/mlposey/z4/storage"
@@ -9,6 +10,7 @@ import (
 	"go.uber.org/zap"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
+	pb "google.golang.org/protobuf/proto"
 	"google.golang.org/protobuf/types/known/timestamppb"
 	"io"
 	"time"
@@ -17,11 +19,12 @@ import (
 // collection implements the gRPC Collection service.
 type collection struct {
 	proto.UnimplementedCollectionServer
-	fm *feeds.Manager
+	fm   *feeds.Manager
+	raft *raft.Raft
 }
 
-func newCollection(fm *feeds.Manager) proto.CollectionServer {
-	return &collection{fm: fm}
+func newCollection(fm *feeds.Manager, raft *raft.Raft) proto.CollectionServer {
+	return &collection{fm: fm, raft: raft}
 }
 
 type taskCreationType int
@@ -36,47 +39,68 @@ func (c *collection) CreateTask(ctx context.Context, req *proto.CreateTaskReques
 	return c.createTask(ctx, req, syncCreation)
 }
 
-func (c *collection) CreateTaskStreamAsync(stream proto.Collection_CreateTaskStreamAsyncServer) error {
+func (c *collection) CreateTaskAsync(ctx context.Context, req *proto.CreateTaskRequest) (*proto.Task, error) {
+	telemetry.Logger.Debug("got CreateTaskAsync rpc request")
+	return c.createTask(ctx, req, asyncCreation)
+}
+
+func (c *collection) CreateTaskStream(stream proto.Collection_CreateTaskStreamServer) error {
 	for {
 		req, err := stream.Recv()
 		if err == io.EOF {
-			telemetry.Logger.Info("client closed CreateTaskStreamAsync stream")
+			telemetry.Logger.Info("client closed CreateTaskStreamAsyncV2 stream")
 			return nil
 		}
 		if err != nil {
 			return status.Errorf(codes.Internal, "failed to get tasks from client: %v", err)
 		}
 
-		task, err := c.CreateTaskAsync(stream.Context(), req)
-		var sendErr error
+		task, err := c.createTask(stream.Context(), req, syncCreation)
 		if err != nil {
-			sendErr = stream.Send(&proto.TaskStreamResponse{
-				Status:  uint32(codes.Internal),
-				Message: err.Error(),
-			})
-		} else {
-			sendErr = stream.Send(&proto.TaskStreamResponse{
-				Task:   task,
-				Status: uint32(codes.OK),
-			})
+			return status.Errorf(codes.Internal, "failed to create task: %v", err)
 		}
 
+		err = stream.Send(&proto.TaskStreamResponse{
+			Task:   task,
+			Status: uint32(codes.OK),
+		})
+
 		if err != nil {
-			telemetry.Logger.Error("failed to send task to client", zap.Error(sendErr))
+			telemetry.Logger.Error("failed to send task to client", zap.Error(err))
 			return status.Errorf(codes.Internal, "failed to send task to client")
 		}
 	}
 }
 
-func (c *collection) CreateTaskAsync(ctx context.Context, req *proto.CreateTaskRequest) (*proto.Task, error) {
-	telemetry.Logger.Debug("got CreateTaskAsync rpc request")
-	return c.createTask(ctx, req, asyncCreation)
+func (c *collection) CreateTaskStreamAsync(stream proto.Collection_CreateTaskStreamAsyncServer) error {
+	for {
+		req, err := stream.Recv()
+		if err == io.EOF {
+			telemetry.Logger.Info("client closed CreateTaskStreamAsyncV2 stream")
+			return nil
+		}
+		if err != nil {
+			return status.Errorf(codes.Internal, "failed to get tasks from client: %v", err)
+		}
+
+		task, err := c.createTask(stream.Context(), req, asyncCreation)
+		if err != nil {
+			return status.Errorf(codes.Internal, "failed to create task: %v", err)
+		}
+
+		err = stream.Send(&proto.TaskStreamResponse{
+			Task:   task,
+			Status: uint32(codes.OK),
+		})
+
+		if err != nil {
+			telemetry.Logger.Error("failed to send task to client", zap.Error(err))
+			return status.Errorf(codes.Internal, "failed to send task to client")
+		}
+	}
 }
 
 func (c *collection) createTask(ctx context.Context, req *proto.CreateTaskRequest, ct taskCreationType) (*proto.Task, error) {
-	lease := c.fm.Lease(req.GetNamespace())
-	defer lease.Release()
-
 	task := &proto.Task{
 		Id:        storage.NewTaskID(c.getRunTime(req)),
 		Namespace: req.GetNamespace(),
@@ -87,12 +111,12 @@ func (c *collection) createTask(ctx context.Context, req *proto.CreateTaskReques
 
 	switch ct {
 	case asyncCreation:
-		lease.Feed().AddAsync(task)
+		c.saveTask(task)
 
 	case syncCreation:
-		err := lease.Feed().Add(task)
+		err := c.saveTask(task).Error()
 		if err != nil {
-			return nil, status.Errorf(codes.Internal, "failed to save storage: %v", err)
+			return nil, status.Errorf(codes.Internal, "failed to save task: %v", err)
 		}
 
 	default:
@@ -100,6 +124,11 @@ func (c *collection) createTask(ctx context.Context, req *proto.CreateTaskReques
 	}
 
 	return task, nil
+}
+
+func (c *collection) saveTask(task *proto.Task) raft.ApplyFuture {
+	cmd, _ := pb.Marshal(task)
+	return c.raft.Apply(cmd, 0)
 }
 
 func (c *collection) GetTaskStream(req *proto.StreamTasksRequest, stream proto.Collection_GetTaskStreamServer) error {
