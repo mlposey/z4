@@ -50,11 +50,10 @@ message RemoveClusterMemberRequest {
 // The Collection service manages tasks.
 service Collection {
   rpc CreateTask(CreateTaskRequest) returns (Task) {};
-  // TODO: Consider building CreateTaskStream
+  rpc CreateTaskStream(stream CreateTaskRequest) returns (stream TaskStreamResponse) {};
 
   rpc CreateTaskAsync(CreateTaskRequest) returns (Task) {};
   rpc CreateTaskStreamAsync(stream CreateTaskRequest) returns (stream TaskStreamResponse) {};
-  rpc CreateTaskStreamAsyncV2(stream CreateTaskRequest) returns (stream TaskStreamResponse) {};
 
   rpc GetTaskStream(StreamTasksRequest) returns (stream Task) {};
 }

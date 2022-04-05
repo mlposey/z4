@@ -65,8 +65,12 @@ func (s *Server) newRaft() (*raft.Raft, error) {
 	// TODO: Refactor this method into a new type for raft/peer logic.
 
 	c := raft.DefaultConfig()
-	// TODO: Generate serverID once; store in config and reuse later.
 	c.LocalID = raft.ServerID(s.config.PeerID)
+
+	// TODO: Verify impact of these settings on write durability.
+	// These settings greatly improve performance, but may introduce issues.
+	c.BatchApplyCh = true
+	c.MaxAppendEntries = 1000
 
 	// TODO: Create z4peer folder if it does not exist.
 	// Bolt is creating the logs.dat and stable.dat files but not the parent folder.
