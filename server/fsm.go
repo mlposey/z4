@@ -75,5 +75,4 @@ func (s *snapshot) Persist(sink raft.SnapshotSink) error {
 }
 
 func (s *snapshot) Release() {
-	panic("implement me")
 }
