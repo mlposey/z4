@@ -32,7 +32,7 @@ cluster configurations
 |..|..|
 
 ## Cluster Administration
-z4 peers provide a gRPC service for managing the cluster. This repository
+z4 provides a gRPC service for managing the cluster. This repository
 ships with [a tool](cmd/z4t) for interacting with that service.
 ### Example Usage
 #### Get cluster info
