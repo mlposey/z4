@@ -47,12 +47,6 @@ func (f *stateMachine) ApplyBatch(logs []*raft.Log) []interface{} {
 	return res
 }
 
-func (f *stateMachine) placeError(cap, i int, err error) []interface{} {
-	errs := make([]interface{}, cap)
-	errs[i] = err
-	return errs
-}
-
 func (f *stateMachine) Apply(log *raft.Log) interface{} {
 	// Internally, this method should never be invoked. The raft package should
 	// use our ApplyBatch method instead in order to speed up write performance.
