@@ -6,3 +6,4 @@ z4peer
 cpuprofile
 cmd/load/load
 z4_cpu.profile
+cmd/z4t/z4t
