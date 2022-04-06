@@ -44,11 +44,11 @@ The `info` command returns information that the target node has about the overal
 `z4t -t localhost:6355 -p localhost:6456 -id peer1 add-peer`
 
 The `add-peer` command adds a peer to the cluster. The peer address must point to
-the peer's raft port rather than the port of the admin gRPC service. The target peer
-must be the leader.
+the peer's raft port rather than the port of the admin gRPC service. The address
+pointed to by the `t` flag must be that of the cluster leader.
 
 #### Remove peers from the cluster
 `z4t -t localhost:6355 -id peer1 remove-peer`
 
-The `remove-peer` command removes a node from the cluster. The target peer
-must be the leader.
+The `remove-peer` command removes a node from the cluster. The address
+pointed to by the `t` flag must be that of the cluster leader.
