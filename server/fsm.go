@@ -3,8 +3,8 @@ package server
 import (
 	"github.com/dgraph-io/badger/v3"
 	"github.com/hashicorp/raft"
-	"github.com/mlposey/z4/feeds"
 	"github.com/mlposey/z4/proto"
+	"github.com/mlposey/z4/storage"
 	"github.com/mlposey/z4/telemetry"
 	"go.uber.org/zap"
 	pb "google.golang.org/protobuf/proto"
@@ -13,17 +13,52 @@ import (
 
 type stateMachine struct {
 	db *badger.DB
-	fm *feeds.Manager
+	ts *storage.TaskStore
 }
 
-func newFSM(db *badger.DB, fm *feeds.Manager) *stateMachine {
+func newFSM(db *badger.DB, ts *storage.TaskStore) *stateMachine {
 	return &stateMachine{
 		db: db,
-		fm: fm,
+		ts: ts,
 	}
 }
 
+func (f *stateMachine) ApplyBatch(logs []*raft.Log) []interface{} {
+	tasks := make([]*proto.Task, len(logs))
+	res := make([]interface{}, len(logs))
+
+	for i, log := range logs {
+		task := new(proto.Task)
+		err := pb.Unmarshal(log.Data, task)
+		if err != nil {
+			res[i] = err
+			return res
+		}
+
+		tasks[i] = task
+	}
+
+	err := f.ts.SaveAll(tasks)
+	if err != nil {
+		for i := 0; i < len(res); i++ {
+			res[i] = err
+		}
+	}
+	return res
+}
+
+func (f *stateMachine) placeError(cap, i int, err error) []interface{} {
+	errs := make([]interface{}, cap)
+	errs[i] = err
+	return errs
+}
+
 func (f *stateMachine) Apply(log *raft.Log) interface{} {
+	// Internally, this method should never be invoked. The raft package should
+	// use our ApplyBatch method instead in order to speed up write performance.
+	// However, we will keep this implementation around just in case the raft
+	// package uses it in the future.
+
 	task := new(proto.Task)
 	err := pb.Unmarshal(log.Data, task)
 	if err != nil {
@@ -31,16 +66,7 @@ func (f *stateMachine) Apply(log *raft.Log) interface{} {
 		return err
 	}
 
-	lease := f.fm.Lease(task.GetNamespace())
-	defer lease.Release()
-
-	// TODO: Consider async.
-	// Not currently sure how that will impact logs during sudden exits
-	// when the batches can't be properly flushed.
-	// There is an Apply that provides a batch of logs. Maybe we can
-	// skip async writes and simply write the batch of tasks to badger
-	// in a synchronous way.
-	err = lease.Feed().Add(task)
+	err = f.ts.Save(task)
 	if err != nil {
 		telemetry.Logger.Error("task submission to feed failed", zap.Error(err))
 	}

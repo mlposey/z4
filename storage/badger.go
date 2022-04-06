@@ -82,21 +82,11 @@ func (cs *ConfigStore) getConfigFQN(namespace string) []byte {
 
 type TaskStore struct {
 	Client *BadgerClient
-	buffer *taskBuffer
 }
 
 func NewTaskStore(db *BadgerClient) *TaskStore {
 	store := &TaskStore{Client: db}
-	// TODO: Make buffer params configurable using synced config.
-	store.buffer = newTaskBuffer(100*time.Millisecond, 1000, func(tasks []*proto.Task) error {
-		return store.SaveBatch(tasks)
-	})
 	return store
-}
-
-func (ts *TaskStore) Close() error {
-	// TODO: Ensure this method is called when app is terminated.
-	return ts.buffer.Close()
 }
 
 func (ts *TaskStore) Save(task *proto.Task) error {
@@ -111,11 +101,7 @@ func (ts *TaskStore) Save(task *proto.Task) error {
 	})
 }
 
-func (ts *TaskStore) SaveAsync(task *proto.Task) {
-	ts.buffer.Add(task)
-}
-
-func (ts *TaskStore) SaveBatch(tasks []*proto.Task) error {
+func (ts *TaskStore) SaveAll(tasks []*proto.Task) error {
 	telemetry.Logger.Debug("writing task batch to DB", zap.Any("count", len(tasks)))
 	batch := ts.Client.DB.NewWriteBatch()
 	defer batch.Cancel()

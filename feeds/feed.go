@@ -5,7 +5,6 @@ import (
 	"github.com/mlposey/z4/proto"
 	"github.com/mlposey/z4/storage"
 	"github.com/mlposey/z4/telemetry"
-	"go.uber.org/multierr"
 	"go.uber.org/zap"
 	"time"
 )
@@ -73,14 +72,6 @@ func (f *Feed) Tasks() <-chan *proto.Task {
 	return f.feed
 }
 
-func (f *Feed) Add(task *proto.Task) error {
-	return f.tasks.Save(task)
-}
-
-func (f *Feed) AddAsync(task *proto.Task) {
-	f.tasks.SaveAsync(task)
-}
-
 func (f *Feed) Namespace() string {
 	return f.namespace
 }
@@ -95,7 +86,7 @@ func (f *Feed) Close() error {
 	// won't close at all. This is because the goroutine blocks until
 	// a consumer takes a storage from the channel.
 	f.closed = true
-	err := multierr.Combine(f.config.Close(), f.tasks.Close())
+	err := f.config.Close()
 	if err != nil {
 		return fmt.Errorf("failed to close feed for namespace '%s': %w", f.namespace, err)
 	}

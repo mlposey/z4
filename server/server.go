@@ -28,6 +28,7 @@ type Config struct {
 }
 
 type Server struct {
+	tasks       *storage.TaskStore
 	fm          *feeds.Manager
 	fsm         *stateMachine
 	config      Config
@@ -50,6 +51,7 @@ func (s *Server) Start() error {
 		zap.Int("port", s.config.ServicePort))
 
 	s.fm = feeds.NewManager(s.config.DB)
+	s.tasks = storage.NewTaskStore(s.config.DB)
 	s.raft, err = s.newRaft()
 	if err != nil {
 		return fmt.Errorf("failed to start raft server: %w", err)
@@ -104,7 +106,7 @@ func (s *Server) newRaft() (*raft.Raft, error) {
 	}
 	s.peerNetwork = tm
 
-	s.fsm = newFSM(s.config.DB.DB, s.fm)
+	s.fsm = newFSM(s.config.DB.DB, s.tasks)
 	r, err := raft.NewRaft(c, s.fsm, ldb, sdb, fss, tm)
 	if err != nil {
 		return nil, fmt.Errorf("raft.NewRaft: %v", err)
