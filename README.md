@@ -16,7 +16,7 @@ algorithm. Raft enables the replication of data as well as the automated
 failover when peers die.
 
 ## Deployment Model
-A collection of z4 nodes forms a cluster. Each member of the cluster is called
+A collection of z4 application instances forms a cluster. Each member of the cluster is called
 a peer.
 
 When choosing the number of peers for a cluster, one must consider quorum needs.
