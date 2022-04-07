@@ -136,16 +136,25 @@ func (c *collection) GetTaskStream(req *proto.StreamTasksRequest, stream proto.C
 	lease := c.fm.Lease(req.GetNamespace())
 	defer lease.Release()
 
+	ctx := stream.Context()
+
 	tasks := lease.Feed().Tasks()
-	for task := range tasks {
-		telemetry.Logger.Debug("sending task to client",
-			zap.Any("task", task),
-			telemetry.LogRequestID(req.GetRequestId()))
+LOOP:
+	for {
+		select {
+		case <-ctx.Done():
+			break LOOP
 
-		err := stream.Send(task)
+		case task := <-tasks:
+			telemetry.Logger.Debug("sending task to client",
+				zap.Any("task", task),
+				telemetry.LogRequestID(req.GetRequestId()))
 
-		if err != nil {
-			return status.Errorf(codes.Internal, "failed to send tasks to client: %v", err)
+			err := stream.Send(task)
+
+			if err != nil {
+				return status.Errorf(codes.Internal, "failed to send tasks to client: %v", err)
+			}
 		}
 	}
 

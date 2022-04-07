@@ -75,8 +75,6 @@ func (s *Server) newRaft() (*raft.Raft, error) {
 	c.BatchApplyCh = true
 	c.MaxAppendEntries = 1000
 
-	// TODO: Create z4peer folder if it does not exist.
-	// Bolt is creating the logs.dat and stable.dat files but not the parent folder.
 	if _, err := os.Stat(s.config.RaftDataDir); errors.Is(err, os.ErrNotExist) {
 		err := os.Mkdir(s.config.RaftDataDir, os.ModePerm)
 		if err != nil {
@@ -136,7 +134,8 @@ func (s *Server) Close() error {
 	// TODO: Close raft Bolt databases.
 
 	telemetry.Logger.Info("stopping server...")
-	s.server.GracefulStop()
+	s.server.Stop()
+	// s.server.GracefulStop() - doesnt stop streams, causing server to stay running
 	err := s.peerNetwork.Close()
 	err = multierr.Append(err, s.fm.Close())
 	telemetry.Logger.Info("server stopped")

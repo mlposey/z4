@@ -14,7 +14,7 @@ type Feed struct {
 	config    *storage.SyncedConfig
 	feed      chan *proto.Task
 	namespace string
-	closed    bool
+	close     chan bool
 }
 
 func New(namespace string, db *storage.BadgerClient) *Feed {
@@ -23,6 +23,7 @@ func New(namespace string, db *storage.BadgerClient) *Feed {
 		config:    storage.NewSyncedConfig(&storage.ConfigStore{Client: db}, namespace),
 		namespace: namespace,
 		feed:      make(chan *proto.Task),
+		close:     make(chan bool),
 	}
 	q.config.StartSync()
 	go q.startFeed()
@@ -30,10 +31,18 @@ func New(namespace string, db *storage.BadgerClient) *Feed {
 }
 
 func (f *Feed) startFeed() {
+	telemetry.Logger.Info("feed started",
+		zap.String("namespace", f.namespace))
 	config := f.config.C
 
-	for !f.closed {
-		// TODO: Add timeout when fetching tasks from store.
+LOOP:
+	for {
+		select {
+		case <-f.close:
+			break LOOP
+		default:
+		}
+
 		tasks, err := f.tasks.Get(storage.TaskRange{
 			Namespace: f.namespace,
 			StartID:   config.LastDeliveredTask,
@@ -61,8 +70,13 @@ func (f *Feed) startFeed() {
 		}
 
 		for _, task := range tasks {
-			f.feed <- task
-			f.config.C.LastDeliveredTask = task.GetId()
+			select {
+			case f.feed <- task:
+				f.config.C.LastDeliveredTask = task.GetId()
+
+			case <-f.close:
+				break LOOP
+			}
 		}
 	}
 	close(f.feed)
@@ -77,18 +91,13 @@ func (f *Feed) Namespace() string {
 }
 
 func (f *Feed) Close() error {
-	// TODO: Call this method before closing app.
-	// Important because failing to save the config to disk
-	// could cause duplicate deliveries.
-
-	// TODO: Find a better way to do this.
-	// This won't immediately close the feed, and it is likely the feed
-	// won't close at all. This is because the goroutine blocks until
-	// a consumer takes a storage from the channel.
-	f.closed = true
+	f.close <- true
 	err := f.config.Close()
 	if err != nil {
 		return fmt.Errorf("failed to close feed for namespace '%s': %w", f.namespace, err)
 	}
+
+	telemetry.Logger.Info("feed stopped",
+		zap.String("namespace", f.namespace))
 	return nil
 }
