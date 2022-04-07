@@ -28,13 +28,13 @@ type Config struct {
 }
 
 type Server struct {
-	tasks       *storage.TaskStore
-	fm          *feeds.Manager
-	fsm         *stateMachine
-	config      Config
-	server      *grpc.Server
-	raft        *raft.Raft
-	peerNetwork *raft.NetworkTransport
+	tasks      *storage.TaskStore
+	fm         *feeds.Manager
+	fsm        *stateMachine
+	config     Config
+	server     *grpc.Server
+	raft       *raft.Raft
+	raftCloser func() error
 }
 
 func NewServer(config Config) *Server {
@@ -52,7 +52,7 @@ func (s *Server) Start() error {
 
 	s.fm = feeds.NewManager(s.config.DB)
 	s.tasks = storage.NewTaskStore(s.config.DB)
-	s.raft, err = s.newRaft()
+	s.raft, s.raftCloser, err = s.newRaft()
 	if err != nil {
 		return fmt.Errorf("failed to start raft server: %w", err)
 	}
@@ -64,7 +64,7 @@ func (s *Server) Start() error {
 	return s.server.Serve(lis)
 }
 
-func (s *Server) newRaft() (*raft.Raft, error) {
+func (s *Server) newRaft() (*raft.Raft, func() error, error) {
 	// TODO: Refactor this method into a new type for raft/peer logic.
 
 	c := raft.DefaultConfig()
@@ -78,36 +78,35 @@ func (s *Server) newRaft() (*raft.Raft, error) {
 	if _, err := os.Stat(s.config.RaftDataDir); errors.Is(err, os.ErrNotExist) {
 		err := os.Mkdir(s.config.RaftDataDir, os.ModePerm)
 		if err != nil {
-			return nil, fmt.Errorf("failed to create raft peer folder: %w", err)
+			return nil, nil, fmt.Errorf("failed to create raft peer folder: %w", err)
 		}
 	}
 
 	ldb, err := boltdb.NewBoltStore(filepath.Join(s.config.RaftDataDir, "logs.dat"))
 	if err != nil {
-		return nil, fmt.Errorf(`boltdb.NewBoltStore(%q): %v`, filepath.Join(s.config.RaftDataDir, "logs.dat"), err)
+		return nil, nil, fmt.Errorf(`boltdb.NewBoltStore(%q): %v`, filepath.Join(s.config.RaftDataDir, "logs.dat"), err)
 	}
 
 	sdb, err := boltdb.NewBoltStore(filepath.Join(s.config.RaftDataDir, "stable.dat"))
 	if err != nil {
-		return nil, fmt.Errorf(`boltdb.NewBoltStore(%q): %v`, filepath.Join(s.config.RaftDataDir, "stable.dat"), err)
+		return nil, nil, fmt.Errorf(`boltdb.NewBoltStore(%q): %v`, filepath.Join(s.config.RaftDataDir, "stable.dat"), err)
 	}
 
 	fss, err := raft.NewFileSnapshotStore(s.config.RaftDataDir, 3, os.Stderr)
 	if err != nil {
-		return nil, fmt.Errorf(`raft.NewFileSnapshotStore(%q, ...): %v`, s.config.RaftDataDir, err)
+		return nil, nil, fmt.Errorf(`raft.NewFileSnapshotStore(%q, ...): %v`, s.config.RaftDataDir, err)
 	}
 
 	addr := fmt.Sprintf("127.0.0.1:%d", s.config.PeerPort)
 	tm, err := raft.NewTCPTransport(addr, nil, 0, 0, nil)
 	if err != nil {
-		return nil, fmt.Errorf("could not create transport for raft peer: %w", err)
+		return nil, nil, fmt.Errorf("could not create transport for raft peer: %w", err)
 	}
-	s.peerNetwork = tm
 
 	s.fsm = newFSM(s.config.DB.DB, s.tasks)
 	r, err := raft.NewRaft(c, s.fsm, ldb, sdb, fss, tm)
 	if err != nil {
-		return nil, fmt.Errorf("raft.NewRaft: %v", err)
+		return nil, nil, fmt.Errorf("raft.NewRaft: %v", err)
 	}
 
 	if s.config.BootstrapRaft {
@@ -123,21 +122,25 @@ func (s *Server) newRaft() (*raft.Raft, error) {
 		}
 		f := r.BootstrapCluster(cfg)
 		if err := f.Error(); err != nil {
-			return nil, fmt.Errorf("raft.Raft.BootstrapCluster: %v", err)
+			return nil, nil, fmt.Errorf("raft.Raft.BootstrapCluster: %v", err)
 		}
 	}
-	return r, nil
+
+	return r, func() error {
+		return multierr.Combine(
+			tm.Close(),
+			ldb.Close(),
+			sdb.Close())
+	}, nil
 }
 
 func (s *Server) Close() error {
-	// TODO: Consider supporting a context with timeout.
-	// TODO: Close raft Bolt databases.
-
 	telemetry.Logger.Info("stopping server...")
 	s.server.Stop()
 	// s.server.GracefulStop() - doesnt stop streams, causing server to stay running
-	err := s.peerNetwork.Close()
-	err = multierr.Append(err, s.fm.Close())
+	err := multierr.Combine(
+		s.raftCloser(),
+		s.fm.Close())
 	telemetry.Logger.Info("server stopped")
 	return err
 }
