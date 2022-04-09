@@ -6,14 +6,17 @@ import (
 	"flag"
 	"fmt"
 	"github.com/mlposey/z4/proto"
+	"github.com/segmentio/ksuid"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials/insecure"
+	"io"
 )
 
 func main() {
 	host := flag.String("t", "", "host:port of the peer to send requests to")
 	peerAddress := flag.String("p", "", "host:port of the peer")
 	peerID := flag.String("id", "", "id of the peer")
+	namespace := flag.String("ns", "", "namespace")
 	flag.Parse()
 
 	if flag.NArg() != 1 {
@@ -21,20 +24,23 @@ func main() {
 		return
 	}
 
-	client, err := makeClient(*host)
+	admin, collection, err := makeClients(*host)
 	if err != nil {
 		panic(err)
 	}
 
 	switch flag.Arg(0) {
 	case "add-peer":
-		addPeer(client, *peerAddress, *peerID)
+		addPeer(admin, *peerAddress, *peerID)
 
 	case "remove-peer":
-		removePeer(client, *peerID)
+		removePeer(admin, *peerID)
 
 	case "info":
-		info(client)
+		info(admin)
+
+	case "consume":
+		consume(collection, *namespace)
 
 	default:
 		printHelp()
@@ -45,13 +51,13 @@ func printHelp() {
 	fmt.Println("help")
 }
 
-func makeClient(host string) (proto.AdminClient, error) {
+func makeClients(host string) (proto.AdminClient, proto.CollectionClient, error) {
 	opts := []grpc.DialOption{grpc.WithTransportCredentials(insecure.NewCredentials())}
 	conn, err := grpc.Dial(host, opts...)
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
-	return proto.NewAdminClient(conn), nil
+	return proto.NewAdminClient(conn), proto.NewCollectionClient(conn), nil
 }
 
 func addPeer(client proto.AdminClient, addr, id string) {
@@ -86,4 +92,28 @@ func info(client proto.AdminClient) {
 		panic(err)
 	}
 	fmt.Println(string(out))
+}
+
+func consume(client proto.CollectionClient, namespace string) {
+	stream, err := client.GetTaskStream(context.Background(), &proto.StreamTasksRequest{
+		RequestId: ksuid.New().String(),
+		Namespace: namespace,
+	})
+	if err != nil {
+		panic(err)
+	}
+
+	for {
+		task, err := stream.Recv()
+		if err != io.EOF {
+			fmt.Println(err)
+			return
+		}
+
+		out, err := json.MarshalIndent(task, "", "  ")
+		if err != nil {
+			panic(err)
+		}
+		fmt.Println(string(out))
+	}
 }
