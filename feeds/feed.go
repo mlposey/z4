@@ -9,6 +9,7 @@ import (
 	"time"
 )
 
+// Feed provides access to a stream of tasks that are ready to be delivered.
 type Feed struct {
 	tasks     *storage.TaskStore
 	config    *storage.SyncedConfig
@@ -90,6 +91,10 @@ func (f *Feed) Namespace() string {
 	return f.namespace
 }
 
+// Close stops the feed from listening to ready tasks.
+//
+// This method must be called once after the feed is no longer
+// needed.
 func (f *Feed) Close() error {
 	f.close <- true
 	err := f.config.Close()

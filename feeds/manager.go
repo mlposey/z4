@@ -59,6 +59,7 @@ func (qm *Manager) cleanUpLeases(namespace string) {
 	delete(qm.leases, namespace)
 }
 
+// Close releases all resources for managed feeds.
 func (qm *Manager) Close() error {
 	qm.mu.Lock()
 	defer qm.mu.Unlock()

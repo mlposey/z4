@@ -7,6 +7,7 @@ import (
 	"sync"
 )
 
+// leaseHolder manages access to a feed.
 type leaseHolder struct {
 	F        *Feed
 	leases   map[*Lease]interface{}
@@ -24,6 +25,7 @@ func newLeaseHolder(namespace string, db *storage.BadgerClient, onRemove func())
 	}
 }
 
+// Lease grants a client access to the feed.
 func (lh *leaseHolder) Lease() *Lease {
 	lh.mu.Lock()
 	defer lh.mu.Unlock()
@@ -47,6 +49,9 @@ func (lh *leaseHolder) remove(l *Lease) {
 	lh.onRemove()
 }
 
+// Close frees all leases and closes the feed.
+//
+// This method should be called when there are no active leases.
 func (lh *leaseHolder) Close() error {
 	lh.mu.Lock()
 	defer lh.mu.Unlock()
@@ -57,6 +62,7 @@ func (lh *leaseHolder) Close() error {
 	return lh.F.Close()
 }
 
+// ActiveCount is the number of open leases on the feed.
 func (lh *leaseHolder) ActiveCount() int {
 	return len(lh.leases)
 }
@@ -73,6 +79,9 @@ func (l *Lease) Release() {
 	l.feed.remove(l)
 }
 
+// Feed returns the feed being leased.
+//
+// The feed object must not be used after Release is called.
 func (l *Lease) Feed() *Feed {
 	return l.feed.F
 }
