@@ -19,12 +19,17 @@ import (
 // collection implements the gRPC Collection service.
 type collection struct {
 	proto.UnimplementedCollectionServer
-	fm   *feeds.Manager
-	raft *raft.Raft
+	fm    *feeds.Manager
+	tasks *storage.TaskStore
+	raft  *raft.Raft
 }
 
-func newCollection(fm *feeds.Manager, raft *raft.Raft) proto.CollectionServer {
-	return &collection{fm: fm, raft: raft}
+func newCollection(fm *feeds.Manager, tasks *storage.TaskStore, raft *raft.Raft) proto.CollectionServer {
+	return &collection{
+		fm:    fm,
+		tasks: tasks,
+		raft:  raft,
+	}
 }
 
 type taskCreationType int
@@ -129,6 +134,14 @@ func (c *collection) createTask(ctx context.Context, req *proto.CreateTaskReques
 func (c *collection) saveTask(task *proto.Task) raft.ApplyFuture {
 	cmd, _ := pb.Marshal(task)
 	return c.raft.Apply(cmd, 0)
+}
+
+func (c *collection) GetTask(ctx context.Context, req *proto.GetTaskRequest) (*proto.Task, error) {
+	task, err := c.tasks.Get(req.GetNamespace(), req.GetTaskId())
+	if err != nil {
+		return nil, status.Errorf(codes.NotFound, "task not found: %v", err)
+	}
+	return task, nil
 }
 
 func (c *collection) GetTaskStream(req *proto.StreamTasksRequest, stream proto.Collection_GetTaskStreamServer) error {

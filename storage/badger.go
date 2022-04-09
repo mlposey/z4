@@ -128,7 +128,24 @@ func (ts *TaskStore) SaveAll(tasks []*proto.Task) error {
 	return batch.Flush()
 }
 
-func (ts *TaskStore) Get(query TaskRange) ([]*proto.Task, error) {
+func (ts *TaskStore) Get(namespace, id string) (*proto.Task, error) {
+	var task *proto.Task
+	err := ts.Client.DB.View(func(txn *badger.Txn) error {
+		key := ts.getTaskFQN(namespace, id)
+		item, err := txn.Get(key)
+		if err != nil {
+			return err
+		}
+
+		return item.Value(func(val []byte) error {
+			task = new(proto.Task)
+			return pb.Unmarshal(val, task)
+		})
+	})
+	return task, err
+}
+
+func (ts *TaskStore) GetRange(query TaskRange) ([]*proto.Task, error) {
 	err := query.Validate()
 	if err != nil {
 		return nil, fmt.Errorf("failed to fetch tasks due to invalid query: %w", err)

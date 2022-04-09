@@ -44,7 +44,7 @@ LOOP:
 		default:
 		}
 
-		tasks, err := f.tasks.Get(storage.TaskRange{
+		tasks, err := f.tasks.GetRange(storage.TaskRange{
 			Namespace: f.namespace,
 			StartID:   config.LastDeliveredTask,
 			EndID:     storage.NewTaskID(time.Now()),

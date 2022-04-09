@@ -50,7 +50,7 @@ func (s *Server) Start() error {
 	proto.RegisterAdminServer(s.server, newAdmin(s.peer.Raft, s.config.PeerConfig.ID))
 
 	s.fm = feeds.NewManager(s.config.DB)
-	proto.RegisterCollectionServer(s.server, newCollection(s.fm, s.peer.Raft))
+	proto.RegisterCollectionServer(s.server, newCollection(s.fm, s.config.PeerConfig.Tasks, s.peer.Raft))
 	return s.server.Serve(lis)
 }
 

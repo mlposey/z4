@@ -55,6 +55,7 @@ service Collection {
   rpc CreateTaskAsync(CreateTaskRequest) returns (Task) {};
   rpc CreateTaskStreamAsync(stream CreateTaskRequest) returns (stream TaskStreamResponse) {};
 
+  rpc GetTask(GetTaskRequest) returns (Task) {};
   rpc GetTaskStream(StreamTasksRequest) returns (stream Task) {};
 }
 
@@ -76,6 +77,12 @@ message TaskStreamResponse {
 message StreamTasksRequest {
   string request_id = 1;
   string namespace = 2;
+}
+
+message GetTaskRequest {
+  string request_id = 1;
+  string namespace = 2;
+  string task_id = 3;
 }
 
 message Task {
