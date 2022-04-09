@@ -1,10 +1,7 @@
 package server
 
 import (
-	"errors"
 	"fmt"
-	"github.com/hashicorp/raft"
-	boltdb "github.com/hashicorp/raft-boltdb"
 	"github.com/mlposey/z4/feeds"
 	"github.com/mlposey/z4/proto"
 	"github.com/mlposey/z4/storage"
@@ -13,28 +10,20 @@ import (
 	"go.uber.org/zap"
 	"google.golang.org/grpc"
 	"net"
-	"os"
-	"path/filepath"
 )
 
 type Config struct {
-	DB            *storage.BadgerClient
-	ServicePort   int
-	PeerPort      int
-	PeerID        string
-	Opts          []grpc.ServerOption
-	RaftDataDir   string
-	BootstrapRaft bool
+	DB         *storage.BadgerClient
+	GRPCPort   int
+	PeerConfig PeerConfig
+	Opts       []grpc.ServerOption
 }
 
 type Server struct {
-	tasks      *storage.TaskStore
-	fm         *feeds.Manager
-	fsm        *stateMachine
-	config     Config
-	server     *grpc.Server
-	raft       *raft.Raft
-	raftCloser func() error
+	fm     *feeds.Manager
+	config Config
+	server *grpc.Server
+	peer   *raftPeer
 }
 
 func NewServer(config Config) *Server {
@@ -43,95 +32,26 @@ func NewServer(config Config) *Server {
 
 func (s *Server) Start() error {
 	telemetry.Logger.Info("starting server...")
-	lis, err := net.Listen("tcp", fmt.Sprintf("0.0.0.0:%d", s.config.ServicePort))
+	lis, err := net.Listen("tcp", fmt.Sprintf("0.0.0.0:%d", s.config.GRPCPort))
 	if err != nil {
 		return err
 	}
 	telemetry.Logger.Info("listening for connections",
-		zap.Int("port", s.config.ServicePort))
+		zap.Int("port", s.config.GRPCPort))
 
-	s.fm = feeds.NewManager(s.config.DB)
-	s.tasks = storage.NewTaskStore(s.config.DB)
-	s.raft, s.raftCloser, err = s.newRaft()
+	s.config.PeerConfig.Tasks = storage.NewTaskStore(s.config.DB)
+	s.config.PeerConfig.DB = s.config.DB
+	s.peer, err = newPeer(s.config.PeerConfig)
 	if err != nil {
 		return fmt.Errorf("failed to start raft server: %w", err)
 	}
 
 	s.server = grpc.NewServer(s.config.Opts...)
-	proto.RegisterAdminServer(s.server, newAdmin(s.raft, s.config.PeerID))
+	proto.RegisterAdminServer(s.server, newAdmin(s.peer.Raft, s.config.PeerConfig.ID))
 
-	proto.RegisterCollectionServer(s.server, newCollection(s.fm, s.raft))
+	s.fm = feeds.NewManager(s.config.DB)
+	proto.RegisterCollectionServer(s.server, newCollection(s.fm, s.peer.Raft))
 	return s.server.Serve(lis)
-}
-
-func (s *Server) newRaft() (*raft.Raft, func() error, error) {
-	// TODO: Refactor this method into a new type for raft/peer logic.
-
-	c := raft.DefaultConfig()
-	c.LocalID = raft.ServerID(s.config.PeerID)
-
-	// TODO: Verify impact of these settings on write durability.
-	// These settings greatly improve performance, but may introduce issues.
-	c.BatchApplyCh = true
-	c.MaxAppendEntries = 1000
-
-	if _, err := os.Stat(s.config.RaftDataDir); errors.Is(err, os.ErrNotExist) {
-		err := os.Mkdir(s.config.RaftDataDir, os.ModePerm)
-		if err != nil {
-			return nil, nil, fmt.Errorf("failed to create raft peer folder: %w", err)
-		}
-	}
-
-	ldb, err := boltdb.NewBoltStore(filepath.Join(s.config.RaftDataDir, "logs.dat"))
-	if err != nil {
-		return nil, nil, fmt.Errorf(`boltdb.NewBoltStore(%q): %v`, filepath.Join(s.config.RaftDataDir, "logs.dat"), err)
-	}
-
-	sdb, err := boltdb.NewBoltStore(filepath.Join(s.config.RaftDataDir, "stable.dat"))
-	if err != nil {
-		return nil, nil, fmt.Errorf(`boltdb.NewBoltStore(%q): %v`, filepath.Join(s.config.RaftDataDir, "stable.dat"), err)
-	}
-
-	fss, err := raft.NewFileSnapshotStore(s.config.RaftDataDir, 3, os.Stderr)
-	if err != nil {
-		return nil, nil, fmt.Errorf(`raft.NewFileSnapshotStore(%q, ...): %v`, s.config.RaftDataDir, err)
-	}
-
-	addr := fmt.Sprintf("127.0.0.1:%d", s.config.PeerPort)
-	tm, err := raft.NewTCPTransport(addr, nil, 0, 0, nil)
-	if err != nil {
-		return nil, nil, fmt.Errorf("could not create transport for raft peer: %w", err)
-	}
-
-	s.fsm = newFSM(s.config.DB.DB, s.tasks)
-	r, err := raft.NewRaft(c, s.fsm, ldb, sdb, fss, tm)
-	if err != nil {
-		return nil, nil, fmt.Errorf("raft.NewRaft: %v", err)
-	}
-
-	if s.config.BootstrapRaft {
-		telemetry.Logger.Info("bootstrapping cluster")
-		cfg := raft.Configuration{
-			Servers: []raft.Server{
-				{
-					Suffrage: raft.Voter,
-					ID:       raft.ServerID(s.config.PeerID),
-					Address:  raft.ServerAddress(addr),
-				},
-			},
-		}
-		f := r.BootstrapCluster(cfg)
-		if err := f.Error(); err != nil {
-			return nil, nil, fmt.Errorf("raft.Raft.BootstrapCluster: %v", err)
-		}
-	}
-
-	return r, func() error {
-		return multierr.Combine(
-			tm.Close(),
-			ldb.Close(),
-			sdb.Close())
-	}, nil
 }
 
 func (s *Server) Close() error {
@@ -139,7 +59,7 @@ func (s *Server) Close() error {
 	s.server.Stop()
 	// s.server.GracefulStop() - doesnt stop streams, causing server to stay running
 	err := multierr.Combine(
-		s.raftCloser(),
+		s.peer.Close(),
 		s.fm.Close())
 	telemetry.Logger.Info("server stopped")
 	return err
