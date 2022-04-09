@@ -22,7 +22,20 @@ func NewManager(db *storage.BadgerClient) *Manager {
 	}
 }
 
+// Tasks provides access to ready tasks from a namespace.
+//
+// This method automatically manages a lease on the feed.
+func (qm *Manager) Tasks(namespace string, handle func(tasks TaskStream) error) error {
+	lease := qm.Lease(namespace)
+	defer lease.Release()
+
+	tasks := lease.Feed().Tasks()
+	return handle(tasks)
+}
+
 // Lease grants access to the feed for the requested namespace.
+//
+// The Tasks method should be preferred in most cases.
 func (qm *Manager) Lease(namespace string) *Lease {
 	qm.mu.Lock()
 	defer qm.mu.Unlock()

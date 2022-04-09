@@ -9,6 +9,8 @@ import (
 	"time"
 )
 
+type TaskStream <-chan *proto.Task
+
 // Feed provides access to a stream of tasks that are ready to be delivered.
 type Feed struct {
 	tasks     *storage.TaskStore
@@ -83,7 +85,7 @@ LOOP:
 	close(f.feed)
 }
 
-func (f *Feed) Tasks() <-chan *proto.Task {
+func (f *Feed) Tasks() TaskStream {
 	return f.feed
 }
 

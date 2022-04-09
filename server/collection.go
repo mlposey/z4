@@ -40,12 +40,10 @@ const (
 )
 
 func (c *collection) CreateTask(ctx context.Context, req *proto.CreateTaskRequest) (*proto.Task, error) {
-	telemetry.Logger.Debug("got CreateTask rpc request")
 	return c.createTask(ctx, req, syncCreation)
 }
 
 func (c *collection) CreateTaskAsync(ctx context.Context, req *proto.CreateTaskRequest) (*proto.Task, error) {
-	telemetry.Logger.Debug("got CreateTaskAsync rpc request")
 	return c.createTask(ctx, req, asyncCreation)
 }
 
@@ -53,7 +51,6 @@ func (c *collection) CreateTaskStream(stream proto.Collection_CreateTaskStreamSe
 	for {
 		req, err := stream.Recv()
 		if err == io.EOF {
-			telemetry.Logger.Info("client closed CreateTaskStreamAsyncV2 stream")
 			return nil
 		}
 		if err != nil {
@@ -81,7 +78,6 @@ func (c *collection) CreateTaskStreamAsync(stream proto.Collection_CreateTaskStr
 	for {
 		req, err := stream.Recv()
 		if err == io.EOF {
-			telemetry.Logger.Info("client closed CreateTaskStreamAsyncV2 stream")
 			return nil
 		}
 		if err != nil {
@@ -145,35 +141,20 @@ func (c *collection) GetTask(ctx context.Context, req *proto.GetTaskRequest) (*p
 }
 
 func (c *collection) GetTaskStream(req *proto.StreamTasksRequest, stream proto.Collection_GetTaskStreamServer) error {
-	telemetry.Logger.Debug("got StreamTasks rpc request")
-	lease := c.fm.Lease(req.GetNamespace())
-	defer lease.Release()
+	return c.fm.Tasks(req.GetNamespace(), func(tasks feeds.TaskStream) error {
+		for {
+			select {
+			case <-stream.Context().Done():
+				return nil
 
-	ctx := stream.Context()
-
-	tasks := lease.Feed().Tasks()
-LOOP:
-	for {
-		select {
-		case <-ctx.Done():
-			break LOOP
-
-		case task := <-tasks:
-			telemetry.Logger.Debug("sending task to client",
-				zap.Any("task", task),
-				telemetry.LogRequestID(req.GetRequestId()))
-
-			err := stream.Send(task)
-
-			if err != nil {
-				return status.Errorf(codes.Internal, "failed to send tasks to client: %v", err)
+			case task := <-tasks:
+				err := stream.Send(task)
+				if err != nil {
+					return status.Errorf(codes.Internal, "failed to send tasks to client: %v", err)
+				}
 			}
 		}
-	}
-
-	telemetry.Logger.Info("client closed GetTaskStream stream",
-		telemetry.LogRequestID(req.GetRequestId()))
-	return nil
+	})
 }
 
 func (c *collection) getRunTime(req *proto.CreateTaskRequest) time.Time {
