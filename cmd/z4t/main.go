@@ -9,7 +9,6 @@ import (
 	"github.com/segmentio/ksuid"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials/insecure"
-	"io"
 )
 
 func main() {
@@ -105,7 +104,7 @@ func consume(client proto.CollectionClient, namespace string) {
 
 	for {
 		task, err := stream.Recv()
-		if err != io.EOF {
+		if err != nil {
 			fmt.Println(err)
 			return
 		}
