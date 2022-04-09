@@ -49,7 +49,7 @@ type ConfigStore struct {
 	Client *BadgerClient
 }
 
-func (cs *ConfigStore) Save(namespace string, config QueueConfig) error {
+func (cs *ConfigStore) Save(namespace string, config FeedConfig) error {
 	return cs.Client.DB.Update(func(txn *badger.Txn) error {
 		payload, err := json.Marshal(config)
 		if err != nil {
@@ -60,9 +60,9 @@ func (cs *ConfigStore) Save(namespace string, config QueueConfig) error {
 	})
 }
 
-func (cs *ConfigStore) Get(namespace string) (QueueConfig, error) {
+func (cs *ConfigStore) Get(namespace string) (FeedConfig, error) {
 	telemetry.Logger.Debug("getting config from DB")
-	var config QueueConfig
+	var config FeedConfig
 	return config, cs.Client.DB.View(func(txn *badger.Txn) error {
 		key := cs.getConfigFQN(namespace)
 		item, err := txn.Get(key)

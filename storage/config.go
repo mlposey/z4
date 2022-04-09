@@ -8,13 +8,36 @@ import (
 	"time"
 )
 
-type QueueConfig struct {
+// FeedConfig defines how a feed should work.
+type FeedConfig struct {
+	// Update Equals and Copy methods if modifying fields in this type.
+
 	LastDeliveredTask string // The ID of the last delivered task
 }
 
+// Equals compares two feeds for equality.
+func (c *FeedConfig) Equals(other *FeedConfig) bool {
+	if other == nil {
+		return false
+	}
+	return c.LastDeliveredTask == other.LastDeliveredTask
+}
+
+// Copy makes a deep copy of the config.
+func (c *FeedConfig) Copy() *FeedConfig {
+	return &FeedConfig{
+		LastDeliveredTask: c.LastDeliveredTask,
+	}
+}
+
+// SyncedConfig is a FeedConfig that syncs to disk.
 type SyncedConfig struct {
+	// C is the config that will be synced to disk.
+	// It is safe to make changes directly to this field.
+	C *FeedConfig
+
 	configs   *ConfigStore
-	C         *QueueConfig
+	lastSaved *FeedConfig
 	namespace string
 	closeReq  chan interface{}
 	closeRes  chan interface{}
@@ -34,6 +57,8 @@ func (sc *SyncedConfig) StartSync() {
 	go sc.startConfigSync()
 }
 
+// Close flushes config changes to disk and stops the sync thread.
+// The object should not be used after a call to Close.
 func (sc *SyncedConfig) Close() error {
 	sc.closeReq <- nil
 	<-sc.closeRes
@@ -49,7 +74,7 @@ func (sc *SyncedConfig) loadConfig() {
 				zap.Error(err))
 		}
 
-		config = QueueConfig{
+		config = FeedConfig{
 			LastDeliveredTask: NewTaskID(time.Now().Add(-time.Minute)),
 		}
 		err = sc.configs.Save(sc.namespace, config)
@@ -66,7 +91,7 @@ func (sc *SyncedConfig) startConfigSync() {
 	for {
 		select {
 		case <-sc.closeReq:
-			err := sc.configs.Save(sc.namespace, *sc.C)
+			err := sc.trySave()
 			if err != nil {
 				telemetry.Logger.Error("failed to save config to database",
 					zap.Error(err))
@@ -77,11 +102,25 @@ func (sc *SyncedConfig) startConfigSync() {
 		// TODO: Consider syncing after X number of changes if before tick.
 
 		case <-ticker.C:
-			err := sc.configs.Save(sc.namespace, *sc.C)
+			err := sc.trySave()
 			if err != nil {
 				telemetry.Logger.Error("failed to save config to database",
 					zap.Error(err))
 			}
 		}
 	}
+}
+
+// trySave saves the config if it has changed since the last write.
+func (sc *SyncedConfig) trySave() error {
+	if sc.C.Equals(sc.lastSaved) {
+		return nil
+	}
+
+	snapshot := sc.C.Copy()
+	err := sc.configs.Save(sc.namespace, *snapshot)
+	if err == nil {
+		sc.lastSaved = snapshot
+	}
+	return err
 }
