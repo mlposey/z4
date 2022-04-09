@@ -11,6 +11,7 @@ import (
 	"io"
 )
 
+// stateMachine uses raft logs to modify the task database.
 type stateMachine struct {
 	db *badger.DB
 	ts *storage.TaskStore
