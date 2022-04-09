@@ -122,6 +122,14 @@ func (ts *TaskStore) SaveAll(tasks []*proto.Task) error {
 }
 
 func (ts *TaskStore) Get(query TaskRange) ([]*proto.Task, error) {
+	err := query.Validate()
+	if err != nil {
+		return nil, fmt.Errorf("failed to fetch tasks due to invalid query: %w", err)
+	}
+	return ts.get(query)
+}
+
+func (ts *TaskStore) get(query TaskRange) ([]*proto.Task, error) {
 	var tasks []*proto.Task
 	err := ts.Client.DB.View(func(txn *badger.Txn) error {
 		it := txn.NewIterator(badger.DefaultIteratorOptions)
