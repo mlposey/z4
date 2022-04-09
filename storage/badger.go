@@ -12,6 +12,7 @@ import (
 	"time"
 )
 
+// BadgerClient manages a connection to a BadgerDB file store.
 type BadgerClient struct {
 	DB *badger.DB
 }
@@ -41,10 +42,15 @@ func (bc *BadgerClient) handleGC() {
 	}
 }
 
+// Close flushes writes to disk.
+//
+// It must be called when the client is no longer needed or else
+// pending writes may be canceled when the application terminates.
 func (bc *BadgerClient) Close() error {
 	return bc.DB.Close()
 }
 
+// ConfigStore manages persistent storage for feed configurations.
 type ConfigStore struct {
 	Client *BadgerClient
 }
@@ -80,6 +86,7 @@ func (cs *ConfigStore) getConfigFQN(namespace string) []byte {
 	return []byte(fmt.Sprintf("%s#config", namespace))
 }
 
+// TaskStore manages persistent storage for tasks.
 type TaskStore struct {
 	Client *BadgerClient
 }

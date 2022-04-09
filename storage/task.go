@@ -34,6 +34,7 @@ type TaskRange struct {
 	EndID string
 }
 
+// Validate determines whether the TaskRange contains valid properties.
 func (tr TaskRange) Validate() error {
 	if tr.StartID == "" {
 		return errors.New("missing start id in task range")
