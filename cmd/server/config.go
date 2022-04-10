@@ -14,6 +14,7 @@ type Config struct {
 	PeerPort            int    `envconfig:"PEER_PORT" default:"6356"`
 	PeerID              string `envconfig:"PEER_ID" required:"true"`
 	ProfilerEnabled     bool   `envconfig:"PROFILER_ENABLED" default:"false"`
+	MetricsPort         int    `envconfig:"METRICS_PORT" default:"2112"`
 }
 
 func configFromEnv() *Config {

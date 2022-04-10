@@ -25,7 +25,9 @@ func newFSM(db *badger.DB, ts *storage.TaskStore) *stateMachine {
 }
 
 func (f *stateMachine) ApplyBatch(logs []*raft.Log) []interface{} {
+	telemetry.ReceivedLogs.Add(float64(len(logs)))
 	tasks := make([]*proto.Task, len(logs))
+	var taskCount float64
 	res := make([]interface{}, len(logs))
 
 	for i, log := range logs {
@@ -37,6 +39,7 @@ func (f *stateMachine) ApplyBatch(logs []*raft.Log) []interface{} {
 		}
 
 		tasks[i] = task
+		taskCount++
 	}
 
 	err := f.ts.SaveAll(tasks)
@@ -44,6 +47,8 @@ func (f *stateMachine) ApplyBatch(logs []*raft.Log) []interface{} {
 		for i := 0; i < len(res); i++ {
 			res[i] = err
 		}
+	} else {
+		telemetry.AppliedLogs.Add(taskCount)
 	}
 	return res
 }
@@ -54,6 +59,7 @@ func (f *stateMachine) Apply(log *raft.Log) interface{} {
 	// However, we will keep this implementation around just in case the raft
 	// package uses it in the future.
 
+	telemetry.ReceivedLogs.Inc()
 	task := new(proto.Task)
 	err := pb.Unmarshal(log.Data, task)
 	if err != nil {
@@ -64,6 +70,8 @@ func (f *stateMachine) Apply(log *raft.Log) interface{} {
 	err = f.ts.Save(task)
 	if err != nil {
 		telemetry.Logger.Error("task submission to feed failed", zap.Error(err))
+	} else {
+		telemetry.AppliedLogs.Inc()
 	}
 	return err
 }
@@ -90,6 +98,7 @@ func (s *snapshot) Persist(sink raft.SnapshotSink) error {
 	if err != nil {
 		sink.Cancel()
 	} else {
+		telemetry.LastFSMSnapshot.SetToCurrentTime()
 		sink.Close()
 	}
 	return err

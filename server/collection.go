@@ -40,10 +40,16 @@ const (
 )
 
 func (c *collection) CreateTask(ctx context.Context, req *proto.CreateTaskRequest) (*proto.Task, error) {
+	telemetry.CreateTaskRequests.
+		WithLabelValues("CreateTask", req.GetNamespace()).
+		Inc()
 	return c.createTask(ctx, req, syncCreation)
 }
 
 func (c *collection) CreateTaskAsync(ctx context.Context, req *proto.CreateTaskRequest) (*proto.Task, error) {
+	telemetry.CreateTaskRequests.
+		WithLabelValues("CreateTaskAsync", req.GetNamespace()).
+		Inc()
 	return c.createTask(ctx, req, asyncCreation)
 }
 
@@ -56,6 +62,9 @@ func (c *collection) CreateTaskStream(stream proto.Collection_CreateTaskStreamSe
 		if err != nil {
 			return status.Errorf(codes.Internal, "failed to get tasks from client: %v", err)
 		}
+		telemetry.CreateTaskRequests.
+			WithLabelValues("CreateTaskStream", req.GetNamespace()).
+			Inc()
 
 		task, err := c.createTask(stream.Context(), req, syncCreation)
 		if err != nil {
@@ -83,6 +92,9 @@ func (c *collection) CreateTaskStreamAsync(stream proto.Collection_CreateTaskStr
 		if err != nil {
 			return status.Errorf(codes.Internal, "failed to get tasks from client: %v", err)
 		}
+		telemetry.CreateTaskRequests.
+			WithLabelValues("CreateTaskStreamAsync", req.GetNamespace()).
+			Inc()
 
 		task, err := c.createTask(stream.Context(), req, asyncCreation)
 		if err != nil {
@@ -137,11 +149,16 @@ func (c *collection) GetTask(ctx context.Context, req *proto.GetTaskRequest) (*p
 	if err != nil {
 		return nil, status.Errorf(codes.NotFound, "task not found: %v", err)
 	}
+
+	telemetry.StreamedTasks.
+		WithLabelValues("GetTask", req.GetNamespace()).
+		Inc()
 	return task, nil
 }
 
 func (c *collection) GetTaskStream(req *proto.StreamTasksRequest, stream proto.Collection_GetTaskStreamServer) error {
-	return c.fm.Tasks(req.GetNamespace(), func(tasks feeds.TaskStream) error {
+	namespace := req.GetNamespace()
+	return c.fm.Tasks(namespace, func(tasks feeds.TaskStream) error {
 		for {
 			select {
 			case <-stream.Context().Done():
@@ -152,6 +169,10 @@ func (c *collection) GetTaskStream(req *proto.StreamTasksRequest, stream proto.C
 				if err != nil {
 					return status.Errorf(codes.Internal, "failed to send tasks to client: %v", err)
 				}
+
+				telemetry.StreamedTasks.
+					WithLabelValues("GetTaskStream", namespace).
+					Inc()
 			}
 		}
 	})

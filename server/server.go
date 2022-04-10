@@ -13,10 +13,11 @@ import (
 )
 
 type Config struct {
-	DB         *storage.BadgerClient
-	GRPCPort   int
-	PeerConfig PeerConfig
-	Opts       []grpc.ServerOption
+	DB          *storage.BadgerClient
+	GRPCPort    int
+	MetricsPort int
+	PeerConfig  PeerConfig
+	Opts        []grpc.ServerOption
 }
 
 type Server struct {
@@ -51,6 +52,7 @@ func (s *Server) Start() error {
 
 	s.fm = feeds.NewManager(s.config.DB)
 	proto.RegisterCollectionServer(s.server, newCollection(s.fm, s.config.PeerConfig.Tasks, s.peer.Raft))
+	go telemetry.StartPromServer(s.config.MetricsPort)
 	return s.server.Serve(lis)
 }
 

@@ -34,8 +34,9 @@ func main() {
 	db := initDB(config.DBDataDir)
 
 	srv := server.NewServer(server.Config{
-		DB:       db,
-		GRPCPort: config.ServicePort,
+		DB:          db,
+		GRPCPort:    config.ServicePort,
+		MetricsPort: config.MetricsPort,
 		PeerConfig: server.PeerConfig{
 			ID:               config.PeerID,
 			Port:             config.PeerPort,

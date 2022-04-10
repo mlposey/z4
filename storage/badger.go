@@ -34,11 +34,13 @@ func (bc *BadgerClient) handleGC() {
 	defer ticker.Stop()
 	for range ticker.C {
 		telemetry.Logger.Debug("running value log garbage collector")
+
 	again:
 		err := bc.DB.RunValueLogGC(0.7)
 		if err == nil {
 			goto again
 		}
+		telemetry.LastDBGC.SetToCurrentTime()
 	}
 }
 
