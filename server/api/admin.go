@@ -32,7 +32,9 @@ func (a *Admin) CheckHealth(
 	ctx context.Context,
 	req *proto.CheckHealthRequest,
 ) (*proto.Status, error) {
-	// TODO: Implement real health check.
+	if a.handle.LeaderAddress() == "" {
+		return nil, status.Error(codes.Internal, "peer has no leader")
+	}
 	return new(proto.Status), nil
 }
 
