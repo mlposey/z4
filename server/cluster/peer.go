@@ -8,6 +8,7 @@ import (
 	"github.com/mlposey/z4/storage"
 	"github.com/mlposey/z4/telemetry"
 	"go.uber.org/multierr"
+	"net"
 	"os"
 	"path/filepath"
 )
@@ -16,6 +17,7 @@ import (
 type PeerConfig struct {
 	ID               string
 	Port             int
+	AdvertiseAddr    string
 	DataDir          string
 	LogBatchSize     int
 	BootstrapCluster bool
@@ -89,9 +91,13 @@ func (p *Peer) joinNetwork() error {
 	c.BatchApplyCh = true
 	c.MaxAppendEntries = p.config.LogBatchSize
 
-	p.addr = fmt.Sprintf("127.0.0.1:%d", p.config.Port)
-	var err error
-	p.transport, err = raft.NewTCPTransport(p.addr, nil, 0, 0, nil)
+	p.addr = fmt.Sprintf("0.0.0.0:%d", p.config.Port)
+	advertise, err := net.ResolveTCPAddr("tcp", p.config.AdvertiseAddr)
+	if err != nil {
+		return fmt.Errorf("failed to parse avertise address: %s: %w", p.config.AdvertiseAddr, err)
+	}
+
+	p.transport, err = raft.NewTCPTransport(p.addr, advertise, 0, 0, nil)
 	if err != nil {
 		return fmt.Errorf("could not create transport for raft peer: %w", err)
 	}
