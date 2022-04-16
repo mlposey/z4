@@ -167,7 +167,7 @@ func (c *Collection) forwardRequest(
 	ct taskCreationType,
 ) (*proto.CreateTaskResponse, error) {
 
-	client, err := c.handle.Client()
+	client, err := c.handle.CollectionClient()
 	if err != nil {
 		return nil, status.Errorf(codes.Internal, "could not forward request: %v", err)
 	}

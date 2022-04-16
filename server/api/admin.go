@@ -4,6 +4,7 @@ import (
 	"context"
 	"github.com/hashicorp/raft"
 	"github.com/mlposey/z4/proto"
+	"github.com/mlposey/z4/server/cluster"
 	"github.com/mlposey/z4/telemetry"
 	"go.uber.org/zap"
 	"google.golang.org/grpc/codes"
@@ -15,13 +16,15 @@ import (
 type Admin struct {
 	proto.UnimplementedAdminServer
 	raft     *raft.Raft
+	handle   *cluster.LeaderHandle
 	serverID string
 }
 
-func NewAdmin(raft *raft.Raft, serverID string) *Admin {
+func NewAdmin(raft *raft.Raft, serverID string, handle *cluster.LeaderHandle) *Admin {
 	return &Admin{
 		raft:     raft,
 		serverID: serverID,
+		handle:   handle,
 	}
 }
 
@@ -61,9 +64,13 @@ func (a *Admin) AddClusterMember(
 	ctx context.Context,
 	req *proto.AddClusterMemberRequest,
 ) (*emptypb.Empty, error) {
-	// TODO: For now, assume this is always sent to the right node: the leader.
-	// If we can detect within the server if we are the leader, we can forward
-	// the request. Not sure how to do that right now
+	if !a.handle.IsLeader() {
+		client, err := a.handle.AdminClient()
+		if err != nil {
+			return nil, status.Errorf(codes.Internal, "could not forward request: %v", err)
+		}
+		return client.AddClusterMember(ctx, req)
+	}
 
 	if req.GetMemberId() == a.serverID {
 		return nil, status.Error(codes.InvalidArgument, "cannot add leader as duplicate member of cluster")
@@ -84,9 +91,13 @@ func (a *Admin) RemoveClusterMember(
 	ctx context.Context,
 	req *proto.RemoveClusterMemberRequest,
 ) (*emptypb.Empty, error) {
-	// TODO: For now, assume this is always sent to the right node: the leader.
-	// If we can detect within the server if we are the leader, we can forward
-	// the request. Not sure how to do that right now
+	if !a.handle.IsLeader() {
+		client, err := a.handle.AdminClient()
+		if err != nil {
+			return nil, status.Errorf(codes.Internal, "could not forward request: %v", err)
+		}
+		return client.RemoveClusterMember(ctx, req)
+	}
 
 	id := raft.ServerID(req.GetMemberId())
 	future := a.raft.RemoveServer(id, 0, 0)

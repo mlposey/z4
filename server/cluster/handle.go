@@ -13,11 +13,12 @@ import (
 )
 
 type LeaderHandle struct {
-	conn     *grpc.ClientConn
-	client   proto.CollectionClient
-	tracker  *LeaderTracker
-	grpcPort int
-	mu       sync.RWMutex
+	conn             *grpc.ClientConn
+	collectionClient proto.CollectionClient
+	adminClient      proto.AdminClient
+	tracker          *LeaderTracker
+	grpcPort         int
+	mu               sync.RWMutex
 }
 
 func NewHandle(tracker *LeaderTracker, grpcPort int) (*LeaderHandle, error) {
@@ -55,7 +56,8 @@ func (lh *LeaderHandle) resetConn(leaderAddress string) error {
 			return fmt.Errorf("failed to close leader connection: %w", err)
 		}
 		lh.conn = nil
-		lh.client = nil
+		lh.collectionClient = nil
+		lh.adminClient = nil
 	}
 
 	hostPort := strings.Split(leaderAddress, ":")
@@ -70,7 +72,8 @@ func (lh *LeaderHandle) resetConn(leaderAddress string) error {
 		return err
 	}
 	lh.conn = conn
-	lh.client = proto.NewCollectionClient(lh.conn)
+	lh.collectionClient = proto.NewCollectionClient(lh.conn)
+	lh.adminClient = proto.NewAdminClient(lh.conn)
 	return nil
 }
 
@@ -82,12 +85,22 @@ func (lh *LeaderHandle) LeaderAddress() string {
 	return lh.tracker.LeaderAddress()
 }
 
-func (lh *LeaderHandle) Client() (proto.CollectionClient, error) {
+func (lh *LeaderHandle) CollectionClient() (proto.CollectionClient, error) {
 	lh.mu.RLock()
 	defer lh.mu.RUnlock()
 
-	if lh.conn == nil || lh.client == nil {
+	if lh.conn == nil || lh.collectionClient == nil {
 		return nil, errors.New("leader not found")
 	}
-	return lh.client, nil
+	return lh.collectionClient, nil
+}
+
+func (lh *LeaderHandle) AdminClient() (proto.AdminClient, error) {
+	lh.mu.RLock()
+	defer lh.mu.RUnlock()
+
+	if lh.conn == nil || lh.collectionClient == nil {
+		return nil, errors.New("leader not found")
+	}
+	return lh.adminClient, nil
 }

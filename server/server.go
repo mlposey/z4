@@ -49,16 +49,17 @@ func (s *Server) Start() error {
 		return fmt.Errorf("failed to start raft server: %w", err)
 	}
 
-	s.server = grpc.NewServer(s.config.Opts...)
-	adminServer := api.NewAdmin(s.peer.Raft, s.config.PeerConfig.ID)
-	proto.RegisterAdminServer(s.server, adminServer)
-
-	s.fm = feeds.NewManager(s.config.DB)
 	tracker := cluster.NewTracker(s.peer.Raft, s.config.PeerConfig.ID)
 	handle, err := cluster.NewHandle(tracker, s.config.GRPCPort)
 	if err != nil {
 		return fmt.Errorf("failed to obtain leader handle: %w", err)
 	}
+
+	s.server = grpc.NewServer(s.config.Opts...)
+	adminServer := api.NewAdmin(s.peer.Raft, s.config.PeerConfig.ID, handle)
+	proto.RegisterAdminServer(s.server, adminServer)
+
+	s.fm = feeds.NewManager(s.config.DB)
 	collectionServer := api.NewCollection(s.fm, s.config.PeerConfig.Tasks, s.peer.Raft, handle)
 	proto.RegisterCollectionServer(s.server, collectionServer)
 
