@@ -99,7 +99,7 @@ func (lh *LeaderHandle) AdminClient() (proto.AdminClient, error) {
 	lh.mu.RLock()
 	defer lh.mu.RUnlock()
 
-	if lh.conn == nil || lh.collectionClient == nil {
+	if lh.conn == nil || lh.adminClient == nil {
 		return nil, errors.New("leader not found")
 	}
 	return lh.adminClient, nil
