@@ -53,6 +53,7 @@ func (lh *LeaderHandle) resetConn(leaderAddress string) error {
 		if err != nil {
 			return fmt.Errorf("failed to close leader connection: %w", err)
 		}
+		lh.conn = nil
 		lh.client = nil
 	}
 
