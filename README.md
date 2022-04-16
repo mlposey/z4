@@ -68,3 +68,17 @@ pointed to by the `t` flag should be that of the cluster leader.
 
 The `remove-peer` command removes a node from the cluster. The address
 pointed to by the `t` flag should be that of the cluster leader.
+
+## Configuration
+### Environment Variables
+|Variable|Description|Default|
+|--------|-----------|-------|
+|Z4_DEBUG_LOGGING_ENABLED|Enables or disables debug-level logging|false|
+|Z4_DB_DATA_DIR|The directory where task data is stored|z4data|
+|Z4_PEER_DATA_DIR|The directory where cluster membership data is stored|z4peer|
+|Z4_SERVICE_PORT|The port containing the gRPC services|6355|
+|Z4_PEER_PORT|The port containing the internal cluster membership service|6356|
+|Z4_METRICS_PORT|The port containing the Prometheus metrics service|2112|
+|Z4_PEER_ID|The unique ID of the cluster member. Must be stable across restarts||
+|Z4_PEER_ADVERTISE_ADDR|The host:port of the peer that other members use for internal operations|127.0.0.1:6356|
+|Z4_BOOTSTRAP_CLUSTER|Determines whether the peer should declare itself the leader to kickstart the cluster|false|
