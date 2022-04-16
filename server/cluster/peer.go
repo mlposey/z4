@@ -8,6 +8,7 @@ import (
 	"github.com/mlposey/z4/storage"
 	"github.com/mlposey/z4/telemetry"
 	"go.uber.org/multierr"
+	"go.uber.org/zap"
 	"net"
 	"os"
 	"path/filepath"
@@ -49,10 +50,7 @@ func NewPeer(config PeerConfig) (*Peer, error) {
 		return nil, fmt.Errorf("failed to join raft network: %w", err)
 	}
 
-	err = peer.tryBootstrap()
-	if err != nil {
-		return nil, fmt.Errorf("failed to bootstrap cluster: %w", err)
-	}
+	peer.tryBootstrap()
 	return peer, nil
 }
 
@@ -116,9 +114,9 @@ func (p *Peer) joinNetwork() error {
 	return nil
 }
 
-func (p *Peer) tryBootstrap() error {
+func (p *Peer) tryBootstrap() {
 	if !p.config.BootstrapCluster {
-		return nil
+		return
 	}
 	telemetry.Logger.Info("bootstrapping cluster")
 
@@ -133,9 +131,9 @@ func (p *Peer) tryBootstrap() error {
 	}
 	f := p.Raft.BootstrapCluster(cfg)
 	if err := f.Error(); err != nil {
-		return fmt.Errorf("raft.Raft.BootstrapCluster: %v", err)
+		telemetry.Logger.Error("failed to bootstrap cluster",
+			zap.Error(err))
 	}
-	return nil
 }
 
 // Close stops the raft server and flushes writes to disk.
