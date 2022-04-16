@@ -1,4 +1,7 @@
 services:
+  # This container will start out as the leader.
+  # The other containers will need to be added to the cluster
+  # using this container's admin gRPC service.
   peer1:
     build:
       context: ../
@@ -8,6 +11,9 @@ services:
       Z4_PEER_ADVERTISE_ADDR: peer1:6356
       Z4_DB_DATA_DIR: /var/lib/z4/db
       Z4_PEER_DATA_DIR: /var/lib/z4/cluster
+      # This command is essentially ignored when restarting this container
+      # after bootstrapping it the first time, so we do not need to modify
+      # it when testing failure scenarios.
       Z4_BOOTSTRAP_CLUSTER: true
     ports:
       - 6355:6355

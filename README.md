@@ -31,6 +31,22 @@ cluster configurations
 |7|3|
 |..|..|
 
+## Running Locally with Docker Compose
+A [docker-compose file](docker/docker-compose.yaml) allows you to test a three-node cluster locally.
+
+Run `make compose_up` to build and start the cluster.  
+Run `make compose_down` to stop and destroy the cluster.
+
+The Compose environment will initially make container `peer1` the leader. The other peers
+can be added to the cluster using the Admin gRPC service directly or through
+the [z4t](cmd/z4t) tool. Peers can be stopped and started using the docker commands:  
+```
+docker-compose -f docker/docker-compose.yaml stop <container_name>
+docker-compose -f docker/docker-compose.yaml start <container_name>
+```
+Storage is persisted when calling stop/start but erased when using the
+`make compose_down` command.
+
 ## Cluster Administration
 z4 provides a gRPC service for managing clusters. This repository
 ships with [a tool](cmd/z4t) for interacting with that service.
