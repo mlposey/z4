@@ -39,14 +39,82 @@ Run `make compose_down` to stop and destroy the cluster.
 
 The Compose environment will initially make container `peer1` the leader. The other peers
 can be added to the cluster using the Admin gRPC service directly or through
-the [z4t](cmd/z4t) tool. Peers can be stopped and started using the docker commands:  
-```
-docker-compose -f docker/docker-compose.yaml stop <container_name>
-docker-compose -f docker/docker-compose.yaml start <container_name>
-```
-Storage is persisted when calling stop/start but erased when using the
+the [z4t](cmd/z4t) tool. Peers can be stopped and started using docker commands.  
+
+Storage is persisted when restarting individual containers but erased when using the
 `make compose_down` command.
 
+### Example Usage
+1. Start the cluster
+   ```
+   > make compose_up
+   ```
+2. Build z4t tool
+   ```
+   > cd cmd/z4t
+   > go build
+   ```
+3. Inspect the cluster
+   ```
+   > ./z4t -t localhost:6355 info
+   {
+     "server_id": "peer1",
+     "leader_address": "192.168.112.4:6356",
+     "members": [
+       {
+         "id": "peer1",
+         "address": "peer1:6356"
+       }
+     ]
+   }
+   ```
+4. Connect cluster members
+   ```
+   > ./z4t -t localhost:6355 -p peer2:6356 -id peer2 add-peer
+   peer added
+   > ./z4t -t localhost:6355 -p peer3:6356 -id peer3 add-peer
+   peer added
+   ```
+5. Inspect the cluster
+   ```
+   > ./z4t -t localhost:6355 info
+   {
+     "server_id": "peer1",
+     "leader_address": "192.168.112.4:6356",
+     "members": [
+       {
+         "id": "peer1",
+         "address": "peer1:6356"
+       },
+       {
+         "id": "peer2",
+         "address": "peer2:6356"
+       },
+       {
+         "id": "peer3",
+         "address": "peer3:6356"
+       }
+     ]
+   }
+   ```
+6. Add some tasks using the Collection gRPC service  
+   Requests *should* be sent to the leader, but any follower with access to the leader
+   can accept requests and forward them to the leader.
+7. Terminate the leader
+   ```
+   > cd ../..
+   > docker-compose -f docker/docker-compose.yaml stop peer1
+   ```
+8. Add more tasks using either peer2 or peer3
+9. Restart the old leader (and observe that they become a follower this time)
+   ```
+   > docker-compose -f docker/docker-compose.yaml start peer1
+   ```
+10. Add more tasks using any peer
+11. Tear down the cluster
+   ```
+   > make compose_down
+   ```
 ## Cluster Administration
 z4 provides a gRPC service for managing clusters. This repository
 ships with [a tool](cmd/z4t) for interacting with that service.
