@@ -141,6 +141,7 @@ func (p *Peer) tryBootstrap() {
 // This method must be called before the application terminates.
 func (p *Peer) Close() error {
 	return multierr.Combine(
+		p.Raft.Shutdown().Error(),
 		p.transport.Close(),
 		p.logStore.Close(),
 		p.stableStore.Close())
