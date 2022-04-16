@@ -20,7 +20,7 @@ type Feed struct {
 	close     chan bool
 }
 
-func New(namespace string, db *storage.BadgerClient) *Feed {
+func New(namespace string, db *storage.BadgerClient) (*Feed, error) {
 	q := &Feed{
 		tasks:     storage.NewTaskStore(db),
 		config:    storage.NewSyncedConfig(&storage.ConfigStore{Client: db}, namespace),
@@ -28,9 +28,13 @@ func New(namespace string, db *storage.BadgerClient) *Feed {
 		feed:      make(chan *proto.Task),
 		close:     make(chan bool),
 	}
-	q.config.StartSync()
+
+	if err := q.config.StartSync(); err != nil {
+		return nil, fmt.Errorf("feed creation failed due to config error: %w", err)
+	}
+
 	go q.startFeed()
-	return q
+	return q, nil
 }
 
 func (f *Feed) startFeed() {

@@ -1,6 +1,7 @@
 package feeds
 
 import (
+	"fmt"
 	"github.com/mlposey/z4/storage"
 	"github.com/mlposey/z4/telemetry"
 	"go.uber.org/multierr"
@@ -26,7 +27,10 @@ func NewManager(db *storage.BadgerClient) *Manager {
 //
 // This method automatically manages a lease on the feed.
 func (qm *Manager) Tasks(namespace string, handle func(tasks TaskStream) error) error {
-	lease := qm.Lease(namespace)
+	lease, err := qm.Lease(namespace)
+	if err != nil {
+		return err
+	}
 	defer lease.Release()
 
 	tasks := lease.Feed().Tasks()
@@ -36,18 +40,23 @@ func (qm *Manager) Tasks(namespace string, handle func(tasks TaskStream) error) 
 // Lease grants access to the feed for the requested namespace.
 //
 // The Tasks method should be preferred in most cases.
-func (qm *Manager) Lease(namespace string) *Lease {
+func (qm *Manager) Lease(namespace string) (*Lease, error) {
 	qm.mu.Lock()
 	defer qm.mu.Unlock()
 
-	feed, exists := qm.leases[namespace]
+	lease, exists := qm.leases[namespace]
 	if !exists {
-		feed = newLeaseHolder(namespace, qm.db, func() {
+		var err error
+		lease, err = newLeaseHolder(namespace, qm.db, func() {
 			qm.cleanUpLeases(namespace)
 		})
-		qm.leases[namespace] = feed
+		if err != nil {
+			return nil, fmt.Errorf("failed to acquire lease for namespace %s: %w", namespace, err)
+		}
+
+		qm.leases[namespace] = lease
 	}
-	return feed.Lease()
+	return lease.Get(), nil
 }
 
 func (qm *Manager) cleanUpLeases(namespace string) {

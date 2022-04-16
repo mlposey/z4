@@ -2,6 +2,7 @@ package storage
 
 import (
 	"errors"
+	"fmt"
 	"github.com/dgraph-io/badger/v3"
 	"github.com/mlposey/z4/telemetry"
 	"go.uber.org/zap"
@@ -52,9 +53,13 @@ func NewSyncedConfig(configs *ConfigStore, namespace string) *SyncedConfig {
 	}
 }
 
-func (sc *SyncedConfig) StartSync() {
-	sc.loadConfig()
+func (sc *SyncedConfig) StartSync() error {
+	if err := sc.loadConfig(); err != nil {
+		return err
+	}
+
 	go sc.startConfigSync()
+	return nil
 }
 
 // Close flushes config changes to disk and stops the sync thread.
@@ -65,13 +70,11 @@ func (sc *SyncedConfig) Close() error {
 	return nil
 }
 
-func (sc *SyncedConfig) loadConfig() {
-	// TODO: Return error instead of fatal logging.
+func (sc *SyncedConfig) loadConfig() error {
 	config, err := sc.configs.Get(sc.namespace)
 	if err != nil {
 		if !errors.Is(err, badger.ErrKeyNotFound) {
-			telemetry.Logger.Fatal("failed to load namespace config from database",
-				zap.Error(err))
+			return fmt.Errorf("failed to load namespace config from database: %w", err)
 		}
 
 		config = FeedConfig{
@@ -79,11 +82,11 @@ func (sc *SyncedConfig) loadConfig() {
 		}
 		err = sc.configs.Save(sc.namespace, config)
 		if err != nil {
-			telemetry.Logger.Fatal("failed to save config to database",
-				zap.Error(err))
+			return fmt.Errorf("failed to save config to database: %w", err)
 		}
 	}
 	sc.C = &config
+	return nil
 }
 
 func (sc *SyncedConfig) startConfigSync() {

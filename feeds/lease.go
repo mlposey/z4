@@ -1,6 +1,7 @@
 package feeds
 
 import (
+	"fmt"
 	"github.com/mlposey/z4/storage"
 	"github.com/mlposey/z4/telemetry"
 	"go.uber.org/zap"
@@ -16,17 +17,22 @@ type leaseHolder struct {
 	onRemove func()
 }
 
-func newLeaseHolder(namespace string, db *storage.BadgerClient, onRemove func()) *leaseHolder {
+func newLeaseHolder(namespace string, db *storage.BadgerClient, onRemove func()) (*leaseHolder, error) {
+	feed, err := New(namespace, db)
+	if err != nil {
+		return nil, fmt.Errorf("lease creation failed: %w", err)
+	}
+
 	return &leaseHolder{
-		F:        New(namespace, db),
+		F:        feed,
 		leases:   make(map[*Lease]interface{}),
 		empty:    struct{}{},
 		onRemove: onRemove,
-	}
+	}, nil
 }
 
-// Lease grants a client access to the feed.
-func (lh *leaseHolder) Lease() *Lease {
+// Get grants a client access to the feed.
+func (lh *leaseHolder) Get() *Lease {
 	lh.mu.Lock()
 	defer lh.mu.Unlock()
 
