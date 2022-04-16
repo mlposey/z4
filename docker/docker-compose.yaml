@@ -1,0 +1,38 @@
+services:
+  peer1:
+    build:
+      context: ../
+      dockerfile: docker/Dockerfile
+    environment:
+      Z4_PEER_ID: peer1
+      Z4_PEER_ADVERTISE_ADDR: peer1:6356
+      Z4_BOOTSTRAP_CLUSTER: true
+    ports:
+      - 6355:6355
+  peer2:
+    build:
+      context: ../
+      dockerfile: docker/Dockerfile
+    environment:
+      Z4_PEER_ID: peer2
+      Z4_PEER_ADVERTISE_ADDR: peer2:6356
+    ports:
+      - 6455:6355
+  peer3:
+    build:
+      context: ../
+      dockerfile: docker/Dockerfile
+    environment:
+      Z4_PEER_ID: peer3
+      Z4_PEER_ADVERTISE_ADDR: peer3:6356
+    ports:
+      - 6555:6355
+  peer4:
+    build:
+      context: ../
+      dockerfile: docker/Dockerfile
+    environment:
+      Z4_PEER_ID: peer4
+      Z4_PEER_ADVERTISE_ADDR: peer4:6356
+    ports:
+      - 6655:6355
