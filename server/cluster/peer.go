@@ -29,7 +29,6 @@ type PeerConfig struct {
 // Peer controls a node's membership in the raft cluster.
 type Peer struct {
 	Raft        *raft.Raft
-	addr        string
 	config      PeerConfig
 	logStore    *boltdb.BoltStore
 	stableStore *boltdb.BoltStore
@@ -92,13 +91,13 @@ func (p *Peer) joinNetwork() error {
 		return fmt.Errorf("invalid raft config: %w", err)
 	}
 
-	p.addr = fmt.Sprintf("0.0.0.0:%d", p.config.Port)
+	bindAddr := fmt.Sprintf("0.0.0.0:%d", p.config.Port)
 	advertise, err := net.ResolveTCPAddr("tcp", p.config.AdvertiseAddr)
 	if err != nil {
 		return fmt.Errorf("failed to parse avertise address: %s: %w", p.config.AdvertiseAddr, err)
 	}
 
-	p.transport, err = raft.NewTCPTransport(p.addr, advertise, 0, 0, nil)
+	p.transport, err = raft.NewTCPTransport(bindAddr, advertise, 0, 0, nil)
 	if err != nil {
 		return fmt.Errorf("could not create transport for raft peer: %w", err)
 	}
@@ -128,7 +127,7 @@ func (p *Peer) tryBootstrap() {
 			{
 				Suffrage: raft.Voter,
 				ID:       raft.ServerID(p.config.ID),
-				Address:  raft.ServerAddress(p.addr),
+				Address:  raft.ServerAddress(p.config.AdvertiseAddr),
 			},
 		},
 	}
