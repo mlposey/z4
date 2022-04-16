@@ -19,16 +19,23 @@ import (
 // collection implements the gRPC Collection service.
 type collection struct {
 	proto.UnimplementedCollectionServer
-	fm    *feeds.Manager
-	tasks *storage.TaskStore
-	raft  *raft.Raft
+	fm      *feeds.Manager
+	tasks   *storage.TaskStore
+	raft    *raft.Raft
+	checker *leaderStatusChecker
 }
 
-func newCollection(fm *feeds.Manager, tasks *storage.TaskStore, raft *raft.Raft) proto.CollectionServer {
+func newCollection(
+	fm *feeds.Manager,
+	tasks *storage.TaskStore,
+	raft *raft.Raft,
+	checker *leaderStatusChecker,
+) proto.CollectionServer {
 	return &collection{
-		fm:    fm,
-		tasks: tasks,
-		raft:  raft,
+		fm:      fm,
+		tasks:   tasks,
+		raft:    raft,
+		checker: checker,
 	}
 }
 
@@ -38,6 +45,13 @@ const (
 	asyncCreation taskCreationType = iota
 	syncCreation
 )
+
+func (c *collection) verifyLeader() error {
+	if !c.checker.IsLeader() {
+		return status.Errorf(codes.FailedPrecondition, "this request must be sent to the cluster leader")
+	}
+	return nil
+}
 
 func (c *collection) CreateTask(ctx context.Context, req *proto.CreateTaskRequest) (*proto.Task, error) {
 	telemetry.CreateTaskRequests.
@@ -114,6 +128,12 @@ func (c *collection) CreateTaskStreamAsync(stream proto.Collection_CreateTaskStr
 }
 
 func (c *collection) createTask(ctx context.Context, req *proto.CreateTaskRequest, ct taskCreationType) (*proto.Task, error) {
+	if err := c.verifyLeader(); err != nil {
+		// TODO: Forward request to the leader.
+		// But also let them know they should reconnect to the leader for efficiency.
+		return nil, err
+	}
+
 	task := &proto.Task{
 		Id:        storage.NewTaskID(c.getRunTime(req)),
 		Namespace: req.GetNamespace(),

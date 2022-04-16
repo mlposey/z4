@@ -48,10 +48,14 @@ func (s *Server) Start() error {
 	}
 
 	s.server = grpc.NewServer(s.config.Opts...)
-	proto.RegisterAdminServer(s.server, newAdmin(s.peer.Raft, s.config.PeerConfig.ID))
+	adminServer := newAdmin(s.peer.Raft, s.config.PeerConfig.ID)
+	proto.RegisterAdminServer(s.server, adminServer)
 
 	s.fm = feeds.NewManager(s.config.DB)
-	proto.RegisterCollectionServer(s.server, newCollection(s.fm, s.config.PeerConfig.Tasks, s.peer.Raft))
+	checker := newStatusChecker(s.peer.Raft, s.config.PeerConfig.ID)
+	collectionServer := newCollection(s.fm, s.config.PeerConfig.Tasks, s.peer.Raft, checker)
+	proto.RegisterCollectionServer(s.server, collectionServer)
+
 	go telemetry.StartPromServer(s.config.MetricsPort)
 	return s.server.Serve(lis)
 }
