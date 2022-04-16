@@ -1,10 +1,11 @@
-package server
+package api
 
 import (
 	"context"
 	"github.com/hashicorp/raft"
 	"github.com/mlposey/z4/feeds"
 	"github.com/mlposey/z4/proto"
+	"github.com/mlposey/z4/server/cluster"
 	"github.com/mlposey/z4/storage"
 	"github.com/mlposey/z4/telemetry"
 	"go.uber.org/zap"
@@ -16,26 +17,26 @@ import (
 	"time"
 )
 
-// collection implements the gRPC Collection service.
-type collection struct {
+// Collection implements the gRPC Collection service.
+type Collection struct {
 	proto.UnimplementedCollectionServer
-	fm      *feeds.Manager
-	tasks   *storage.TaskStore
-	raft    *raft.Raft
-	checker *leaderStatusChecker
+	fm     *feeds.Manager
+	tasks  *storage.TaskStore
+	raft   *raft.Raft
+	handle *cluster.LeaderHandle
 }
 
-func newCollection(
+func NewCollection(
 	fm *feeds.Manager,
 	tasks *storage.TaskStore,
 	raft *raft.Raft,
-	checker *leaderStatusChecker,
+	handle *cluster.LeaderHandle,
 ) proto.CollectionServer {
-	return &collection{
-		fm:      fm,
-		tasks:   tasks,
-		raft:    raft,
-		checker: checker,
+	return &Collection{
+		fm:     fm,
+		tasks:  tasks,
+		raft:   raft,
+		handle: handle,
 	}
 }
 
@@ -46,28 +47,21 @@ const (
 	syncCreation
 )
 
-func (c *collection) verifyLeader() error {
-	if !c.checker.IsLeader() {
-		return status.Errorf(codes.FailedPrecondition, "this request must be sent to the cluster leader")
-	}
-	return nil
-}
-
-func (c *collection) CreateTask(ctx context.Context, req *proto.CreateTaskRequest) (*proto.Task, error) {
+func (c *Collection) CreateTask(ctx context.Context, req *proto.CreateTaskRequest) (*proto.Task, error) {
 	telemetry.CreateTaskRequests.
 		WithLabelValues("CreateTask", req.GetNamespace()).
 		Inc()
 	return c.createTask(ctx, req, syncCreation)
 }
 
-func (c *collection) CreateTaskAsync(ctx context.Context, req *proto.CreateTaskRequest) (*proto.Task, error) {
+func (c *Collection) CreateTaskAsync(ctx context.Context, req *proto.CreateTaskRequest) (*proto.Task, error) {
 	telemetry.CreateTaskRequests.
 		WithLabelValues("CreateTaskAsync", req.GetNamespace()).
 		Inc()
 	return c.createTask(ctx, req, asyncCreation)
 }
 
-func (c *collection) CreateTaskStream(stream proto.Collection_CreateTaskStreamServer) error {
+func (c *Collection) CreateTaskStream(stream proto.Collection_CreateTaskStreamServer) error {
 	for {
 		req, err := stream.Recv()
 		if err == io.EOF {
@@ -97,7 +91,7 @@ func (c *collection) CreateTaskStream(stream proto.Collection_CreateTaskStreamSe
 	}
 }
 
-func (c *collection) CreateTaskStreamAsync(stream proto.Collection_CreateTaskStreamAsyncServer) error {
+func (c *Collection) CreateTaskStreamAsync(stream proto.Collection_CreateTaskStreamAsyncServer) error {
 	for {
 		req, err := stream.Recv()
 		if err == io.EOF {
@@ -127,7 +121,7 @@ func (c *collection) CreateTaskStreamAsync(stream proto.Collection_CreateTaskStr
 	}
 }
 
-func (c *collection) createTask(ctx context.Context, req *proto.CreateTaskRequest, ct taskCreationType) (*proto.Task, error) {
+func (c *Collection) createTask(ctx context.Context, req *proto.CreateTaskRequest, ct taskCreationType) (*proto.Task, error) {
 	if err := c.verifyLeader(); err != nil {
 		// TODO: Forward request to the leader.
 		// But also let them know they should reconnect to the leader for efficiency.
@@ -159,12 +153,19 @@ func (c *collection) createTask(ctx context.Context, req *proto.CreateTaskReques
 	return task, nil
 }
 
-func (c *collection) saveTask(task *proto.Task) raft.ApplyFuture {
+func (c *Collection) verifyLeader() error {
+	if !c.handle.IsLeader() {
+		return status.Errorf(codes.FailedPrecondition, "this request must be sent to the cluster leader")
+	}
+	return nil
+}
+
+func (c *Collection) saveTask(task *proto.Task) raft.ApplyFuture {
 	cmd, _ := pb.Marshal(task)
 	return c.raft.Apply(cmd, 0)
 }
 
-func (c *collection) GetTask(ctx context.Context, req *proto.GetTaskRequest) (*proto.Task, error) {
+func (c *Collection) GetTask(ctx context.Context, req *proto.GetTaskRequest) (*proto.Task, error) {
 	task, err := c.tasks.Get(req.GetNamespace(), req.GetTaskId())
 	if err != nil {
 		return nil, status.Errorf(codes.NotFound, "task not found: %v", err)
@@ -176,7 +177,7 @@ func (c *collection) GetTask(ctx context.Context, req *proto.GetTaskRequest) (*p
 	return task, nil
 }
 
-func (c *collection) GetTaskStream(req *proto.StreamTasksRequest, stream proto.Collection_GetTaskStreamServer) error {
+func (c *Collection) GetTaskStream(req *proto.StreamTasksRequest, stream proto.Collection_GetTaskStreamServer) error {
 	namespace := req.GetNamespace()
 	return c.fm.Tasks(namespace, func(tasks feeds.TaskStream) error {
 		for {
@@ -198,7 +199,7 @@ func (c *collection) GetTaskStream(req *proto.StreamTasksRequest, stream proto.C
 	})
 }
 
-func (c *collection) getRunTime(req *proto.CreateTaskRequest) time.Time {
+func (c *Collection) getRunTime(req *proto.CreateTaskRequest) time.Time {
 	if req.GetTtsSeconds() > 0 {
 		return time.Now().Add(time.Duration(req.GetTtsSeconds()) * time.Second)
 	}
