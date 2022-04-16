@@ -85,7 +85,6 @@ func (p *Peer) initStorage() error {
 func (p *Peer) joinNetwork() error {
 	c := raft.DefaultConfig()
 	c.LocalID = raft.ServerID(p.config.ID)
-
 	c.BatchApplyCh = true
 	c.MaxAppendEntries = p.config.LogBatchSize
 	err := raft.ValidateConfig(c)
