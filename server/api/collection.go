@@ -47,14 +47,14 @@ const (
 	syncCreation
 )
 
-func (c *Collection) CreateTask(ctx context.Context, req *proto.CreateTaskRequest) (*proto.Task, error) {
+func (c *Collection) CreateTask(ctx context.Context, req *proto.CreateTaskRequest) (*proto.CreateTaskResponse, error) {
 	telemetry.CreateTaskRequests.
 		WithLabelValues("CreateTask", req.GetNamespace()).
 		Inc()
 	return c.createTask(ctx, req, syncCreation)
 }
 
-func (c *Collection) CreateTaskAsync(ctx context.Context, req *proto.CreateTaskRequest) (*proto.Task, error) {
+func (c *Collection) CreateTaskAsync(ctx context.Context, req *proto.CreateTaskRequest) (*proto.CreateTaskResponse, error) {
 	telemetry.CreateTaskRequests.
 		WithLabelValues("CreateTaskAsync", req.GetNamespace()).
 		Inc()
@@ -80,8 +80,9 @@ func (c *Collection) CreateTaskStream(stream proto.Collection_CreateTaskStreamSe
 		}
 
 		err = stream.Send(&proto.TaskStreamResponse{
-			Task:   task,
-			Status: uint32(codes.OK),
+			Task:        task.GetTask(),
+			Status:      uint32(codes.OK),
+			ForwardedTo: task.GetForwardedTo(),
 		})
 
 		if err != nil {
@@ -110,8 +111,9 @@ func (c *Collection) CreateTaskStreamAsync(stream proto.Collection_CreateTaskStr
 		}
 
 		err = stream.Send(&proto.TaskStreamResponse{
-			Task:   task,
-			Status: uint32(codes.OK),
+			Task:        task.GetTask(),
+			Status:      uint32(codes.OK),
+			ForwardedTo: task.GetForwardedTo(),
 		})
 
 		if err != nil {
@@ -121,9 +123,17 @@ func (c *Collection) CreateTaskStreamAsync(stream proto.Collection_CreateTaskStr
 	}
 }
 
-func (c *Collection) createTask(ctx context.Context, req *proto.CreateTaskRequest, ct taskCreationType) (*proto.Task, error) {
+func (c *Collection) createTask(ctx context.Context, req *proto.CreateTaskRequest, ct taskCreationType) (*proto.CreateTaskResponse, error) {
 	if !c.handle.IsLeader() {
-		return c.forwardRequest(ctx, req, ct)
+		leader := c.handle.LeaderAddress()
+		res, err := c.forwardRequest(ctx, req, ct)
+		if err == nil {
+			// don't overwrite if it was forwarded multiple times
+			if res.GetForwardedTo() == "" {
+				res.ForwardedTo = leader
+			}
+		}
+		return res, err
 	}
 
 	task := &proto.Task{
@@ -148,14 +158,14 @@ func (c *Collection) createTask(ctx context.Context, req *proto.CreateTaskReques
 		return nil, status.Errorf(codes.Internal, "invalid creation type %v", ct)
 	}
 
-	return task, nil
+	return &proto.CreateTaskResponse{Task: task}, nil
 }
 
 func (c *Collection) forwardRequest(
 	ctx context.Context,
 	req *proto.CreateTaskRequest,
 	ct taskCreationType,
-) (*proto.Task, error) {
+) (*proto.CreateTaskResponse, error) {
 
 	client := c.handle.Client()
 	if client == nil {

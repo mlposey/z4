@@ -49,10 +49,10 @@ message RemoveClusterMemberRequest {
 
 // The Collection service manages tasks.
 service Collection {
-  rpc CreateTask(CreateTaskRequest) returns (Task) {};
+  rpc CreateTask(CreateTaskRequest) returns (CreateTaskResponse) {};
   rpc CreateTaskStream(stream CreateTaskRequest) returns (stream TaskStreamResponse) {};
 
-  rpc CreateTaskAsync(CreateTaskRequest) returns (Task) {};
+  rpc CreateTaskAsync(CreateTaskRequest) returns (CreateTaskResponse) {};
   rpc CreateTaskStreamAsync(stream CreateTaskRequest) returns (stream TaskStreamResponse) {};
 
   rpc GetTask(GetTaskRequest) returns (Task) {};
@@ -68,10 +68,16 @@ message CreateTaskRequest {
   int64 tts_seconds = 6;
 }
 
+message CreateTaskResponse {
+  Task task = 1;
+  string forwarded_to = 2;
+}
+
 message TaskStreamResponse {
   Task task = 1;
   uint32 status = 2;
   string message = 3;
+  string forwarded_to = 4;
 }
 
 message StreamTasksRequest {

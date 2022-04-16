@@ -76,6 +76,10 @@ func (lh *LeaderHandle) IsLeader() bool {
 	return lh.tracker.IsLeader()
 }
 
+func (lh *LeaderHandle) LeaderAddress() string {
+	return lh.tracker.LeaderAddress()
+}
+
 func (lh *LeaderHandle) Client() proto.CollectionClient {
 	lh.mu.RLock()
 	defer lh.mu.RUnlock()
