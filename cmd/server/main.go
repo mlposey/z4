@@ -41,6 +41,7 @@ func main() {
 		PeerConfig: cluster.PeerConfig{
 			ID:               config.PeerID,
 			Port:             config.PeerPort,
+			AdvertiseAddr:    config.PeerAdvertiseAddr,
 			DataDir:          config.PeerDataDir,
 			LogBatchSize:     1000,
 			BootstrapCluster: config.BootstrapCluster,
