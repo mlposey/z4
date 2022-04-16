@@ -1,5 +1,11 @@
 .PHONY: proto
 
+compose_up:
+	docker-compose -f docker/docker-compose.yaml up --build
+
+compose_down:
+	docker-compose -f docker/docker-compose.yaml down -v
+
 clean_db:
 	rm -rf z4data && mkdir z4data
 	rm -rf z4peer && mkdir z4peer
