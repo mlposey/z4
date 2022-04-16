@@ -46,7 +46,7 @@ func (lh *LeaderHandle) resetConn(leaderAddress string) error {
 		return nil
 	}
 	lh.mu.Lock()
-	lh.mu.Unlock()
+	defer lh.mu.Unlock()
 
 	if lh.conn != nil {
 		err := lh.conn.Close()
