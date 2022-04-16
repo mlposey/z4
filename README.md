@@ -13,7 +13,7 @@ The z4 architecture is focused on providing
 
 A key part of achieving the above goals is a reliance on the Raft consensus
 algorithm. Raft enables the replication of data as well as the automated
-failover when peers die.
+failover when peers become unreachable.
 
 ## Deployment Model
 A collection of z4 application instances forms a cluster. Each member of the cluster is called
