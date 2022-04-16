@@ -65,6 +65,10 @@ func (a *Admin) AddClusterMember(
 	// If we can detect within the server if we are the leader, we can forward
 	// the request. Not sure how to do that right now
 
+	if req.GetMemberId() == a.serverID {
+		return nil, status.Error(codes.InvalidArgument, "cannot add leader as duplicate member of cluster")
+	}
+
 	id := raft.ServerID(req.GetMemberId())
 	addr := raft.ServerAddress(req.GetMemberAddress())
 	future := a.raft.AddVoter(id, addr, 0, 0)
