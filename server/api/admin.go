@@ -55,7 +55,7 @@ func (a *Admin) GetClusterInfo(
 
 	return &proto.ClusterInfo{
 		ServerId:      a.serverID,
-		LeaderAddress: string(a.raft.Leader()),
+		LeaderAddress: a.handle.LeaderAddress(),
 		Members:       members,
 	}, nil
 }
@@ -104,7 +104,7 @@ func (a *Admin) RemoveClusterMember(
 	err := future.Error()
 	if err != nil {
 		return new(emptypb.Empty), status.Errorf(codes.Internal,
-			"could not remove member to cluster: %v", err)
+			"could not remove member from cluster: %v", err)
 	}
 	return new(emptypb.Empty), nil
 }
