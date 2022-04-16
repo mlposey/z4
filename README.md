@@ -1,14 +1,14 @@
 # z4
 z4 is a distributed database for managing tasks.
 
-# Contents
+## Contents
 * [Architecture](#architecture)
 * [Deployment Model](#deployment-model)
 * [Running Locally with Docker Compose](#running-locally-with-docker-compose)
 * [Cluster Administration](#cluster-administration)
 * [Configuration](#configuration)
 
-## Architecture
+### Architecture
 The z4 architecture is focused on providing
 * Durability
   * Writes are persisted onto a storage medium and then replicated to other
@@ -22,7 +22,7 @@ A key part of achieving the above goals is a reliance on the Raft consensus
 algorithm. Raft enables the replication of data as well as the automated
 failover when peers become unreachable.
 
-## Deployment Model
+### Deployment Model
 A collection of z4 application instances forms a cluster. Each member of the cluster is called
 a peer.
 
@@ -38,7 +38,7 @@ cluster configurations
 |7|3|
 |..|..|
 
-## Running Locally with Docker Compose
+### Running Locally with Docker Compose
 A [docker-compose file](docker/docker-compose.yaml) allows you to test a three-node cluster locally.
 
 Run `make compose_up` to build and start the cluster.  
@@ -51,7 +51,7 @@ the [z4t](cmd/z4t) tool. Peers can be stopped and started using docker commands.
 Storage is persisted when restarting individual containers but erased when using the
 `make compose_down` command.
 
-### Example Usage
+#### Example Usage
 1. Start the cluster
    ```
    > make compose_up
@@ -122,30 +122,30 @@ Storage is persisted when restarting individual containers but erased when using
    ```
    > make compose_down
    ```
-## Cluster Administration
+### Cluster Administration
 z4 provides a gRPC service for managing clusters. This repository
 ships with [a tool](cmd/z4t) for interacting with that service.
-### Example Usage
-#### Get cluster info
+#### Example Usage
+##### Get cluster info
 `z4t -t localhost:6355 info`
 
 The `info` command returns information that the target node has about the overall cluster.
 
-#### Add peers to the cluster
+##### Add peers to the cluster
 `z4t -t localhost:6355 -p localhost:6456 -id peer1 add-peer`
 
 The `add-peer` command adds a peer to the cluster. The peer address must point to
 the peer's raft port rather than the port of the admin gRPC service. The address
 pointed to by the `t` flag should be that of the cluster leader.
 
-#### Remove peers from the cluster
+##### Remove peers from the cluster
 `z4t -t localhost:6355 -id peer1 remove-peer`
 
 The `remove-peer` command removes a node from the cluster. The address
 pointed to by the `t` flag should be that of the cluster leader.
 
-## Configuration
-### Environment Variables
+### Configuration
+#### Environment Variables
 |Variable|Description|Default|
 |--------|-----------|-------|
 |Z4_DEBUG_LOGGING_ENABLED|Enables or disables debug-level logging|false|
