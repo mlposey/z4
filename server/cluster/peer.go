@@ -88,6 +88,10 @@ func (p *Peer) joinNetwork() error {
 
 	c.BatchApplyCh = true
 	c.MaxAppendEntries = p.config.LogBatchSize
+	err := raft.ValidateConfig(c)
+	if err != nil {
+		return fmt.Errorf("invalid raft config: %w", err)
+	}
 
 	p.addr = fmt.Sprintf("0.0.0.0:%d", p.config.Port)
 	advertise, err := net.ResolveTCPAddr("tcp", p.config.AdvertiseAddr)
