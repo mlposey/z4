@@ -122,10 +122,8 @@ func (c *Collection) CreateTaskStreamAsync(stream proto.Collection_CreateTaskStr
 }
 
 func (c *Collection) createTask(ctx context.Context, req *proto.CreateTaskRequest, ct taskCreationType) (*proto.Task, error) {
-	if err := c.verifyLeader(); err != nil {
-		// TODO: Forward request to the leader.
-		// But also let them know they should reconnect to the leader for efficiency.
-		return nil, err
+	if !c.handle.IsLeader() {
+		return c.forwardRequest(ctx, req, ct)
 	}
 
 	task := &proto.Task{
@@ -153,11 +151,27 @@ func (c *Collection) createTask(ctx context.Context, req *proto.CreateTaskReques
 	return task, nil
 }
 
-func (c *Collection) verifyLeader() error {
-	if !c.handle.IsLeader() {
-		return status.Errorf(codes.FailedPrecondition, "this request must be sent to the cluster leader")
+func (c *Collection) forwardRequest(
+	ctx context.Context,
+	req *proto.CreateTaskRequest,
+	ct taskCreationType,
+) (*proto.Task, error) {
+
+	client := c.handle.Client()
+	if client == nil {
+		return nil, status.Error(codes.Internal, "could not forward request: leader not found")
 	}
-	return nil
+
+	switch ct {
+	case asyncCreation:
+		return client.CreateTaskAsync(ctx, req)
+
+	case syncCreation:
+		return client.CreateTask(ctx, req)
+
+	default:
+		return nil, status.Errorf(codes.Internal, "invalid creation type %v", ct)
+	}
 }
 
 func (c *Collection) saveTask(task *proto.Task) raft.ApplyFuture {
