@@ -194,7 +194,7 @@ func (ts *taskStreams) iHaveCreatedTheTask(arg1 *godog.DocString) error {
 		TtsSeconds: int64(taskDef["tts_seconds"].(float64)),
 	}
 	task, err := ts.client.CreateTask(context.Background(), ts.taskRequest)
-	ts.createdTask = task
+	ts.createdTask = task.GetTask()
 	return err
 }
 
