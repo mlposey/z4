@@ -1,6 +1,13 @@
 # z4
 z4 is a distributed database for managing tasks.
 
+# Contents
+* [Architecture](#architecture)
+* [Deployment Model](#deployment-model)
+* [Running Locally with Docker Compose](#running-locally-with-docker-compose)
+* [Cluster Administration](#cluster-administration)
+* [Configuration](#configuration)
+
 ## Architecture
 The z4 architecture is focused on providing
 * Durability
