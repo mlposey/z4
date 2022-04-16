@@ -167,9 +167,9 @@ func (c *Collection) forwardRequest(
 	ct taskCreationType,
 ) (*proto.CreateTaskResponse, error) {
 
-	client := c.handle.Client()
-	if client == nil {
-		return nil, status.Error(codes.Internal, "could not forward request: leader not found")
+	client, err := c.handle.Client()
+	if err != nil {
+		return nil, status.Errorf(codes.Internal, "could not forward request: %v", err)
 	}
 
 	switch ct {

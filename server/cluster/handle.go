@@ -1,6 +1,7 @@
 package cluster
 
 import (
+	"errors"
 	"fmt"
 	"github.com/mlposey/z4/proto"
 	"github.com/mlposey/z4/telemetry"
@@ -81,8 +82,12 @@ func (lh *LeaderHandle) LeaderAddress() string {
 	return lh.tracker.LeaderAddress()
 }
 
-func (lh *LeaderHandle) Client() proto.CollectionClient {
+func (lh *LeaderHandle) Client() (proto.CollectionClient, error) {
 	lh.mu.RLock()
 	defer lh.mu.RUnlock()
-	return lh.client
+
+	if lh.conn == nil || lh.client == nil {
+		return nil, errors.New("leader not found")
+	}
+	return lh.client, nil
 }
