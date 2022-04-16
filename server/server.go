@@ -4,6 +4,8 @@ import (
 	"fmt"
 	"github.com/mlposey/z4/feeds"
 	"github.com/mlposey/z4/proto"
+	"github.com/mlposey/z4/server/api"
+	"github.com/mlposey/z4/server/cluster"
 	"github.com/mlposey/z4/storage"
 	"github.com/mlposey/z4/telemetry"
 	"go.uber.org/multierr"
@@ -16,7 +18,7 @@ type Config struct {
 	DB          *storage.BadgerClient
 	GRPCPort    int
 	MetricsPort int
-	PeerConfig  PeerConfig
+	PeerConfig  cluster.PeerConfig
 	Opts        []grpc.ServerOption
 }
 
@@ -24,7 +26,7 @@ type Server struct {
 	fm     *feeds.Manager
 	config Config
 	server *grpc.Server
-	peer   *raftPeer
+	peer   *cluster.Peer
 }
 
 func NewServer(config Config) *Server {
@@ -42,18 +44,22 @@ func (s *Server) Start() error {
 
 	s.config.PeerConfig.Tasks = storage.NewTaskStore(s.config.DB)
 	s.config.PeerConfig.DB = s.config.DB
-	s.peer, err = newPeer(s.config.PeerConfig)
+	s.peer, err = cluster.NewPeer(s.config.PeerConfig)
 	if err != nil {
 		return fmt.Errorf("failed to start raft server: %w", err)
 	}
 
 	s.server = grpc.NewServer(s.config.Opts...)
-	adminServer := newAdmin(s.peer.Raft, s.config.PeerConfig.ID)
+	adminServer := api.NewAdmin(s.peer.Raft, s.config.PeerConfig.ID)
 	proto.RegisterAdminServer(s.server, adminServer)
 
 	s.fm = feeds.NewManager(s.config.DB)
-	checker := newStatusChecker(s.peer.Raft, s.config.PeerConfig.ID)
-	collectionServer := newCollection(s.fm, s.config.PeerConfig.Tasks, s.peer.Raft, checker)
+	tracker := cluster.NewTracker(s.peer.Raft, s.config.PeerConfig.ID)
+	handle, err := cluster.NewHandle(tracker, s.config.GRPCPort)
+	if err != nil {
+		return fmt.Errorf("failed to obtain leader handle: %w", err)
+	}
+	collectionServer := api.NewCollection(s.fm, s.config.PeerConfig.Tasks, s.peer.Raft, handle)
 	proto.RegisterCollectionServer(s.server, collectionServer)
 
 	go telemetry.StartPromServer(s.config.MetricsPort)

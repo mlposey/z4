@@ -1,4 +1,4 @@
-package server
+package api
 
 import (
 	"context"
@@ -11,21 +11,21 @@ import (
 	emptypb "google.golang.org/protobuf/types/known/emptypb"
 )
 
-// admin implements the gRPC Admin service.
-type admin struct {
+// Admin implements the gRPC Admin service.
+type Admin struct {
 	proto.UnimplementedAdminServer
 	raft     *raft.Raft
 	serverID string
 }
 
-func newAdmin(raft *raft.Raft, serverID string) *admin {
-	return &admin{
+func NewAdmin(raft *raft.Raft, serverID string) *Admin {
+	return &Admin{
 		raft:     raft,
 		serverID: serverID,
 	}
 }
 
-func (a *admin) CheckHealth(
+func (a *Admin) CheckHealth(
 	ctx context.Context,
 	req *proto.CheckHealthRequest,
 ) (*proto.Status, error) {
@@ -33,7 +33,7 @@ func (a *admin) CheckHealth(
 	return new(proto.Status), nil
 }
 
-func (a *admin) GetClusterInfo(
+func (a *Admin) GetClusterInfo(
 	ctx context.Context,
 	req *proto.GetClusterInfoRequest,
 ) (*proto.ClusterInfo, error) {
@@ -57,7 +57,7 @@ func (a *admin) GetClusterInfo(
 	}, nil
 }
 
-func (a *admin) AddClusterMember(
+func (a *Admin) AddClusterMember(
 	ctx context.Context,
 	req *proto.AddClusterMemberRequest,
 ) (*emptypb.Empty, error) {
@@ -76,7 +76,7 @@ func (a *admin) AddClusterMember(
 	return new(emptypb.Empty), nil
 }
 
-func (a *admin) RemoveClusterMember(
+func (a *Admin) RemoveClusterMember(
 	ctx context.Context,
 	req *proto.RemoveClusterMemberRequest,
 ) (*emptypb.Empty, error) {

@@ -1,4 +1,4 @@
-package server
+package cluster
 
 import (
 	"errors"
@@ -23,8 +23,8 @@ type PeerConfig struct {
 	Tasks            *storage.TaskStore
 }
 
-// raftPeer controls a node's membership in the raft cluster.
-type raftPeer struct {
+// Peer controls a node's membership in the raft cluster.
+type Peer struct {
 	Raft        *raft.Raft
 	addr        string
 	config      PeerConfig
@@ -34,8 +34,8 @@ type raftPeer struct {
 	transport   *raft.NetworkTransport
 }
 
-func newPeer(config PeerConfig) (*raftPeer, error) {
-	peer := &raftPeer{config: config}
+func NewPeer(config PeerConfig) (*Peer, error) {
+	peer := &Peer{config: config}
 
 	err := peer.initStorage()
 	if err != nil {
@@ -54,64 +54,64 @@ func newPeer(config PeerConfig) (*raftPeer, error) {
 	return peer, nil
 }
 
-func (rp *raftPeer) initStorage() error {
-	_, err := os.Stat(rp.config.DataDir)
+func (p *Peer) initStorage() error {
+	_, err := os.Stat(p.config.DataDir)
 	if errors.Is(err, os.ErrNotExist) {
-		err := os.Mkdir(rp.config.DataDir, os.ModePerm)
+		err := os.Mkdir(p.config.DataDir, os.ModePerm)
 		if err != nil {
-			return fmt.Errorf("failed to create raft raftPeer folder: %w", err)
+			return fmt.Errorf("failed to create peer storage folder: %w", err)
 		}
 	}
 
-	logStorePath := filepath.Join(rp.config.DataDir, "logs.dat")
-	rp.logStore, err = boltdb.NewBoltStore(logStorePath)
+	logStorePath := filepath.Join(p.config.DataDir, "logs.dat")
+	p.logStore, err = boltdb.NewBoltStore(logStorePath)
 	if err != nil {
 		return fmt.Errorf(`boltdb.NewBoltStore(%q): %v`, logStorePath, err)
 	}
 
-	stableStorePath := filepath.Join(rp.config.DataDir, "stable.dat")
-	rp.stableStore, err = boltdb.NewBoltStore(stableStorePath)
+	stableStorePath := filepath.Join(p.config.DataDir, "stable.dat")
+	p.stableStore, err = boltdb.NewBoltStore(stableStorePath)
 	if err != nil {
 		return fmt.Errorf(`boltdb.NewBoltStore(%q): %v`, stableStorePath, err)
 	}
 
-	rp.snapshots, err = raft.NewFileSnapshotStore(rp.config.DataDir, 3, os.Stderr)
+	p.snapshots, err = raft.NewFileSnapshotStore(p.config.DataDir, 3, os.Stderr)
 	if err != nil {
-		return fmt.Errorf(`raft.NewFileSnapshotStore(%q, ...): %v`, rp.config.DataDir, err)
+		return fmt.Errorf(`raft.NewFileSnapshotStore(%q, ...): %v`, p.config.DataDir, err)
 	}
 	return nil
 }
 
-func (rp *raftPeer) joinNetwork() error {
+func (p *Peer) joinNetwork() error {
 	c := raft.DefaultConfig()
-	c.LocalID = raft.ServerID(rp.config.ID)
+	c.LocalID = raft.ServerID(p.config.ID)
 
 	c.BatchApplyCh = true
-	c.MaxAppendEntries = rp.config.LogBatchSize
+	c.MaxAppendEntries = p.config.LogBatchSize
 
-	rp.addr = fmt.Sprintf("127.0.0.1:%d", rp.config.Port)
+	p.addr = fmt.Sprintf("127.0.0.1:%d", p.config.Port)
 	var err error
-	rp.transport, err = raft.NewTCPTransport(rp.addr, nil, 0, 0, nil)
+	p.transport, err = raft.NewTCPTransport(p.addr, nil, 0, 0, nil)
 	if err != nil {
-		return fmt.Errorf("could not create transport for raft raftPeer: %w", err)
+		return fmt.Errorf("could not create transport for raft peer: %w", err)
 	}
 
-	fsm := newFSM(rp.config.DB.DB, rp.config.Tasks)
-	rp.Raft, err = raft.NewRaft(
+	fsm := newFSM(p.config.DB.DB, p.config.Tasks)
+	p.Raft, err = raft.NewRaft(
 		c,
 		fsm,
-		rp.logStore,
-		rp.stableStore,
-		rp.snapshots,
-		rp.transport)
+		p.logStore,
+		p.stableStore,
+		p.snapshots,
+		p.transport)
 	if err != nil {
 		return fmt.Errorf("raft.NewRaft: %v", err)
 	}
 	return nil
 }
 
-func (rp *raftPeer) tryBootstrap() error {
-	if !rp.config.BootstrapCluster {
+func (p *Peer) tryBootstrap() error {
+	if !p.config.BootstrapCluster {
 		return nil
 	}
 	telemetry.Logger.Info("bootstrapping cluster")
@@ -120,12 +120,12 @@ func (rp *raftPeer) tryBootstrap() error {
 		Servers: []raft.Server{
 			{
 				Suffrage: raft.Voter,
-				ID:       raft.ServerID(rp.config.ID),
-				Address:  raft.ServerAddress(rp.addr),
+				ID:       raft.ServerID(p.config.ID),
+				Address:  raft.ServerAddress(p.addr),
 			},
 		},
 	}
-	f := rp.Raft.BootstrapCluster(cfg)
+	f := p.Raft.BootstrapCluster(cfg)
 	if err := f.Error(); err != nil {
 		return fmt.Errorf("raft.Raft.BootstrapCluster: %v", err)
 	}
@@ -135,9 +135,9 @@ func (rp *raftPeer) tryBootstrap() error {
 // Close stops the raft server and flushes writes to disk.
 //
 // This method must be called before the application terminates.
-func (rp *raftPeer) Close() error {
+func (p *Peer) Close() error {
 	return multierr.Combine(
-		rp.transport.Close(),
-		rp.logStore.Close(),
-		rp.stableStore.Close())
+		p.transport.Close(),
+		p.logStore.Close(),
+		p.stableStore.Close())
 }

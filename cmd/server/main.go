@@ -2,6 +2,7 @@ package main
 
 import (
 	"github.com/mlposey/z4/server"
+	"github.com/mlposey/z4/server/cluster"
 	"github.com/mlposey/z4/storage"
 	"github.com/mlposey/z4/telemetry"
 	"go.uber.org/zap"
@@ -37,7 +38,7 @@ func main() {
 		DB:          db,
 		GRPCPort:    config.ServicePort,
 		MetricsPort: config.MetricsPort,
-		PeerConfig: server.PeerConfig{
+		PeerConfig: cluster.PeerConfig{
 			ID:               config.PeerID,
 			Port:             config.PeerPort,
 			DataDir:          config.PeerDataDir,

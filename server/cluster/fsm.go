@@ -1,4 +1,4 @@
-package server
+package cluster
 
 import (
 	"github.com/dgraph-io/badger/v3"
