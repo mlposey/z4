@@ -153,6 +153,7 @@ A MySQL interface is exposed on port 3306. This provides read-only access to tas
 There are few things to note
 * There is currently no support for username and password authorization. When connecting, disable authentication.
 * All tasks are stored in the database `z4`.
+* This interface is not optimized for transactional workloads. It is primarily meant as a tool for troubleshooting issues.
 * Queries **require** expressions that filter the namespace and date range.  
   This is okay:
   ```sql
