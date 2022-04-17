@@ -8,6 +8,7 @@ z4 is a distributed database for managing tasks.
 * [Deployment Model](#deployment-model)
 * [Running Locally with Docker Compose](#running-locally-with-docker-compose)
 * [Cluster Administration](#cluster-administration)
+* [MySQL Interface](#mysql-interface)
 * [Configuration](#configuration)
 
 ### Architecture
@@ -145,6 +146,35 @@ pointed to by the `t` flag should be that of the cluster leader.
 
 The `remove-peer` command removes a node from the cluster. The address
 pointed to by the `t` flag should be that of the cluster leader.
+
+### MySQL Interface
+A MySQL interface is exposed on port 3306. This provides read-only access to task data.
+
+There are few things to note
+* There is currently no support for username and password authorization. When connecting, disable authentication.
+* All tasks are stored in the database `z4`.
+* Queries **require** expressions that filter the namespace and date range.  
+  This is okay:
+  ```sql
+  SELECT *
+  FROM  tasks
+  WHERE namespace = 'welcome_emails'
+    AND deliver_at BETWEEN '2022-04-16' AND '2022-04-17'
+    AND JSON_EXTRACT(metadata, '$.user_id') = 'newuser@example.com';
+  ```
+  This is not:
+  ```sql
+  SELECT *
+  FROM  tasks
+  WHERE namespace = 'welcome_emails'
+    AND JSON_EXTRACT(metadata, '$.user_id') = 'newuser@example.com';
+  ```
+  And neither is this:
+  ```sql
+  SELECT *
+  FROM  tasks
+  WHERE JSON_EXTRACT(metadata, '$.user_id') = 'newuser@example.com';
+  ```
 
 ### Configuration
 #### Environment Variables
