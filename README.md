@@ -1,6 +1,8 @@
 # z4
 z4 is a distributed database for managing tasks.
 
+> This project is in an experimental state and not yet ready for production.
+
 ## Contents
 * [Architecture](#architecture)
 * [Deployment Model](#deployment-model)
