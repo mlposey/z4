@@ -80,5 +80,9 @@ func initDB(dataDir string) *storage.BadgerClient {
 	if err != nil {
 		log.Fatalf("error initializing database client: %v", err)
 	}
+	go storage.StartWireListener(storage.WireConfig{
+		Port:  3306,
+		Store: storage.NewTaskStore(db),
+	})
 	return db
 }
