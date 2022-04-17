@@ -3,12 +3,14 @@ package storage
 import (
 	"bytes"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"github.com/dgraph-io/badger/v3"
 	"github.com/mlposey/z4/proto"
 	"github.com/mlposey/z4/telemetry"
 	"go.uber.org/zap"
 	pb "google.golang.org/protobuf/proto"
+	"io"
 	"time"
 )
 
@@ -105,7 +107,7 @@ func (ts *TaskStore) Save(task *proto.Task) error {
 		if err != nil {
 			return fmt.Errorf("could not encode task: %w", err)
 		}
-		key := ts.getTaskFQN(task.GetNamespace(), task.GetId())
+		key := getTaskFQN(task.GetNamespace(), task.GetId())
 		return txn.Set(key, payload)
 	})
 }
@@ -121,7 +123,7 @@ func (ts *TaskStore) SaveAll(tasks []*proto.Task) error {
 			return fmt.Errorf("count not encode task '%s': %w", task.GetId(), err)
 		}
 		// TODO: Determine if grouping tasks by namespace before writing is beneficial.
-		key := ts.getTaskFQN(task.GetNamespace(), task.GetId())
+		key := getTaskFQN(task.GetNamespace(), task.GetId())
 		err = batch.Set(key, payload)
 		if err != nil {
 			return fmt.Errorf("failed to write task '%s' from batch: %w", task.GetId(), err)
@@ -133,7 +135,7 @@ func (ts *TaskStore) SaveAll(tasks []*proto.Task) error {
 func (ts *TaskStore) Get(namespace, id string) (*proto.Task, error) {
 	var task *proto.Task
 	err := ts.Client.DB.View(func(txn *badger.Txn) error {
-		key := ts.getTaskFQN(namespace, id)
+		key := getTaskFQN(namespace, id)
 		item, err := txn.Get(key)
 		if err != nil {
 			return err
@@ -147,50 +149,94 @@ func (ts *TaskStore) Get(namespace, id string) (*proto.Task, error) {
 	return task, err
 }
 
-func (ts *TaskStore) GetRange(query TaskRange) ([]*proto.Task, error) {
+func (ts *TaskStore) IterateRange(query TaskRange) (*TaskIterator, error) {
 	err := query.Validate()
 	if err != nil {
 		return nil, fmt.Errorf("failed to fetch tasks due to invalid query: %w", err)
 	}
-	return ts.get(query)
+	return NewTaskIterator(ts.Client, query), nil
 }
 
-func (ts *TaskStore) get(query TaskRange) ([]*proto.Task, error) {
+func (ts *TaskStore) GetRange(query TaskRange) ([]*proto.Task, error) {
+	it, err := ts.IterateRange(query)
+	if err != nil {
+		return nil, err
+	}
+	defer it.Close()
+
 	var tasks []*proto.Task
-	err := ts.Client.DB.View(func(txn *badger.Txn) error {
-		it := txn.NewIterator(badger.DefaultIteratorOptions)
-		defer it.Close()
-		startID := ts.getTaskFQN(query.Namespace, query.StartID)
-		endID := ts.getTaskFQN(query.Namespace, query.EndID)
-
-		it.Seek(startID)
-		for ; it.Valid(); it.Next() {
-			item := it.Item()
-			if bytes.Compare(item.Key(), endID) > 0 {
-				return nil
+	for {
+		task, err := it.Next()
+		if err != nil {
+			if err == io.EOF {
+				break
 			}
+			return nil, err
+		}
 
-			err := item.Value(func(val []byte) error {
-				task := new(proto.Task)
-				err := pb.Unmarshal(val, task)
-				if err != nil {
-					return err
-				}
+		tasks = append(tasks, task)
+	}
+	return tasks, nil
+}
 
-				if task.GetId() != "" {
-					tasks = append(tasks, task)
-				}
-				return nil
-			})
-			if err != nil {
-				return err
-			}
+type TaskIterator struct {
+	client *BadgerClient
+	query  TaskRange
+	txn    *badger.Txn
+	it     *badger.Iterator
+	end    []byte
+}
+
+func NewTaskIterator(client *BadgerClient, query TaskRange) *TaskIterator {
+	txn := client.DB.NewTransaction(false)
+	it := txn.NewIterator(badger.DefaultIteratorOptions)
+	start := getTaskFQN(query.Namespace, query.StartID)
+	it.Seek(start)
+
+	return &TaskIterator{
+		txn:    txn,
+		it:     it,
+		end:    getTaskFQN(query.Namespace, query.EndID),
+		client: client,
+		query:  query,
+	}
+}
+
+func getTaskFQN(namespace string, id string) []byte {
+	return []byte(fmt.Sprintf("%s#task#%s", namespace, id))
+}
+
+func (ti *TaskIterator) Next() (*proto.Task, error) {
+	if !ti.it.Valid() {
+		return nil, io.EOF
+	}
+	defer ti.it.Next()
+
+	item := ti.it.Item()
+	if bytes.Compare(item.Key(), ti.end) > 0 {
+		return nil, io.EOF
+	}
+
+	task := new(proto.Task)
+	err := item.Value(func(val []byte) error {
+		err := pb.Unmarshal(val, task)
+		if err != nil {
+			return err
+		}
+
+		if task.GetId() == "" {
+			return errors.New("invalid task: empty id")
 		}
 		return nil
 	})
-	return tasks, err
+	if err != nil {
+		return nil, err
+	}
+	return task, nil
 }
 
-func (ts *TaskStore) getTaskFQN(namespace string, id string) []byte {
-	return []byte(fmt.Sprintf("%s#task#%s", namespace, id))
+func (ti *TaskIterator) Close() error {
+	ti.it.Close()
+	ti.txn.Discard()
+	return nil
 }
