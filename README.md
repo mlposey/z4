@@ -13,7 +13,9 @@ Main features
 * [Deployment Model](#deployment-model)
 * [Running Locally with Docker Compose](#running-locally-with-docker-compose)
 * [Cluster Administration](#cluster-administration)
-* [MySQL Interface](#mysql-interface)
+* [APIs](#apis)
+  * [gRPC](#grpc)
+  * [MySQL](#mysql)
 * [Configuration](#configuration)
 
 ### Architecture
@@ -152,8 +154,15 @@ pointed to by the `t` flag should be that of the cluster leader.
 The `remove-peer` command removes a node from the cluster. The address
 pointed to by the `t` flag should be that of the cluster leader.
 
-### MySQL Interface
-A MySQL interface is exposed on port 3306. This provides read-only access to task data.
+### APIs
+#### gRPC
+A gRPC service is exposed on the default port 6355. It suppports cluster administration as well
+as task management.
+
+The specification is located [here](proto/service.proto).
+
+#### MySQL
+A MySQL interface is exposed on the default port 3306. It provides read-only access to task data.
 
 There are few things to note
 * There is currently no support for username and password authorization. When connecting, disable authentication.
