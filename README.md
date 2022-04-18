@@ -192,6 +192,7 @@ There are few things to note
 |Z4_SERVICE_PORT|The port containing the gRPC services|6355|
 |Z4_PEER_PORT|The port containing the internal cluster membership service|6356|
 |Z4_METRICS_PORT|The port containing the Prometheus metrics service|2112|
+|Z4_SQL_PORT|The port containing the MySQL-compatible server|3306|
 |Z4_PEER_ID|The unique ID of the cluster member. Must be stable across restarts||
 |Z4_PEER_ADVERTISE_ADDR|The host:port of the peer that other members use for internal operations|127.0.0.1:6356|
 |Z4_BOOTSTRAP_CLUSTER|Determines whether the peer should declare itself the leader to kickstart the cluster|false|
