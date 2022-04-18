@@ -16,6 +16,10 @@ import (
 	"time"
 )
 
+// TODO: Refine this implementation.
+// SQL support is still pretty fragile. We need to increase the robustness
+// of the namespace/timestamp indexing and also add functional tests.
+
 type WireConfig struct {
 	Port  int
 	Store *TaskStore
