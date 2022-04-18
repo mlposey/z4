@@ -10,13 +10,14 @@ Main features
 
 ## Contents
 * [Architecture](#architecture)
-* [Deployment Model](#deployment-model)
+  * [Cluster Configurations](#cluster-configurations)
 * [Running Locally with Docker Compose](#running-locally-with-docker-compose)
 * [Cluster Administration](#cluster-administration)
 * [APIs](#apis)
   * [gRPC](#grpc)
   * [MySQL](#mysql)
-* [Configuration](#configuration)
+* [Customization](#customization)
+  * [Environment Variables](#environment-variables)
 
 ### Architecture
 The z4 architecture is focused on providing
@@ -32,10 +33,7 @@ A key part of achieving the above goals is a reliance on the Raft consensus
 algorithm. Raft enables the replication of data as well as the automated
 failover when peers become unreachable.
 
-### Deployment Model
-A collection of z4 application instances forms a cluster. Each member of the cluster is called
-a peer.
-
+#### Cluster Configurations
 When choosing the number of peers for a cluster, one must consider quorum needs.
 A cluster needs `(N/2)+1` peers to be available to reach quorum. If it cannot
 reach quorum, the cluster will be become unavailable. This encourages the following
@@ -191,7 +189,7 @@ There are few things to note
   WHERE  JSON_EXTRACT(metadata, '$.user_id') = 'newuser@example.com';
   ```
 
-### Configuration
+### Customization
 #### Environment Variables
 |Variable|Description|Default|
 |--------|-----------|-------|
