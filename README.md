@@ -1,7 +1,12 @@
 > This project is in an experimental state and not yet ready for production.
 
 # z4
-z4 is a distributed database for managing tasks.
+z4 is a database for managing tasks. A "task" is an action that should take place in the future.
+
+Main features
+* Distributed database model that offers durability and automated failure recovery
+* Modern high-throughput gRPC service for writing and consuming tasks
+* SQL interface for use with MySQL-compatible tools
 
 ## Contents
 * [Architecture](#architecture)
