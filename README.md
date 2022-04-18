@@ -1,13 +1,19 @@
 > This project is in an experimental state and not yet ready for production.
 
 # z4
-z4 is a distributed database for managing tasks.
+z4 is a database for managing tasks. A "task" is an action that should take place in the future.
+
+Main features
+* Distributed database model that offers durability and automated failure recovery
+* Modern high-throughput gRPC service for writing and consuming tasks
+* SQL interface for use with MySQL-compatible tools
 
 ## Contents
 * [Architecture](#architecture)
 * [Deployment Model](#deployment-model)
 * [Running Locally with Docker Compose](#running-locally-with-docker-compose)
 * [Cluster Administration](#cluster-administration)
+* [MySQL Interface](#mysql-interface)
 * [Configuration](#configuration)
 
 ### Architecture
@@ -146,6 +152,36 @@ pointed to by the `t` flag should be that of the cluster leader.
 The `remove-peer` command removes a node from the cluster. The address
 pointed to by the `t` flag should be that of the cluster leader.
 
+### MySQL Interface
+A MySQL interface is exposed on port 3306. This provides read-only access to task data.
+
+There are few things to note
+* There is currently no support for username and password authorization. When connecting, disable authentication.
+* All tasks are stored in the database `z4`.
+* This interface is not optimized for transactional workloads. It is primarily meant as a tool for troubleshooting issues.
+* Queries **require** expressions that filter the namespace and date range.  
+  This is okay:
+  ```sql
+  SELECT *
+  FROM  tasks
+  WHERE namespace = 'welcome_emails'
+    AND deliver_at BETWEEN '2022-04-16' AND '2022-04-17'
+    AND JSON_EXTRACT(metadata, '$.user_id') = 'newuser@example.com';
+  ```
+  This is not:
+  ```sql
+  SELECT *
+  FROM  tasks
+  WHERE namespace = 'welcome_emails'
+    AND JSON_EXTRACT(metadata, '$.user_id') = 'newuser@example.com';
+  ```
+  And neither is this:
+  ```sql
+  SELECT *
+  FROM  tasks
+  WHERE JSON_EXTRACT(metadata, '$.user_id') = 'newuser@example.com';
+  ```
+
 ### Configuration
 #### Environment Variables
 |Variable|Description|Default|
@@ -156,6 +192,7 @@ pointed to by the `t` flag should be that of the cluster leader.
 |Z4_SERVICE_PORT|The port containing the gRPC services|6355|
 |Z4_PEER_PORT|The port containing the internal cluster membership service|6356|
 |Z4_METRICS_PORT|The port containing the Prometheus metrics service|2112|
+|Z4_SQL_PORT|The port containing the MySQL-compatible server|3306|
 |Z4_PEER_ID|The unique ID of the cluster member. Must be stable across restarts||
 |Z4_PEER_ADVERTISE_ADDR|The host:port of the peer that other members use for internal operations|127.0.0.1:6356|
 |Z4_BOOTSTRAP_CLUSTER|Determines whether the peer should declare itself the leader to kickstart the cluster|false|

@@ -32,7 +32,7 @@ func main() {
 	}
 
 	initLogger(config.DebugLoggingEnabled)
-	db := initDB(config.DBDataDir)
+	db := initDB(config.DBDataDir, config.SQLPort)
 
 	srv := server.NewServer(server.Config{
 		DB:          db,
@@ -75,10 +75,14 @@ func initLogger(debugEnabled bool) {
 	}
 }
 
-func initDB(dataDir string) *storage.BadgerClient {
+func initDB(dataDir string, port int) *storage.BadgerClient {
 	db, err := storage.NewBadgerClient(dataDir)
 	if err != nil {
 		log.Fatalf("error initializing database client: %v", err)
 	}
+	go storage.StartWireListener(storage.WireConfig{
+		Port:  port,
+		Store: storage.NewTaskStore(db),
+	})
 	return db
 }
