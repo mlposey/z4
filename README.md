@@ -127,9 +127,9 @@ Storage is persisted when restarting individual containers but erased when using
    ```
 10. Add more tasks using any peer
 11. Tear down the cluster
-   ```
-   > make compose_down
-   ```
+    ```
+    > make compose_down
+    ```
 ### Cluster Administration
 z4 provides a gRPC service for managing clusters. This repository
 ships with [a tool](cmd/z4t) for interacting with that service.
