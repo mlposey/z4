@@ -19,4 +19,4 @@ COPY --from=builder /etc/passwd /etc/passwd
 COPY --from=builder /etc/group /etc/group
 COPY --from=builder /app/cmd/server/z4 /usr/local/bin/z4
 ENTRYPOINT ["z4"]
-EXPOSE 6355 6356
+EXPOSE 6355 6356 3306

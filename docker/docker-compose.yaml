@@ -17,6 +17,7 @@ services:
       Z4_BOOTSTRAP_CLUSTER: true
     ports:
       - 6355:6355
+      - 3306:3306
     volumes:
       - peer1_data:/var/lib/z4
   peer2:
@@ -30,6 +31,7 @@ services:
       Z4_PEER_DATA_DIR: /var/lib/z4/cluster
     ports:
       - 6455:6355
+      - 3307:3306
     volumes:
       - peer2_data:/var/lib/z4
   peer3:
@@ -43,6 +45,7 @@ services:
       Z4_PEER_DATA_DIR: /var/lib/z4/cluster
     ports:
       - 6555:6355
+      - 3308:3306
     volumes:
       - peer3_data:/var/lib/z4
 
