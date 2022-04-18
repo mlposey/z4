@@ -163,23 +163,23 @@ There are few things to note
   This is okay:
   ```sql
   SELECT *
-  FROM  tasks
-  WHERE namespace = 'welcome_emails'
-    AND deliver_at BETWEEN '2022-04-16' AND '2022-04-17'
-    AND JSON_EXTRACT(metadata, '$.user_id') = 'newuser@example.com';
+  FROM   tasks
+  WHERE  namespace = 'welcome_emails'
+    AND  deliver_at BETWEEN '2022-04-16' AND '2022-04-17'
+    AND  JSON_EXTRACT(metadata, '$.user_id') = 'newuser@example.com';
   ```
   This is not:
   ```sql
   SELECT *
-  FROM  tasks
-  WHERE namespace = 'welcome_emails'
-    AND JSON_EXTRACT(metadata, '$.user_id') = 'newuser@example.com';
+  FROM   tasks
+  WHERE  namespace = 'welcome_emails'
+    AND  JSON_EXTRACT(metadata, '$.user_id') = 'newuser@example.com';
   ```
   And neither is this:
   ```sql
   SELECT *
-  FROM  tasks
-  WHERE JSON_EXTRACT(metadata, '$.user_id') = 'newuser@example.com';
+  FROM   tasks
+  WHERE  JSON_EXTRACT(metadata, '$.user_id') = 'newuser@example.com';
   ```
 
 ### Configuration
