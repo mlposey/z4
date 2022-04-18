@@ -5,7 +5,7 @@ z4 is a database for managing tasks. A "task" is an action that should take plac
 
 Main features
 * Distributed database model that offers durability and automated failure recovery
-* Modern high-throughput gRPC service for writing and consuming tasks
+* High-throughput gRPC service for writing and consuming tasks
 * SQL interface for use with MySQL-compatible tools
 
 ## Contents
