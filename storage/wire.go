@@ -184,9 +184,12 @@ func (p *Partition) Key() []byte {
 }
 
 type rowIterator struct {
-	filters []sql.Expression
-	store   *TaskStore
-	it      *TaskIterator
+	filters    []sql.Expression
+	store      *TaskStore
+	rangeStart time.Time
+	rangeEnd   time.Time
+	namespace  string
+	it         *TaskIterator
 }
 
 func newRowIterator(filters []sql.Expression, store *TaskStore) *rowIterator {
@@ -199,74 +202,63 @@ func newRowIterator(filters []sql.Expression, store *TaskStore) *rowIterator {
 }
 
 func (r *rowIterator) initBounds() {
-	var (
-		rangeStart time.Time
-		rangeEnd   time.Time
-		namespace  string
-	)
-
 	for _, filter := range r.filters {
 		sql.Inspect(filter, func(expr sql.Expression) bool {
-			between, ok := expr.(*expression.Between)
-			if ok {
-				if r.isTimeExpression(between.Val) {
-					rangeStart = r.getTime(between.Lower)
-					rangeEnd = r.getTime(between.Upper)
-					return false
-				}
-				return true
+			if r.detectTimeBounds(expr) {
+				return false
 			}
-
-			equal, ok := expr.(*expression.Equals)
-			if ok {
-				be := equal.BinaryExpression
-				if r.isNamespaceExpression(be.Left) {
-					namespace = r.getNamespace(be.Right)
-					return false
-				}
-			}
-
-			return true
+			return !r.detectNamespace(expr)
 		})
 	}
 
 	r.it = NewTaskIterator(r.store.Client, TaskRange{
-		Namespace: namespace,
-		StartID:   NewTaskID(rangeStart),
-		EndID:     NewTaskID(rangeEnd),
+		Namespace: r.namespace,
+		StartID:   NewTaskID(r.rangeStart),
+		EndID:     NewTaskID(r.rangeEnd),
 	})
 }
 
-func (r *rowIterator) isTimeExpression(f sql.Expression) bool {
-	// TODO: Reuse GetField methods
-	// isTimeExpression and isNamespaceExpression are essentially the same.
-	// We can make a generic method that replaces them.
+func (r *rowIterator) detectTimeBounds(f sql.Expression) bool {
+	switch v := f.(type) {
+	case *expression.Between:
+		if r.isFieldExpression(v.Val, "deliver_at") {
+			r.rangeStart = r.getTime(v.Lower)
+			r.rangeEnd = r.getTime(v.Upper)
+			return true
+		}
+		return false
 
-	var isTime bool
+	default:
+		return false
+	}
+}
+
+func (r *rowIterator) detectNamespace(f sql.Expression) bool {
+	equal, ok := f.(*expression.Equals)
+	if !ok {
+		return false
+	}
+
+	be := equal.BinaryExpression
+	if r.isFieldExpression(be.Left, "namespace") {
+		r.namespace = r.getNamespace(be.Right)
+		return true
+	}
+	return false
+}
+
+func (r *rowIterator) isFieldExpression(f sql.Expression, field string) bool {
+	var found bool
 	sql.Inspect(f, func(expr sql.Expression) bool {
 		if e, ok := expr.(*expression.GetField); ok {
-			if e.Name() == "deliver_at" {
-				isTime = true
+			if e.Name() == field {
+				found = true
 				return false
 			}
 		}
 		return true
 	})
-	return isTime
-}
-
-func (r *rowIterator) isNamespaceExpression(f sql.Expression) bool {
-	var isNamespace bool
-	sql.Inspect(f, func(expr sql.Expression) bool {
-		if e, ok := expr.(*expression.GetField); ok {
-			if e.Name() == "namespace" {
-				isNamespace = true
-				return false
-			}
-		}
-		return true
-	})
-	return isNamespace
+	return found
 }
 
 func (r *rowIterator) getNamespace(f sql.Expression) string {
