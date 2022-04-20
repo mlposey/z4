@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"github.com/dgraph-io/badger/v3"
 	"github.com/mlposey/z4/telemetry"
+	"github.com/segmentio/ksuid"
 	"go.uber.org/zap"
 	"time"
 )
@@ -78,7 +79,7 @@ func (sc *SyncedConfig) loadConfig() error {
 		}
 
 		config = FeedConfig{
-			LastDeliveredTask: NewTaskID(time.Now().Add(-time.Minute)),
+			LastDeliveredTask: NewTaskID(ksuid.Nil.Time()),
 		}
 		err = sc.configs.Save(sc.namespace, config)
 		if err != nil {
