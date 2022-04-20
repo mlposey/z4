@@ -11,6 +11,7 @@ import (
 	"github.com/dolthub/go-mysql-server/sql/information_schema"
 	"github.com/mlposey/z4/proto"
 	"github.com/mlposey/z4/telemetry"
+	"github.com/segmentio/ksuid"
 	"go.uber.org/zap"
 	"io"
 	"time"
@@ -19,6 +20,14 @@ import (
 // TODO: Refine this implementation.
 // SQL support is still pretty fragile. We need to increase the robustness
 // of the namespace/timestamp indexing and also add functional tests.
+
+const (
+	sqlColumnDeliverAt = "deliver_at"
+	sqlColumnNamespace = "namespace"
+	sqlColumnID        = "id"
+	sqlColumnMetadata  = "metadata"
+	sqlColumnPayload   = "payload"
+)
 
 type WireConfig struct {
 	Port  int
@@ -29,11 +38,11 @@ func StartWireListener(config WireConfig) error {
 	db := NewDatabase("z4")
 	const tasksTable = "tasks"
 	db.AddTable(NewTable(tasksTable, sql.Schema{
-		{Name: "namespace", Type: sql.Text, Nullable: false, Source: tasksTable},
-		{Name: "id", Type: sql.Text, Nullable: false, Source: tasksTable},
-		{Name: "deliver_at", Type: sql.Timestamp, Nullable: false, Source: tasksTable},
-		{Name: "metadata", Type: sql.JSON, Nullable: true, Source: tasksTable},
-		{Name: "payload", Type: sql.Blob, Nullable: true, Source: tasksTable},
+		{Name: sqlColumnNamespace, Type: sql.Text, Nullable: false, Source: tasksTable},
+		{Name: sqlColumnID, Type: sql.Text, Nullable: false, Source: tasksTable},
+		{Name: sqlColumnDeliverAt, Type: sql.Timestamp, Nullable: false, Source: tasksTable},
+		{Name: sqlColumnMetadata, Type: sql.JSON, Nullable: true, Source: tasksTable},
+		{Name: sqlColumnPayload, Type: sql.Blob, Nullable: true, Source: tasksTable},
 	}, config.Store))
 
 	engine := sqle.NewDefault(
@@ -221,16 +230,52 @@ func (r *rowIterator) initBounds() {
 func (r *rowIterator) detectTimeBounds(f sql.Expression) bool {
 	switch v := f.(type) {
 	case *expression.Between:
-		if r.isFieldExpression(v.Val, "deliver_at") {
+		if r.isFieldExpression(v.Val, sqlColumnDeliverAt) {
 			r.rangeStart = r.getTime(v.Lower)
 			r.rangeEnd = r.getTime(v.Upper)
 			return true
 		}
-		return false
+
+	case *expression.GreaterThan:
+		if r.isFieldExpression(v.Left(), sqlColumnDeliverAt) {
+			r.rangeStart = r.getTime(v.Right())
+			r.rangeEnd = time.Now().Add(time.Hour * 24 * 365 * 10)
+			return true
+		}
+
+	case *expression.GreaterThanOrEqual:
+		if r.isFieldExpression(v.Left(), sqlColumnDeliverAt) {
+			r.rangeStart = r.getTime(v.Right())
+			r.rangeEnd = time.Now().Add(time.Hour * 24 * 365 * 10)
+			return true
+		}
+
+	case *expression.LessThan:
+		if r.isFieldExpression(v.Left(), sqlColumnDeliverAt) {
+			r.rangeStart = ksuid.Nil.Time()
+			r.rangeEnd = r.getTime(v.Right())
+			return true
+		}
+
+	case *expression.LessThanOrEqual:
+		if r.isFieldExpression(v.Left(), sqlColumnDeliverAt) {
+			r.rangeStart = ksuid.Nil.Time()
+			r.rangeEnd = r.getTime(v.Right())
+			return true
+		}
+
+	case *expression.Equals:
+		// TODO: This expression type does not work. No results are returned.
+		if r.isFieldExpression(v.Left(), sqlColumnDeliverAt) {
+			r.rangeStart = r.getTime(v.Right())
+			r.rangeEnd = r.rangeStart
+			return true
+		}
 
 	default:
 		return false
 	}
+	return false
 }
 
 func (r *rowIterator) detectNamespace(f sql.Expression) bool {
