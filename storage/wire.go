@@ -193,12 +193,13 @@ func (p *Partition) Key() []byte {
 }
 
 type rowIterator struct {
-	filters    []sql.Expression
-	store      *TaskStore
-	rangeStart time.Time
-	rangeEnd   time.Time
-	namespace  string
-	it         *TaskIterator
+	filters        []sql.Expression
+	store          *TaskStore
+	rangeStart     time.Time
+	rangeEnd       time.Time
+	namespace      string
+	namespaceFound bool
+	it             *TaskIterator
 }
 
 func newRowIterator(filters []sql.Expression, store *TaskStore) (*rowIterator, error) {
@@ -225,6 +226,10 @@ func (r *rowIterator) initBounds() error {
 
 	if r.rangeStart.IsZero() || r.rangeEnd.IsZero() {
 		return fmt.Errorf("invalid or missing range query for field: %s", sqlColumnDeliverAt)
+	}
+
+	if !r.namespaceFound {
+		return fmt.Errorf("missing required namespace in query")
 	}
 
 	r.it = NewTaskIterator(r.store.Client, TaskRange{
@@ -295,6 +300,7 @@ func (r *rowIterator) detectNamespace(f sql.Expression) bool {
 	be := equal.BinaryExpression
 	if r.isFieldExpression(be.Left, "namespace") {
 		r.namespace = r.getNamespace(be.Right)
+		r.namespaceFound = true
 		return true
 	}
 	return false
