@@ -201,8 +201,38 @@ func (c *Collection) GetTask(ctx context.Context, req *proto.GetTaskRequest) (*p
 	return task, nil
 }
 
-func (c *Collection) GetTaskStream(req *proto.StreamTasksRequest, stream proto.Collection_GetTaskStreamServer) error {
-	namespace := req.GetNamespace()
+func (c *Collection) GetTaskStream(stream proto.Collection_GetTaskStreamServer) error {
+	start, err := stream.Recv()
+	if err != nil {
+		return status.Errorf(codes.Internal, "failed to start GetTaskStream stream")
+	}
+	if start.GetStartReq() == nil {
+		return status.Error(codes.InvalidArgument, "got unexpected start request")
+	}
+
+	namespace := start.GetStartReq().GetNamespace()
+	go func() {
+		for {
+			req, err := stream.Recv()
+			if err != nil {
+				telemetry.Logger.Debug("closing ack stream",
+					zap.Error(err),
+					zap.String("namespace", namespace))
+				return
+			}
+
+			if req.GetAck() == nil {
+				telemetry.Logger.Warn("got invalid ack",
+					zap.String("namespace", namespace))
+				continue
+			}
+
+			telemetry.Logger.Debug("got ack",
+				zap.String("namespace", namespace),
+				zap.String("task_id", req.GetAck().GetTaskId()))
+		}
+	}()
+
 	return c.fm.Tasks(namespace, func(tasks feeds.TaskStream) error {
 		for {
 			select {
