@@ -291,21 +291,6 @@ func (r *rowIterator) detectTimeBounds(f sql.Expression) bool {
 	return false
 }
 
-func (r *rowIterator) detectNamespace(f sql.Expression) bool {
-	equal, ok := f.(*expression.Equals)
-	if !ok {
-		return false
-	}
-
-	be := equal.BinaryExpression
-	if r.isFieldExpression(be.Left, "namespace") {
-		r.namespace = r.getNamespace(be.Right)
-		r.namespaceFound = true
-		return true
-	}
-	return false
-}
-
 func (r *rowIterator) isFieldExpression(f sql.Expression, field string) bool {
 	var found bool
 	sql.Inspect(f, func(expr sql.Expression) bool {
@@ -368,6 +353,21 @@ func (r *rowIterator) getTime(f sql.Expression) time.Time {
 		return false
 	})
 	return ts
+}
+
+func (r *rowIterator) detectNamespace(f sql.Expression) bool {
+	equal, ok := f.(*expression.Equals)
+	if !ok {
+		return false
+	}
+
+	be := equal.BinaryExpression
+	if r.isFieldExpression(be.Left, "namespace") {
+		r.namespace = r.getNamespace(be.Right)
+		r.namespaceFound = true
+		return true
+	}
+	return false
 }
 
 func (r *rowIterator) Next() (sql.Row, error) {
