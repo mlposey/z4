@@ -155,7 +155,7 @@ func (t *Table) Partitions(context *sql.Context) (sql.PartitionIter, error) {
 }
 
 func (t *Table) PartitionRows(context *sql.Context, partition sql.Partition) (sql.RowIter, error) {
-	return newRowIterator(t.filters, t.store), nil
+	return newRowIterator(t.filters, t.store)
 }
 
 func (t *Table) HandledFilters(filters []sql.Expression) []sql.Expression {
@@ -201,16 +201,19 @@ type rowIterator struct {
 	it         *TaskIterator
 }
 
-func newRowIterator(filters []sql.Expression, store *TaskStore) *rowIterator {
+func newRowIterator(filters []sql.Expression, store *TaskStore) (*rowIterator, error) {
 	it := &rowIterator{
 		filters: filters,
 		store:   store,
 	}
-	it.initBounds()
-	return it
+	err := it.initBounds()
+	if err != nil {
+		return nil, err
+	}
+	return it, nil
 }
 
-func (r *rowIterator) initBounds() {
+func (r *rowIterator) initBounds() error {
 	for _, filter := range r.filters {
 		sql.Inspect(filter, func(expr sql.Expression) bool {
 			if r.detectTimeBounds(expr) {
@@ -220,11 +223,16 @@ func (r *rowIterator) initBounds() {
 		})
 	}
 
+	if r.rangeStart.IsZero() || r.rangeEnd.IsZero() {
+		return fmt.Errorf("invalid or missing range query for field: %s", sqlColumnDeliverAt)
+	}
+
 	r.it = NewTaskIterator(r.store.Client, TaskRange{
 		Namespace: r.namespace,
 		StartID:   NewTaskID(r.rangeStart),
 		EndID:     NewTaskID(r.rangeEnd),
 	})
+	return nil
 }
 
 func (r *rowIterator) detectTimeBounds(f sql.Expression) bool {
@@ -239,14 +247,14 @@ func (r *rowIterator) detectTimeBounds(f sql.Expression) bool {
 	case *expression.GreaterThan:
 		if r.isFieldExpression(v.Left(), sqlColumnDeliverAt) {
 			r.rangeStart = r.getTime(v.Right())
-			r.rangeEnd = time.Now().Add(time.Hour * 24 * 365 * 10)
+			r.rangeEnd = ksuid.Max.Time()
 			return true
 		}
 
 	case *expression.GreaterThanOrEqual:
 		if r.isFieldExpression(v.Left(), sqlColumnDeliverAt) {
 			r.rangeStart = r.getTime(v.Right())
-			r.rangeEnd = time.Now().Add(time.Hour * 24 * 365 * 10)
+			r.rangeEnd = ksuid.Max.Time()
 			return true
 		}
 
