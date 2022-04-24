@@ -100,6 +100,56 @@ func NewTaskStore(db *BadgerClient) *TaskStore {
 	return store
 }
 
+func (ts *TaskStore) DeleteAll(acks []*proto.Ack) error {
+	telemetry.Logger.Debug("deleting task batch from DB", zap.Int("count", len(acks)))
+	batch := ts.Client.DB.NewWriteBatch()
+	defer batch.Cancel()
+
+	for _, ack := range acks {
+		key := getTaskFQN(ack.GetNamespace(), ack.GetTaskId())
+		err := batch.Delete(key)
+		if err != nil {
+			return fmt.Errorf("failed to delete task '%s' in batch: %w", ack.GetTaskId(), err)
+		}
+	}
+	return batch.Flush()
+}
+
+func (ts *TaskStore) RewriteAll(tasks []*proto.Task, next time.Time) error {
+	telemetry.Logger.Debug("rewriting tasks in DB", zap.Int("count", len(tasks)))
+	for _, task := range tasks {
+		// TODO: Determine if we can use WriteBatch for performance gains.
+		// It looks like WriteBatch splits writes over multiple transactions.
+		// We need to ensure that the Delete and Set go into the same transaction,
+		// so using WriteBatch may be a bit tricky.
+
+		err := ts.Client.DB.Update(func(txn *badger.Txn) error {
+			key := getTaskFQN(task.GetNamespace(), task.GetId())
+			err := txn.Delete(key)
+			if err != nil {
+				return err
+			}
+
+			if task.GetSourceId() == "" {
+				task.SourceId = task.GetId()
+			}
+			task.Id = NewTaskID(next)
+			payload, err := pb.Marshal(task)
+			if err != nil {
+				return fmt.Errorf("could not encode task: %w", err)
+			}
+
+			// We have a new id now
+			key = getTaskFQN(task.GetNamespace(), task.GetId())
+			return txn.Set(key, payload)
+		})
+		if err != nil {
+			return fmt.Errorf("failed to rewrite task '%s' in batch: %w", task.GetId(), err)
+		}
+	}
+	return nil
+}
+
 func (ts *TaskStore) Save(task *proto.Task) error {
 	telemetry.Logger.Debug("writing task to DB", zap.Any("task", task))
 	return ts.Client.DB.Update(func(txn *badger.Txn) error {
@@ -113,7 +163,7 @@ func (ts *TaskStore) Save(task *proto.Task) error {
 }
 
 func (ts *TaskStore) SaveAll(tasks []*proto.Task) error {
-	telemetry.Logger.Debug("writing task batch to DB", zap.Any("count", len(tasks)))
+	telemetry.Logger.Debug("writing task batch to DB", zap.Int("count", len(tasks)))
 	batch := ts.Client.DB.NewWriteBatch()
 	defer batch.Cancel()
 

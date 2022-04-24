@@ -6,6 +6,7 @@ import (
 	"github.com/mlposey/z4/telemetry"
 	"go.uber.org/zap"
 	"sync"
+	"time"
 )
 
 // leaseHolder manages access to a feed.
@@ -18,7 +19,8 @@ type leaseHolder struct {
 }
 
 func newLeaseHolder(namespace string, db *storage.BadgerClient, onRemove func()) (*leaseHolder, error) {
-	feed, err := New(namespace, db)
+	// TODO: Make ack deadline configurable.
+	feed, err := New(namespace, db, time.Minute*5)
 	if err != nil {
 		return nil, fmt.Errorf("lease creation failed: %w", err)
 	}

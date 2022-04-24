@@ -202,55 +202,9 @@ func (c *Collection) GetTask(ctx context.Context, req *proto.GetTaskRequest) (*p
 }
 
 func (c *Collection) GetTaskStream(stream proto.Collection_GetTaskStreamServer) error {
-	start, err := stream.Recv()
-	if err != nil {
-		return status.Errorf(codes.Internal, "failed to start GetTaskStream stream")
-	}
-	if start.GetStartReq() == nil {
-		return status.Error(codes.InvalidArgument, "got unexpected start request")
-	}
-
-	namespace := start.GetStartReq().GetNamespace()
-	go func() {
-		for {
-			req, err := stream.Recv()
-			if err != nil {
-				telemetry.Logger.Debug("closing ack stream",
-					zap.Error(err),
-					zap.String("namespace", namespace))
-				return
-			}
-
-			if req.GetAck() == nil {
-				telemetry.Logger.Warn("got invalid ack",
-					zap.String("namespace", namespace))
-				continue
-			}
-
-			telemetry.Logger.Debug("got ack",
-				zap.String("namespace", namespace),
-				zap.String("task_id", req.GetAck().GetTaskId()))
-		}
-	}()
-
-	return c.fm.Tasks(namespace, func(tasks feeds.TaskStream) error {
-		for {
-			select {
-			case <-stream.Context().Done():
-				return nil
-
-			case task := <-tasks:
-				err := stream.Send(task)
-				if err != nil {
-					return status.Errorf(codes.Internal, "failed to send tasks to client: %v", err)
-				}
-
-				telemetry.StreamedTasks.
-					WithLabelValues("GetTaskStream", namespace).
-					Inc()
-			}
-		}
-	})
+	broker := feeds.NewTaskBroker(stream, c.fm)
+	defer broker.Close()
+	return broker.Start()
 }
 
 func (c *Collection) getRunTime(req *proto.CreateTaskRequest) time.Time {

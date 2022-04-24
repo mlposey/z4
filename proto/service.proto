@@ -108,4 +108,5 @@ message Task {
   map<string, string> metadata = 3;
   bytes payload = 4;
   google.protobuf.Timestamp deliver_at = 5;
+  string source_id = 6;
 }
