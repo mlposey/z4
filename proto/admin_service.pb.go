@@ -26,6 +26,7 @@ type CheckHealthRequest struct {
 	sizeCache     protoimpl.SizeCache
 	unknownFields protoimpl.UnknownFields
 
+	// A unique id for the request.
 	RequestId string `protobuf:"bytes,1,opt,name=request_id,json=requestId,proto3" json:"request_id,omitempty"`
 }
 
@@ -144,14 +145,18 @@ func (*GetClusterInfoRequest) Descriptor() ([]byte, []int) {
 	return file_admin_service_proto_rawDescGZIP(), []int{2}
 }
 
+// ClusterInfo contains information about the cluster.
 type ClusterInfo struct {
 	state         protoimpl.MessageState
 	sizeCache     protoimpl.SizeCache
 	unknownFields protoimpl.UnknownFields
 
-	ServerId      string    `protobuf:"bytes,1,opt,name=server_id,json=serverId,proto3" json:"server_id,omitempty"`
-	LeaderAddress string    `protobuf:"bytes,2,opt,name=leader_address,json=leaderAddress,proto3" json:"leader_address,omitempty"`
-	Members       []*Server `protobuf:"bytes,3,rep,name=members,proto3" json:"members,omitempty"`
+	// The unique id of the peer that the request was sent to.
+	ServerId string `protobuf:"bytes,1,opt,name=server_id,json=serverId,proto3" json:"server_id,omitempty"`
+	// The host:port of the cluster leader's Raft server.
+	LeaderAddress string `protobuf:"bytes,2,opt,name=leader_address,json=leaderAddress,proto3" json:"leader_address,omitempty"`
+	// All peers of the cluster.
+	Members []*Server `protobuf:"bytes,3,rep,name=members,proto3" json:"members,omitempty"`
 }
 
 func (x *ClusterInfo) Reset() {
@@ -207,12 +212,16 @@ func (x *ClusterInfo) GetMembers() []*Server {
 	return nil
 }
 
+// TODO: Rename this to Peer.
+// Server is a member of the cluster.
 type Server struct {
 	state         protoimpl.MessageState
 	sizeCache     protoimpl.SizeCache
 	unknownFields protoimpl.UnknownFields
 
-	Id      string `protobuf:"bytes,1,opt,name=id,proto3" json:"id,omitempty"`
+	// The unique id of the peer.
+	Id string `protobuf:"bytes,1,opt,name=id,proto3" json:"id,omitempty"`
+	// The host:port of the peer's Raft server.
 	Address string `protobuf:"bytes,2,opt,name=address,proto3" json:"address,omitempty"`
 }
 
@@ -267,8 +276,10 @@ type AddClusterMemberRequest struct {
 	sizeCache     protoimpl.SizeCache
 	unknownFields protoimpl.UnknownFields
 
+	// The host:port of the peer's Raft server.
 	MemberAddress string `protobuf:"bytes,1,opt,name=member_address,json=memberAddress,proto3" json:"member_address,omitempty"`
-	MemberId      string `protobuf:"bytes,2,opt,name=member_id,json=memberId,proto3" json:"member_id,omitempty"`
+	// The unique id of the peer.
+	MemberId string `protobuf:"bytes,2,opt,name=member_id,json=memberId,proto3" json:"member_id,omitempty"`
 }
 
 func (x *AddClusterMemberRequest) Reset() {
@@ -322,6 +333,7 @@ type RemoveClusterMemberRequest struct {
 	sizeCache     protoimpl.SizeCache
 	unknownFields protoimpl.UnknownFields
 
+	// The unique id of the peer.
 	MemberId string `protobuf:"bytes,1,opt,name=member_id,json=memberId,proto3" json:"member_id,omitempty"`
 }
 

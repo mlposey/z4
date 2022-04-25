@@ -23,10 +23,19 @@ const _ = grpc.SupportPackageIsVersion7
 //
 // For semantics around ctx use and closing/ending streaming RPCs, please refer to https://pkg.go.dev/google.golang.org/grpc/?tab=doc#ClientConn.NewStream.
 type AdminClient interface {
+	// CheckHealth determines whether the service is in a healthy state.
 	CheckHealth(ctx context.Context, in *CheckHealthRequest, opts ...grpc.CallOption) (*Status, error)
-	// TODO: Consider moving cluster RPCs to dedicated Cluster service and removing cluster from names.
+	// GetClusterInfo returns information about the structure of the Raft cluster.
 	GetClusterInfo(ctx context.Context, in *GetClusterInfoRequest, opts ...grpc.CallOption) (*ClusterInfo, error)
+	// AddClusterMember adds a peer to the Raft cluster.
+	//
+	// This rpc should be called on the leader but can be invoked on any peer that
+	// is connected to the leader.
 	AddClusterMember(ctx context.Context, in *AddClusterMemberRequest, opts ...grpc.CallOption) (*emptypb.Empty, error)
+	// RemoveClusterMember removes a peer from the Raft cluster.
+	//
+	// This rpc should be called on the leader but can be invoked on any peer that
+	// is connected to the leader.
 	RemoveClusterMember(ctx context.Context, in *RemoveClusterMemberRequest, opts ...grpc.CallOption) (*emptypb.Empty, error)
 }
 
@@ -78,10 +87,19 @@ func (c *adminClient) RemoveClusterMember(ctx context.Context, in *RemoveCluster
 // All implementations must embed UnimplementedAdminServer
 // for forward compatibility
 type AdminServer interface {
+	// CheckHealth determines whether the service is in a healthy state.
 	CheckHealth(context.Context, *CheckHealthRequest) (*Status, error)
-	// TODO: Consider moving cluster RPCs to dedicated Cluster service and removing cluster from names.
+	// GetClusterInfo returns information about the structure of the Raft cluster.
 	GetClusterInfo(context.Context, *GetClusterInfoRequest) (*ClusterInfo, error)
+	// AddClusterMember adds a peer to the Raft cluster.
+	//
+	// This rpc should be called on the leader but can be invoked on any peer that
+	// is connected to the leader.
 	AddClusterMember(context.Context, *AddClusterMemberRequest) (*emptypb.Empty, error)
+	// RemoveClusterMember removes a peer from the Raft cluster.
+	//
+	// This rpc should be called on the leader but can be invoked on any peer that
+	// is connected to the leader.
 	RemoveClusterMember(context.Context, *RemoveClusterMemberRequest) (*emptypb.Empty, error)
 	mustEmbedUnimplementedAdminServer()
 }
