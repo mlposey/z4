@@ -23,6 +23,7 @@ import (
 
 const (
 	sqlColumnDeliverAt = "deliver_at"
+	sqlColumnLastRetry = "last_retry"
 	sqlColumnNamespace = "namespace"
 	sqlColumnID        = "id"
 	sqlColumnMetadata  = "metadata"
@@ -41,6 +42,7 @@ func StartWireListener(config WireConfig) error {
 		{Name: sqlColumnNamespace, Type: sql.Text, Nullable: false, Source: tasksTable},
 		{Name: sqlColumnID, Type: sql.Text, Nullable: false, Source: tasksTable},
 		{Name: sqlColumnDeliverAt, Type: sql.Timestamp, Nullable: false, Source: tasksTable},
+		{Name: sqlColumnLastRetry, Type: sql.Timestamp, Nullable: false, Source: tasksTable},
 		{Name: sqlColumnMetadata, Type: sql.JSON, Nullable: true, Source: tasksTable},
 		{Name: sqlColumnPayload, Type: sql.Blob, Nullable: true, Source: tasksTable},
 	}, config.Store))
@@ -68,10 +70,16 @@ func StartWireListener(config WireConfig) error {
 }
 
 func RowFromTask(task *proto.Task) sql.Row {
+	var lastRetry interface{}
+	if task.GetLastRetry() != nil {
+		lastRetry = task.GetLastRetry().AsTime()
+	}
+
 	return sql.NewRow(
 		task.GetNamespace(),
 		task.GetId(),
 		task.GetDeliverAt().AsTime(),
+		lastRetry,
 		sql.JSONDocument{Val: task.GetMetadata()},
 		task.GetPayload(),
 	)
