@@ -79,6 +79,7 @@ func (tb *TaskBroker) startAckListener() {
 			zap.String("namespace", tb.namespace),
 			zap.String("task_id", req.GetAck().GetTaskId()))
 
+		// This is intentionally async.
 		cluster.ApplyAckCommand(tb.raft, req.GetAck())
 	}
 }
