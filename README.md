@@ -2,7 +2,7 @@
 
 # z4
 z4 is a task scheduling service. It accepts information about actions that should take place
-in the future and then reminds consumers when the actions should be performed.
+in the future and then informs consumers when the actions should be performed.
 
 Main features
 * Distributed database model that offers durability and automated failure recovery
