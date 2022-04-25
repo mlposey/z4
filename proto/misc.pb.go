@@ -20,6 +20,7 @@ const (
 	_ = protoimpl.EnforceVersion(protoimpl.MaxVersion - 20)
 )
 
+// Command is any command replicated by Raft peers and applied to their FSM.
 type Command struct {
 	state         protoimpl.MessageState
 	sizeCache     protoimpl.SizeCache

@@ -4,6 +4,7 @@ option go_package = "github.com/mlposey/z4/proto;proto";
 
 import "collection_service.proto";
 
+// Command is any command replicated by Raft peers and applied to their FSM.
 message Command {
   oneof cmd {
     Task task = 1;
