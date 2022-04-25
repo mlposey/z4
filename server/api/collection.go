@@ -201,26 +201,11 @@ func (c *Collection) GetTask(ctx context.Context, req *proto.GetTaskRequest) (*p
 	return task, nil
 }
 
-func (c *Collection) GetTaskStream(req *proto.StreamTasksRequest, stream proto.Collection_GetTaskStreamServer) error {
-	namespace := req.GetNamespace()
-	return c.fm.Tasks(namespace, func(tasks feeds.TaskStream) error {
-		for {
-			select {
-			case <-stream.Context().Done():
-				return nil
-
-			case task := <-tasks:
-				err := stream.Send(task)
-				if err != nil {
-					return status.Errorf(codes.Internal, "failed to send tasks to client: %v", err)
-				}
-
-				telemetry.StreamedTasks.
-					WithLabelValues("GetTaskStream", namespace).
-					Inc()
-			}
-		}
-	})
+func (c *Collection) GetTaskStream(stream proto.Collection_GetTaskStreamServer) error {
+	// TODO: Determine how much of task broker writes should use raft vs. direct badger client.
+	broker := feeds.NewTaskBroker(stream, c.fm)
+	defer broker.Close()
+	return broker.Start()
 }
 
 func (c *Collection) getRunTime(req *proto.CreateTaskRequest) time.Time {

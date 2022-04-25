@@ -12,6 +12,7 @@ import (
 	"google.golang.org/grpc/credentials/insecure"
 	pb "google.golang.org/protobuf/proto"
 	"io"
+	"log"
 	"os"
 	"os/exec"
 	"strings"
@@ -153,15 +154,25 @@ func (ts *taskStreams) iBeginStreamingAfterASecondDelay(arg1 int) error {
 }
 
 func (ts *taskStreams) consumeTaskStream() error {
-	stream, err := ts.client.GetTaskStream(context.Background(), &proto.StreamTasksRequest{
-		// TODO: Generate this or take it from the gherkin.
-		RequestId: ts.taskRequest.GetRequestId() + "_stream",
-		// TODO: Supply namespace in gherkin so we can test failure scenarios.
-		Namespace: ts.taskRequest.GetNamespace(),
+	stream, err := ts.client.GetTaskStream(context.Background())
+	if err != nil {
+		return err
+	}
+
+	err = stream.Send(&proto.StreamTasksRequest{
+		Request: &proto.StreamTasksRequest_StartReq{
+			StartReq: &proto.StartStreamRequest{
+				// TODO: Generate this or take it from the gherkin.
+				RequestId: ksuid.New().String(),
+				// TODO: Supply namespace in gherkin so we can test failure scenarios.
+				Namespace: ts.taskRequest.GetNamespace(),
+			},
+		},
 	})
 	if err != nil {
 		return err
 	}
+
 	go func() {
 		for {
 			task, err := stream.Recv()
@@ -176,6 +187,18 @@ func (ts *taskStreams) consumeTaskStream() error {
 			}
 
 			ts.receivedTasks = append(ts.receivedTasks, task)
+
+			err = stream.Send(&proto.StreamTasksRequest{
+				Request: &proto.StreamTasksRequest_Ack{
+					Ack: &proto.Ack{
+						TaskId:    task.GetId(),
+						Namespace: task.GetNamespace(),
+					},
+				},
+			})
+			if err != nil {
+				log.Fatalf("ack failed: %v", err)
+			}
 		}
 	}()
 	return nil

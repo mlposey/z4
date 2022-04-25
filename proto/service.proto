@@ -55,7 +55,7 @@ service Collection {
   rpc CreateTaskStreamAsync(stream CreateTaskRequest) returns (stream TaskStreamResponse) {};
 
   rpc GetTask(GetTaskRequest) returns (Task) {};
-  rpc GetTaskStream(StreamTasksRequest) returns (stream Task) {};
+  rpc GetTaskStream(stream StreamTasksRequest) returns (stream Task) {};
 }
 
 message CreateTaskRequest {
@@ -80,8 +80,20 @@ message TaskStreamResponse {
 }
 
 message StreamTasksRequest {
+  oneof request {
+    StartStreamRequest start_req = 1;
+    Ack ack = 2;
+  }
+}
+
+message StartStreamRequest {
   string request_id = 1;
   string namespace = 2;
+}
+
+message Ack {
+  string namespace = 1;
+  string task_id = 2;
 }
 
 message GetTaskRequest {
@@ -96,4 +108,6 @@ message Task {
   map<string, string> metadata = 3;
   bytes payload = 4;
   google.protobuf.Timestamp deliver_at = 5;
+  // Last time the task was sent to the client due to not receiving an ack.
+  google.protobuf.Timestamp last_retry = 6;
 }

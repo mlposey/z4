@@ -100,6 +100,21 @@ func NewTaskStore(db *BadgerClient) *TaskStore {
 	return store
 }
 
+func (ts *TaskStore) DeleteAll(acks []*proto.Ack) error {
+	telemetry.Logger.Debug("deleting task batch from DB", zap.Int("count", len(acks)))
+	batch := ts.Client.DB.NewWriteBatch()
+	defer batch.Cancel()
+
+	for _, ack := range acks {
+		key := getTaskFQN(ack.GetNamespace(), ack.GetTaskId())
+		err := batch.Delete(key)
+		if err != nil {
+			return fmt.Errorf("failed to delete task '%s' in batch: %w", ack.GetTaskId(), err)
+		}
+	}
+	return batch.Flush()
+}
+
 func (ts *TaskStore) Save(task *proto.Task) error {
 	telemetry.Logger.Debug("writing task to DB", zap.Any("task", task))
 	return ts.Client.DB.Update(func(txn *badger.Txn) error {
@@ -113,7 +128,7 @@ func (ts *TaskStore) Save(task *proto.Task) error {
 }
 
 func (ts *TaskStore) SaveAll(tasks []*proto.Task) error {
-	telemetry.Logger.Debug("writing task batch to DB", zap.Any("count", len(tasks)))
+	telemetry.Logger.Debug("writing task batch to DB", zap.Int("count", len(tasks)))
 	batch := ts.Client.DB.NewWriteBatch()
 	defer batch.Cancel()
 

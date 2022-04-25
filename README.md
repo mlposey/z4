@@ -1,11 +1,13 @@
 > This project is in an experimental state and not yet ready for production.
 
 # z4
-z4 is a database for managing tasks. A "task" is an action that should take place in the future.
+z4 is a task scheduling service. It accepts information about actions that should take place
+in the future and then reminds consumers when the actions should be performed.
 
 Main features
 * Distributed database model that offers durability and automated failure recovery
 * High-throughput gRPC service for writing and consuming tasks
+* At-least-once delivery of scheduled tasks
 * SQL interface for use with MySQL-compatible tools
 
 ## Contents

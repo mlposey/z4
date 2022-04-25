@@ -94,9 +94,18 @@ func info(client proto.AdminClient) {
 }
 
 func consume(client proto.CollectionClient, namespace string) {
-	stream, err := client.GetTaskStream(context.Background(), &proto.StreamTasksRequest{
-		RequestId: ksuid.New().String(),
-		Namespace: namespace,
+	stream, err := client.GetTaskStream(context.Background())
+	if err != nil {
+		panic(err)
+	}
+
+	err = stream.Send(&proto.StreamTasksRequest{
+		Request: &proto.StreamTasksRequest_StartReq{
+			StartReq: &proto.StartStreamRequest{
+				RequestId: ksuid.New().String(),
+				Namespace: namespace,
+			},
+		},
 	})
 	if err != nil {
 		panic(err)
@@ -114,5 +123,17 @@ func consume(client proto.CollectionClient, namespace string) {
 			panic(err)
 		}
 		fmt.Println(string(out))
+
+		err = stream.Send(&proto.StreamTasksRequest{
+			Request: &proto.StreamTasksRequest_Ack{
+				Ack: &proto.Ack{
+					TaskId:    task.GetId(),
+					Namespace: task.GetNamespace(),
+				},
+			},
+		})
+		if err != nil {
+			panic(err)
+		}
 	}
 }

@@ -224,7 +224,7 @@ type CollectionClient interface {
 	CreateTaskAsync(ctx context.Context, in *CreateTaskRequest, opts ...grpc.CallOption) (*CreateTaskResponse, error)
 	CreateTaskStreamAsync(ctx context.Context, opts ...grpc.CallOption) (Collection_CreateTaskStreamAsyncClient, error)
 	GetTask(ctx context.Context, in *GetTaskRequest, opts ...grpc.CallOption) (*Task, error)
-	GetTaskStream(ctx context.Context, in *StreamTasksRequest, opts ...grpc.CallOption) (Collection_GetTaskStreamClient, error)
+	GetTaskStream(ctx context.Context, opts ...grpc.CallOption) (Collection_GetTaskStreamClient, error)
 }
 
 type collectionClient struct {
@@ -324,28 +324,27 @@ func (c *collectionClient) GetTask(ctx context.Context, in *GetTaskRequest, opts
 	return out, nil
 }
 
-func (c *collectionClient) GetTaskStream(ctx context.Context, in *StreamTasksRequest, opts ...grpc.CallOption) (Collection_GetTaskStreamClient, error) {
+func (c *collectionClient) GetTaskStream(ctx context.Context, opts ...grpc.CallOption) (Collection_GetTaskStreamClient, error) {
 	stream, err := c.cc.NewStream(ctx, &Collection_ServiceDesc.Streams[2], "/z4.Collection/GetTaskStream", opts...)
 	if err != nil {
 		return nil, err
 	}
 	x := &collectionGetTaskStreamClient{stream}
-	if err := x.ClientStream.SendMsg(in); err != nil {
-		return nil, err
-	}
-	if err := x.ClientStream.CloseSend(); err != nil {
-		return nil, err
-	}
 	return x, nil
 }
 
 type Collection_GetTaskStreamClient interface {
+	Send(*StreamTasksRequest) error
 	Recv() (*Task, error)
 	grpc.ClientStream
 }
 
 type collectionGetTaskStreamClient struct {
 	grpc.ClientStream
+}
+
+func (x *collectionGetTaskStreamClient) Send(m *StreamTasksRequest) error {
+	return x.ClientStream.SendMsg(m)
 }
 
 func (x *collectionGetTaskStreamClient) Recv() (*Task, error) {
@@ -365,7 +364,7 @@ type CollectionServer interface {
 	CreateTaskAsync(context.Context, *CreateTaskRequest) (*CreateTaskResponse, error)
 	CreateTaskStreamAsync(Collection_CreateTaskStreamAsyncServer) error
 	GetTask(context.Context, *GetTaskRequest) (*Task, error)
-	GetTaskStream(*StreamTasksRequest, Collection_GetTaskStreamServer) error
+	GetTaskStream(Collection_GetTaskStreamServer) error
 	mustEmbedUnimplementedCollectionServer()
 }
 
@@ -388,7 +387,7 @@ func (UnimplementedCollectionServer) CreateTaskStreamAsync(Collection_CreateTask
 func (UnimplementedCollectionServer) GetTask(context.Context, *GetTaskRequest) (*Task, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method GetTask not implemented")
 }
-func (UnimplementedCollectionServer) GetTaskStream(*StreamTasksRequest, Collection_GetTaskStreamServer) error {
+func (UnimplementedCollectionServer) GetTaskStream(Collection_GetTaskStreamServer) error {
 	return status.Errorf(codes.Unimplemented, "method GetTaskStream not implemented")
 }
 func (UnimplementedCollectionServer) mustEmbedUnimplementedCollectionServer() {}
@@ -511,15 +510,12 @@ func _Collection_GetTask_Handler(srv interface{}, ctx context.Context, dec func(
 }
 
 func _Collection_GetTaskStream_Handler(srv interface{}, stream grpc.ServerStream) error {
-	m := new(StreamTasksRequest)
-	if err := stream.RecvMsg(m); err != nil {
-		return err
-	}
-	return srv.(CollectionServer).GetTaskStream(m, &collectionGetTaskStreamServer{stream})
+	return srv.(CollectionServer).GetTaskStream(&collectionGetTaskStreamServer{stream})
 }
 
 type Collection_GetTaskStreamServer interface {
 	Send(*Task) error
+	Recv() (*StreamTasksRequest, error)
 	grpc.ServerStream
 }
 
@@ -529,6 +525,14 @@ type collectionGetTaskStreamServer struct {
 
 func (x *collectionGetTaskStreamServer) Send(m *Task) error {
 	return x.ServerStream.SendMsg(m)
+}
+
+func (x *collectionGetTaskStreamServer) Recv() (*StreamTasksRequest, error) {
+	m := new(StreamTasksRequest)
+	if err := x.ServerStream.RecvMsg(m); err != nil {
+		return nil, err
+	}
+	return m, nil
 }
 
 // Collection_ServiceDesc is the grpc.ServiceDesc for Collection service.
@@ -568,6 +572,7 @@ var Collection_ServiceDesc = grpc.ServiceDesc{
 			StreamName:    "GetTaskStream",
 			Handler:       _Collection_GetTaskStream_Handler,
 			ServerStreams: true,
+			ClientStreams: true,
 		},
 	},
 	Metadata: "service.proto",
