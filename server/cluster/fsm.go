@@ -52,6 +52,8 @@ func (f *stateMachine) ApplyBatch(logs []*raft.Log) []interface{} {
 		}
 	}
 
+	// TODO: Determine if concurrently saving and deleting improves performance.
+
 	if len(tasks) > 0 {
 		err := f.ts.SaveAll(tasks)
 		if err != nil {
