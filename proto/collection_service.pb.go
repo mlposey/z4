@@ -21,17 +21,28 @@ const (
 	_ = protoimpl.EnforceVersion(protoimpl.MaxVersion - 20)
 )
 
+// CreateTaskRequest is a request to create a task.
 type CreateTaskRequest struct {
 	state         protoimpl.MessageState
 	sizeCache     protoimpl.SizeCache
 	unknownFields protoimpl.UnknownFields
 
-	RequestId  string                 `protobuf:"bytes,1,opt,name=request_id,json=requestId,proto3" json:"request_id,omitempty"`
-	Namespace  string                 `protobuf:"bytes,2,opt,name=namespace,proto3" json:"namespace,omitempty"`
-	Metadata   map[string]string      `protobuf:"bytes,3,rep,name=metadata,proto3" json:"metadata,omitempty" protobuf_key:"bytes,1,opt,name=key,proto3" protobuf_val:"bytes,2,opt,name=value,proto3"`
-	Payload    []byte                 `protobuf:"bytes,4,opt,name=payload,proto3" json:"payload,omitempty"`
-	DeliverAt  *timestamppb.Timestamp `protobuf:"bytes,5,opt,name=deliver_at,json=deliverAt,proto3" json:"deliver_at,omitempty"`
-	TtsSeconds int64                  `protobuf:"varint,6,opt,name=tts_seconds,json=ttsSeconds,proto3" json:"tts_seconds,omitempty"`
+	// The unique id of this request
+	RequestId string `protobuf:"bytes,1,opt,name=request_id,json=requestId,proto3" json:"request_id,omitempty"`
+	// The namespace where the task should be created.
+	Namespace string `protobuf:"bytes,2,opt,name=namespace,proto3" json:"namespace,omitempty"`
+	// Arbitrary key/value metadata for the task.
+	Metadata map[string]string `protobuf:"bytes,3,rep,name=metadata,proto3" json:"metadata,omitempty" protobuf_key:"bytes,1,opt,name=key,proto3" protobuf_val:"bytes,2,opt,name=value,proto3"`
+	// An arbitrary task payload.
+	Payload []byte `protobuf:"bytes,4,opt,name=payload,proto3" json:"payload,omitempty"`
+	// The time when the task should be delivered to consumers.
+	//
+	// Use this field or tts_seconds, not both.
+	DeliverAt *timestamppb.Timestamp `protobuf:"bytes,5,opt,name=deliver_at,json=deliverAt,proto3" json:"deliver_at,omitempty"`
+	// The amount of time to wait before delivering the task to consumers.
+	//
+	// Use this field or deliver_at, not both.
+	TtsSeconds int64 `protobuf:"varint,6,opt,name=tts_seconds,json=ttsSeconds,proto3" json:"tts_seconds,omitempty"`
 }
 
 func (x *CreateTaskRequest) Reset() {
@@ -108,12 +119,21 @@ func (x *CreateTaskRequest) GetTtsSeconds() int64 {
 	return 0
 }
 
+// CreateTaskResponse is the result of creating a task.
 type CreateTaskResponse struct {
 	state         protoimpl.MessageState
 	sizeCache     protoimpl.SizeCache
 	unknownFields protoimpl.UnknownFields
 
-	Task        *Task  `protobuf:"bytes,1,opt,name=task,proto3" json:"task,omitempty"`
+	// The task that was created
+	Task *Task `protobuf:"bytes,1,opt,name=task,proto3" json:"task,omitempty"`
+	// The peer that handled the task creation
+	//
+	// Under normal circumstances, this field should be an empty string.
+	// If a request to create a task is sent to a follower instead of
+	// a leader, the follower will forward the request to the leader
+	// and set this field to the leader's address. This is a hint to the
+	// client that it should reconnect to the leader.
 	ForwardedTo string `protobuf:"bytes,2,opt,name=forwarded_to,json=forwardedTo,proto3" json:"forwarded_to,omitempty"`
 }
 
@@ -163,6 +183,7 @@ func (x *CreateTaskResponse) GetForwardedTo() string {
 	return ""
 }
 
+// TaskStreamResponse is a stream response from the server when creating a task.
 type TaskStreamResponse struct {
 	state         protoimpl.MessageState
 	sizeCache     protoimpl.SizeCache

@@ -22,11 +22,50 @@ const _ = grpc.SupportPackageIsVersion7
 //
 // For semantics around ctx use and closing/ending streaming RPCs, please refer to https://pkg.go.dev/google.golang.org/grpc/?tab=doc#ClientConn.NewStream.
 type CollectionClient interface {
+	// CreateTask synchronously creates a task.
+	//
+	// Synchronous task creation ensures the task is durably persisted before
+	// the request returns. This is much slower than async creation but useful
+	// if durability is required.
+	//
+	// This rpc should be called on the leader.
 	CreateTask(ctx context.Context, in *CreateTaskRequest, opts ...grpc.CallOption) (*CreateTaskResponse, error)
+	// CreateTaskStream opens a bi-directional stream for creating tasks synchronously.
+	//
+	// Synchronous task creation ensures the task is durably persisted before
+	// the request returns. This is much slower than async creation but useful
+	// if durability is required.
+	//
+	// CreateTaskStream should be preferred over CreateTask if high throughput is
+	// a priority but durability is required.
+	//
+	// This rpc should be called on the leader.
 	CreateTaskStream(ctx context.Context, opts ...grpc.CallOption) (Collection_CreateTaskStreamClient, error)
+	// CreateTaskAsync asynchronously creates a task.
+	//
+	// Asynchronous task creation does not wait for the task to be persisted before
+	// the request returns. This makes "writes" faster but at the expensive of losing
+	// data if persistence issues arise.
+	//
+	// This rpc should be called on the leader.
 	CreateTaskAsync(ctx context.Context, in *CreateTaskRequest, opts ...grpc.CallOption) (*CreateTaskResponse, error)
+	// CreateTaskStreamAsync opens a bi-directional stream for creating tasks asynchronously.
+	//
+	// Asynchronous task creation does not wait for the task to be persisted before
+	// the request returns. This makes "writes" faster but at the expensive of losing
+	// data if persistence issues arise.
+	//
+	// CreateTaskStreamAsync should be preferred over CreateTaskAsync if high throughput is
+	// a priority and durability is strongly desired but not required. It offers the highest
+	// write throughput out of all methods.
+	//
+	// This rpc should be called on the leader.
 	CreateTaskStreamAsync(ctx context.Context, opts ...grpc.CallOption) (Collection_CreateTaskStreamAsyncClient, error)
+	// GetTask retrieves a task by its ID.
 	GetTask(ctx context.Context, in *GetTaskRequest, opts ...grpc.CallOption) (*Task, error)
+	// GetTaskStream opens a bi-directional stream for consuming ready tasks.
+	//
+	// This rpc must be called on the leader.
 	GetTaskStream(ctx context.Context, opts ...grpc.CallOption) (Collection_GetTaskStreamClient, error)
 }
 
@@ -162,11 +201,50 @@ func (x *collectionGetTaskStreamClient) Recv() (*Task, error) {
 // All implementations must embed UnimplementedCollectionServer
 // for forward compatibility
 type CollectionServer interface {
+	// CreateTask synchronously creates a task.
+	//
+	// Synchronous task creation ensures the task is durably persisted before
+	// the request returns. This is much slower than async creation but useful
+	// if durability is required.
+	//
+	// This rpc should be called on the leader.
 	CreateTask(context.Context, *CreateTaskRequest) (*CreateTaskResponse, error)
+	// CreateTaskStream opens a bi-directional stream for creating tasks synchronously.
+	//
+	// Synchronous task creation ensures the task is durably persisted before
+	// the request returns. This is much slower than async creation but useful
+	// if durability is required.
+	//
+	// CreateTaskStream should be preferred over CreateTask if high throughput is
+	// a priority but durability is required.
+	//
+	// This rpc should be called on the leader.
 	CreateTaskStream(Collection_CreateTaskStreamServer) error
+	// CreateTaskAsync asynchronously creates a task.
+	//
+	// Asynchronous task creation does not wait for the task to be persisted before
+	// the request returns. This makes "writes" faster but at the expensive of losing
+	// data if persistence issues arise.
+	//
+	// This rpc should be called on the leader.
 	CreateTaskAsync(context.Context, *CreateTaskRequest) (*CreateTaskResponse, error)
+	// CreateTaskStreamAsync opens a bi-directional stream for creating tasks asynchronously.
+	//
+	// Asynchronous task creation does not wait for the task to be persisted before
+	// the request returns. This makes "writes" faster but at the expensive of losing
+	// data if persistence issues arise.
+	//
+	// CreateTaskStreamAsync should be preferred over CreateTaskAsync if high throughput is
+	// a priority and durability is strongly desired but not required. It offers the highest
+	// write throughput out of all methods.
+	//
+	// This rpc should be called on the leader.
 	CreateTaskStreamAsync(Collection_CreateTaskStreamAsyncServer) error
+	// GetTask retrieves a task by its ID.
 	GetTask(context.Context, *GetTaskRequest) (*Task, error)
+	// GetTaskStream opens a bi-directional stream for consuming ready tasks.
+	//
+	// This rpc must be called on the leader.
 	GetTaskStream(Collection_GetTaskStreamServer) error
 	mustEmbedUnimplementedCollectionServer()
 }

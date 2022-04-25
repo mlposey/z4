@@ -6,30 +6,99 @@ import "google/protobuf/timestamp.proto";
 
 // The Collection service manages tasks.
 service Collection {
+  // CreateTask synchronously creates a task.
+  //
+  // Synchronous task creation ensures the task is durably persisted before
+  // the request returns. This is much slower than async creation but useful
+  // if durability is required.
+  //
+  // This rpc should be called on the leader.
   rpc CreateTask(CreateTaskRequest) returns (CreateTaskResponse) {};
+
+  // CreateTaskStream opens a bi-directional stream for creating tasks synchronously.
+  //
+  // Synchronous task creation ensures the task is durably persisted before
+  // the request returns. This is much slower than async creation but useful
+  // if durability is required.
+  //
+  // CreateTaskStream should be preferred over CreateTask if high throughput is
+  // a priority but durability is required.
+  //
+  // This rpc should be called on the leader.
   rpc CreateTaskStream(stream CreateTaskRequest) returns (stream TaskStreamResponse) {};
 
+  // CreateTaskAsync asynchronously creates a task.
+  //
+  // Asynchronous task creation does not wait for the task to be persisted before
+  // the request returns. This makes "writes" faster but at the expensive of losing
+  // data if persistence issues arise.
+  //
+  // This rpc should be called on the leader.
   rpc CreateTaskAsync(CreateTaskRequest) returns (CreateTaskResponse) {};
+
+  // CreateTaskStreamAsync opens a bi-directional stream for creating tasks asynchronously.
+  //
+  // Asynchronous task creation does not wait for the task to be persisted before
+  // the request returns. This makes "writes" faster but at the expensive of losing
+  // data if persistence issues arise.
+  //
+  // CreateTaskStreamAsync should be preferred over CreateTaskAsync if high throughput is
+  // a priority and durability is strongly desired but not required. It offers the highest
+  // write throughput out of all methods.
+  //
+  // This rpc should be called on the leader.
   rpc CreateTaskStreamAsync(stream CreateTaskRequest) returns (stream TaskStreamResponse) {};
 
+  // GetTask retrieves a task by its ID.
   rpc GetTask(GetTaskRequest) returns (Task) {};
+
+  // GetTaskStream opens a bi-directional stream for consuming ready tasks.
+  //
+  // This rpc must be called on the leader.
   rpc GetTaskStream(stream StreamTasksRequest) returns (stream Task) {};
 }
 
+// CreateTaskRequest is a request to create a task.
 message CreateTaskRequest {
+  // The unique id of this request
   string request_id = 1;
+
+  // The namespace where the task should be created.
   string namespace = 2;
+
+  // Arbitrary key/value metadata for the task.
   map<string, string> metadata = 3;
+
+  // An arbitrary task payload.
   bytes payload = 4;
+
+  // The time when the task should be delivered to consumers.
+  //
+  // Use this field or tts_seconds, not both.
   google.protobuf.Timestamp deliver_at = 5;
+
+  // The amount of time to wait before delivering the task to consumers.
+  //
+  // Use this field or deliver_at, not both.
   int64 tts_seconds = 6;
 }
 
+// CreateTaskResponse is the result of creating a task.
 message CreateTaskResponse {
+  // The task that was created
   Task task = 1;
+
+  // The peer that handled the task creation
+  //
+  // Under normal circumstances, this field should be an empty string.
+  // If a request to create a task is sent to a follower instead of
+  // a leader, the follower will forward the request to the leader
+  // and set this field to the leader's address. This is a hint to the
+  // client that it should reconnect to the leader.
   string forwarded_to = 2;
 }
 
+// TaskStreamResponse is a stream response from the server when creating a task.
 message TaskStreamResponse {
   Task task = 1;
   uint32 status = 2;
