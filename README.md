@@ -158,8 +158,8 @@ pointed to by the `t` flag should be that of the cluster leader.
 #### gRPC
 A gRPC service is exposed on the default port 6355. It suppports cluster administration as well
 as task management.
-
-The specification is located [here](proto/service.proto).
+* [Admin service proto](proto/admin_service.proto)
+* [Collection service proto](proto/collection_service.proto)
 
 #### MySQL
 A MySQL interface is exposed on the default port 3306. It provides read-only access to task data.

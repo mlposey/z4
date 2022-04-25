@@ -1,0 +1,12 @@
+syntax = "proto3";
+package z4;
+option go_package = "github.com/mlposey/z4/proto;proto";
+
+import "collection_service.proto";
+
+message Command {
+  oneof cmd {
+    Task task = 1;
+    Ack ack = 2;
+  }
+}
