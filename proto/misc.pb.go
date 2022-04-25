@@ -90,10 +90,12 @@ type isCommand_Cmd interface {
 }
 
 type Command_Task struct {
+	// A request to save a task.
 	Task *Task `protobuf:"bytes,1,opt,name=task,proto3,oneof"`
 }
 
 type Command_Ack struct {
+	// A request to acknowledge a task so that it is not redelivered.
 	Ack *Ack `protobuf:"bytes,2,opt,name=ack,proto3,oneof"`
 }
 
