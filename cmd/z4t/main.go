@@ -123,5 +123,17 @@ func consume(client proto.CollectionClient, namespace string) {
 			panic(err)
 		}
 		fmt.Println(string(out))
+
+		err = stream.Send(&proto.StreamTasksRequest{
+			Request: &proto.StreamTasksRequest_Ack{
+				Ack: &proto.Ack{
+					TaskId:    task.GetId(),
+					Namespace: task.GetNamespace(),
+				},
+			},
+		})
+		if err != nil {
+			panic(err)
+		}
 	}
 }
