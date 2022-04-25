@@ -185,15 +185,6 @@ func (f *Feed) handleUndeliveredTasks(tasks []*proto.Task) bool {
 	return true
 }
 
-func (f *Feed) Ack(ack *proto.Ack) {
-	// TODO: Batch deletions.
-	err := f.tasks.DeleteAll([]*proto.Ack{ack})
-	if err != nil {
-		telemetry.Logger.Error("failed to ack task",
-			zap.Error(err))
-	}
-}
-
 func (f *Feed) Tasks() TaskStream {
 	return f.feed
 }
