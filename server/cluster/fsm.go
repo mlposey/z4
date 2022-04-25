@@ -1,12 +1,12 @@
 package cluster
 
 import (
+	"errors"
 	"github.com/dgraph-io/badger/v3"
 	"github.com/hashicorp/raft"
 	"github.com/mlposey/z4/proto"
 	"github.com/mlposey/z4/storage"
 	"github.com/mlposey/z4/telemetry"
-	"go.uber.org/zap"
 	pb "google.golang.org/protobuf/proto"
 	"io"
 )
@@ -26,54 +26,60 @@ func newFSM(db *badger.DB, ts *storage.TaskStore) *stateMachine {
 
 func (f *stateMachine) ApplyBatch(logs []*raft.Log) []interface{} {
 	telemetry.ReceivedLogs.Add(float64(len(logs)))
-	tasks := make([]*proto.Task, len(logs))
-	var taskCount float64
+
+	var tasks []*proto.Task
+	var acks []*proto.Ack
 	res := make([]interface{}, len(logs))
 
 	for i, log := range logs {
-		task := new(proto.Task)
-		err := pb.Unmarshal(log.Data, task)
+		cmd := new(proto.Command)
+		err := pb.Unmarshal(log.Data, cmd)
 		if err != nil {
 			res[i] = err
 			return res
 		}
 
-		tasks[i] = task
-		taskCount++
+		switch v := cmd.GetCmd().(type) {
+		case *proto.Command_Task:
+			tasks = append(tasks, v.Task)
+
+		case *proto.Command_Ack:
+			acks = append(acks, v.Ack)
+
+		default:
+			res[i] = errors.New("unknown command type: expected ack or task")
+			return res
+		}
 	}
 
-	err := f.ts.SaveAll(tasks)
-	if err != nil {
-		for i := 0; i < len(res); i++ {
-			res[i] = err
+	if len(tasks) > 0 {
+		err := f.ts.SaveAll(tasks)
+		if err != nil {
+			for i := 0; i < len(res); i++ {
+				res[i] = err
+			}
+			return res
 		}
-	} else {
-		telemetry.AppliedLogs.Add(taskCount)
 	}
+
+	if len(acks) > 0 {
+		err := f.ts.DeleteAll(acks)
+		if err != nil {
+			for i := 0; i < len(res); i++ {
+				res[i] = err
+			}
+			return res
+		}
+	}
+
+	telemetry.AppliedLogs.Add(float64(len(acks) + len(tasks)))
 	return res
 }
 
 func (f *stateMachine) Apply(log *raft.Log) interface{} {
 	// Internally, this method should never be invoked. The raft package should
 	// use our ApplyBatch method instead in order to speed up write performance.
-	// However, we will keep this implementation around just in case the raft
-	// package uses it in the future.
-
-	telemetry.ReceivedLogs.Inc()
-	task := new(proto.Task)
-	err := pb.Unmarshal(log.Data, task)
-	if err != nil {
-		telemetry.Logger.Error("failed to parse log data", zap.Error(err))
-		return err
-	}
-
-	err = f.ts.Save(task)
-	if err != nil {
-		telemetry.Logger.Error("task submission to feed failed", zap.Error(err))
-	} else {
-		telemetry.AppliedLogs.Inc()
-	}
-	return err
+	return errors.New("unexpected call to Apply")
 }
 
 func (f *stateMachine) Snapshot() (raft.FSMSnapshot, error) {

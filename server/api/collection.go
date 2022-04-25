@@ -11,7 +11,6 @@ import (
 	"go.uber.org/zap"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
-	pb "google.golang.org/protobuf/proto"
 	"google.golang.org/protobuf/types/known/timestamppb"
 	"io"
 	"time"
@@ -146,10 +145,10 @@ func (c *Collection) createTask(ctx context.Context, req *proto.CreateTaskReques
 
 	switch ct {
 	case asyncCreation:
-		c.saveTask(task)
+		cluster.ApplySaveTaskCommand(c.raft, task)
 
 	case syncCreation:
-		err := c.saveTask(task).Error()
+		err := cluster.ApplySaveTaskCommand(c.raft, task).Error()
 		if err != nil {
 			return nil, status.Errorf(codes.Internal, "failed to save task: %v", err)
 		}
@@ -182,11 +181,6 @@ func (c *Collection) forwardRequest(
 	default:
 		return nil, status.Errorf(codes.Internal, "invalid creation type %v", ct)
 	}
-}
-
-func (c *Collection) saveTask(task *proto.Task) raft.ApplyFuture {
-	cmd, _ := pb.Marshal(task)
-	return c.raft.Apply(cmd, 0)
 }
 
 func (c *Collection) GetTask(ctx context.Context, req *proto.GetTaskRequest) (*proto.Task, error) {
