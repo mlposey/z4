@@ -197,7 +197,7 @@ func (c *Collection) GetTask(ctx context.Context, req *proto.GetTaskRequest) (*p
 
 func (c *Collection) GetTaskStream(stream proto.Collection_GetTaskStreamServer) error {
 	// TODO: Determine how much of task broker writes should use raft vs. direct badger client.
-	broker := feeds.NewTaskBroker(stream, c.fm)
+	broker := feeds.NewTaskBroker(stream, c.fm, c.raft)
 	defer broker.Close()
 	return broker.Start()
 }

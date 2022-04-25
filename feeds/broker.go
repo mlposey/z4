@@ -1,7 +1,9 @@
 package feeds
 
 import (
+	"github.com/hashicorp/raft"
 	"github.com/mlposey/z4/proto"
+	"github.com/mlposey/z4/server/cluster"
 	"github.com/mlposey/z4/telemetry"
 	"go.uber.org/zap"
 	"google.golang.org/grpc/codes"
@@ -12,6 +14,7 @@ import (
 type TaskBroker struct {
 	fm        *Manager
 	stream    proto.Collection_GetTaskStreamServer
+	raft      *raft.Raft
 	namespace string
 	lease     *Lease
 }
@@ -19,10 +22,12 @@ type TaskBroker struct {
 func NewTaskBroker(
 	stream proto.Collection_GetTaskStreamServer,
 	fm *Manager,
+	raft *raft.Raft,
 ) *TaskBroker {
 	return &TaskBroker{
 		fm:     fm,
 		stream: stream,
+		raft:   raft,
 	}
 }
 
@@ -74,7 +79,7 @@ func (tb *TaskBroker) startAckListener() {
 			zap.String("namespace", tb.namespace),
 			zap.String("task_id", req.GetAck().GetTaskId()))
 
-		tb.lease.Feed().Ack(req.GetAck())
+		cluster.ApplyAckCommand(tb.raft, req.GetAck())
 	}
 }
 
