@@ -42,7 +42,7 @@ func StartWireListener(config WireConfig) error {
 		{Name: sqlColumnNamespace, Type: sql.Text, Nullable: false, Source: tasksTable},
 		{Name: sqlColumnID, Type: sql.Text, Nullable: false, Source: tasksTable},
 		{Name: sqlColumnDeliverAt, Type: sql.Timestamp, Nullable: false, Source: tasksTable},
-		{Name: sqlColumnLastRetry, Type: sql.Timestamp, Nullable: false, Source: tasksTable},
+		{Name: sqlColumnLastRetry, Type: sql.Timestamp, Nullable: true, Source: tasksTable},
 		{Name: sqlColumnMetadata, Type: sql.JSON, Nullable: true, Source: tasksTable},
 		{Name: sqlColumnPayload, Type: sql.Blob, Nullable: true, Source: tasksTable},
 	}, config.Store))
