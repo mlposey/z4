@@ -159,6 +159,9 @@ func (f *Feed) handleDeliveredTasks(tasks []*proto.Task) bool {
 		}
 	}
 
+	// TODO: Determine if we want to apply this to the Raft log.
+	// It doesn't seem entirely necessary, and not having it should
+	// improve performance. It could be nice to have though.
 	err := f.tasks.SaveAll(tasks)
 	if err != nil {
 		telemetry.Logger.Error("failed to update retry tasks",
