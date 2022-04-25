@@ -1,0 +1,47 @@
+apiVersion: v1
+kind: Service
+metadata:
+  labels:
+    {{- include "z4.labels" . | nindent 4 }}
+  name: {{ include "z4.fullname" . }}
+spec:
+  clusterIP: None
+  ports:
+    - port: {{ .Values.service.grpcPort }}
+      targetPort: grpc
+      protocol: TCP
+      name: grpc
+    - port: {{ .Values.service.raftPort }}
+      targetPort: raft
+      protocol: TCP
+      name: raft
+    - port: {{ .Values.service.metricsPort }}
+      targetPort: metrics
+      protocol: TCP
+      name: metrics
+  selector:
+    {{- include "z4.selectorLabels" . | nindent 4 }}
+#apiVersion: v1
+#kind: Service
+#metadata:
+#  name: {{ include "z4.fullname" . }}
+#  labels:
+#    {{- include "z4.labels" . | nindent 4 }}
+#spec:
+#  type: {{ .Values.service.type }}
+#  ports:
+#    - port: {{ .Values.service.grpcPort }}
+#      targetPort: grpc
+#      protocol: TCP
+#      name: grpc
+#    - port: {{ .Values.service.raftPort }}
+#      targetPort: raft
+#      protocol: TCP
+#      name: raft
+#    - port: {{ .Values.service.metricsPort }}
+#      targetPort: metrics
+#      protocol: TCP
+#      name: metrics
+#  selector:
+#    {{- include "z4.selectorLabels" . | nindent 4 }}
+#

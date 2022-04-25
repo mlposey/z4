@@ -4,8 +4,8 @@ services:
   # using this container's admin gRPC service.
   peer1:
     build:
-      context: ../
-      dockerfile: docker/Dockerfile
+      context: ../../
+      dockerfile: deployments/docker/Dockerfile
     environment:
       Z4_PEER_ID: peer1
       Z4_PEER_ADVERTISE_ADDR: peer1:6356
@@ -22,8 +22,8 @@ services:
       - peer1_data:/var/lib/z4
   peer2:
     build:
-      context: ../
-      dockerfile: docker/Dockerfile
+      context: ../../
+      dockerfile: deployments/docker/Dockerfile
     environment:
       Z4_PEER_ID: peer2
       Z4_PEER_ADVERTISE_ADDR: peer2:6356
@@ -36,8 +36,8 @@ services:
       - peer2_data:/var/lib/z4
   peer3:
     build:
-      context: ../
-      dockerfile: docker/Dockerfile
+      context: ../../
+      dockerfile: deployments/docker/Dockerfile
     environment:
       Z4_PEER_ID: peer3
       Z4_PEER_ADVERTISE_ADDR: peer3:6356
