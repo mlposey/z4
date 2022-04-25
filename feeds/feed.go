@@ -8,6 +8,7 @@ import (
 	"github.com/segmentio/ksuid"
 	"go.uber.org/multierr"
 	"go.uber.org/zap"
+	"google.golang.org/protobuf/types/known/timestamppb"
 	"time"
 )
 
@@ -90,10 +91,11 @@ func (f *Feed) getDeliveredTasks() ([]*proto.Task, error) {
 	// TODO: Consider more memory efficient way to do this.
 	// Maybe using iterator so we can filter in place?
 
+	watermark := time.Now().Add(-f.ackDeadline)
 	tasks, err := f.tasks.GetRange(storage.TaskRange{
 		Namespace: f.namespace,
 		StartID:   storage.NewTaskID(ksuid.Nil.Time()),
-		EndID:     storage.NewTaskID(time.Now().Add(-f.ackDeadline)),
+		EndID:     storage.NewTaskID(watermark),
 	})
 	if err != nil {
 		return nil, err
@@ -101,16 +103,24 @@ func (f *Feed) getDeliveredTasks() ([]*proto.Task, error) {
 
 	var filtered []*proto.Task
 	for _, task := range tasks {
-		ts, err := ksuid.Parse(task.GetId())
-		if err != nil {
-			return nil, err
-		}
-
-		if !ts.Time().After(lastDeliveryTime.Time()) {
+		if f.retryTask(task, watermark, lastDeliveryTime.Time()) {
 			filtered = append(filtered, task)
 		}
 	}
 	return filtered, nil
+}
+
+func (f *Feed) retryTask(task *proto.Task, watermark, lastDelivery time.Time) bool {
+	ts, err := ksuid.Parse(task.GetId())
+	if err != nil {
+		telemetry.Logger.Error("failed to parse task id",
+			zap.Error(err))
+		return false
+	}
+
+	lastRetry := task.GetLastRetry().AsTime()
+	return !ts.Time().After(lastDelivery) &&
+		(lastRetry.IsZero() || lastRetry.Add(f.ackDeadline).Before(watermark))
 }
 
 func (f *Feed) getUndeliveredTasks() ([]*proto.Task, error) {
@@ -138,13 +148,22 @@ func (f *Feed) handleDeliveredTasks(tasks []*proto.Task) bool {
 		return true
 	}
 
-	// TODO: Make delay configurable.
-	// TODO: Consider staggering redelivery times.
-	delay := time.Now().Add(time.Second * 5)
-	err := f.tasks.RewriteAll(tasks, delay)
+	for _, task := range tasks {
+		task.LastRetry = timestamppb.New(time.Now())
+
+		select {
+		case <-f.close:
+			return false
+
+		case f.feed <- task:
+		}
+	}
+
+	err := f.tasks.SaveAll(tasks)
 	if err != nil {
-		telemetry.Logger.Error("failed to handle retry batch",
+		telemetry.Logger.Error("failed to update retry tasks",
 			zap.Error(err))
+		return true
 	}
 	return true
 }

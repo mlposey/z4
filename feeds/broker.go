@@ -48,7 +48,9 @@ func (tb *TaskBroker) Start() error {
 }
 
 func (tb *TaskBroker) Close() error {
-	tb.lease.Release()
+	if tb.lease != nil {
+		tb.lease.Release()
+	}
 	return nil
 }
 
