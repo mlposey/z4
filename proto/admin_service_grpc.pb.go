@@ -37,6 +37,7 @@ type AdminClient interface {
 	// This rpc should be called on the leader but can be invoked on any peer that
 	// is connected to the leader.
 	RemoveClusterMember(ctx context.Context, in *RemoveClusterMemberRequest, opts ...grpc.CallOption) (*emptypb.Empty, error)
+	BootstrapCluster(ctx context.Context, in *emptypb.Empty, opts ...grpc.CallOption) (*emptypb.Empty, error)
 }
 
 type adminClient struct {
@@ -83,6 +84,15 @@ func (c *adminClient) RemoveClusterMember(ctx context.Context, in *RemoveCluster
 	return out, nil
 }
 
+func (c *adminClient) BootstrapCluster(ctx context.Context, in *emptypb.Empty, opts ...grpc.CallOption) (*emptypb.Empty, error) {
+	out := new(emptypb.Empty)
+	err := c.cc.Invoke(ctx, "/z4.Admin/BootstrapCluster", in, out, opts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
 // AdminServer is the server API for Admin service.
 // All implementations must embed UnimplementedAdminServer
 // for forward compatibility
@@ -101,6 +111,7 @@ type AdminServer interface {
 	// This rpc should be called on the leader but can be invoked on any peer that
 	// is connected to the leader.
 	RemoveClusterMember(context.Context, *RemoveClusterMemberRequest) (*emptypb.Empty, error)
+	BootstrapCluster(context.Context, *emptypb.Empty) (*emptypb.Empty, error)
 	mustEmbedUnimplementedAdminServer()
 }
 
@@ -119,6 +130,9 @@ func (UnimplementedAdminServer) AddClusterMember(context.Context, *AddClusterMem
 }
 func (UnimplementedAdminServer) RemoveClusterMember(context.Context, *RemoveClusterMemberRequest) (*emptypb.Empty, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method RemoveClusterMember not implemented")
+}
+func (UnimplementedAdminServer) BootstrapCluster(context.Context, *emptypb.Empty) (*emptypb.Empty, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method BootstrapCluster not implemented")
 }
 func (UnimplementedAdminServer) mustEmbedUnimplementedAdminServer() {}
 
@@ -205,6 +219,24 @@ func _Admin_RemoveClusterMember_Handler(srv interface{}, ctx context.Context, de
 	return interceptor(ctx, in, info, handler)
 }
 
+func _Admin_BootstrapCluster_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(emptypb.Empty)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(AdminServer).BootstrapCluster(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: "/z4.Admin/BootstrapCluster",
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(AdminServer).BootstrapCluster(ctx, req.(*emptypb.Empty))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
 // Admin_ServiceDesc is the grpc.ServiceDesc for Admin service.
 // It's only intended for direct use with grpc.RegisterService,
 // and not to be introspected or modified (even as a copy)
@@ -227,6 +259,10 @@ var Admin_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "RemoveClusterMember",
 			Handler:    _Admin_RemoveClusterMember_Handler,
+		},
+		{
+			MethodName: "BootstrapCluster",
+			Handler:    _Admin_BootstrapCluster_Handler,
 		},
 	},
 	Streams:  []grpc.StreamDesc{},

@@ -23,6 +23,8 @@ service Admin {
   // This rpc should be called on the leader but can be invoked on any peer that
   // is connected to the leader.
   rpc RemoveClusterMember(RemoveClusterMemberRequest) returns (google.protobuf.Empty) {};
+
+  rpc BootstrapCluster(google.protobuf.Empty) returns (google.protobuf.Empty) {};
 }
 
 message CheckHealthRequest {
