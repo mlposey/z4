@@ -56,6 +56,7 @@ spec:
               valueFrom:
                 fieldRef:
                   fieldPath: metadata.namespace
+            # Needs to match the name given to the Service object.
             - name: SERVICE_NAME
               value: {{ include "z4.fullname" . }}
             - name: Z4_PEER_ADVERTISE_ADDR
