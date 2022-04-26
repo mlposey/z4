@@ -13,6 +13,7 @@ Main features
 ## Contents
 * [Architecture](#architecture)
   * [Cluster Configurations](#cluster-configurations)
+* [Deployment]()
 * [Running Locally with Docker Compose](#running-locally-with-docker-compose)
 * [Cluster Administration](#cluster-administration)
 * [APIs](#apis)
@@ -48,7 +49,8 @@ cluster configurations
 |7|3|
 |..|..|
 
-### Running Locally with Docker Compose
+### Deployment
+#### Running Locally with Docker Compose
 A [docker-compose file](deployments/docker/docker-compose.yaml) allows you to test a three-node cluster locally.
 
 Run `make compose_up` to build and start the cluster.  
@@ -61,7 +63,7 @@ the [z4t](cmd/z4t) tool. Peers can be stopped and started using docker commands.
 Storage is persisted when restarting individual containers but erased when using the
 `make compose_down` command.
 
-#### Example Usage
+##### Example Usage
 1. Start the cluster
    ```
    > make compose_up
@@ -132,6 +134,10 @@ Storage is persisted when restarting individual containers but erased when using
     ```
     > make compose_down
     ```
+#### Kubernetes Deployment with Helm
+A [Helm chart](deployments/charts/z4) is provided for Kubernetes deploys. It will deploy z4 as a
+StatefulSet with a headless service.
+
 ### Cluster Administration
 z4 provides a gRPC service for managing clusters. This repository
 ships with [a tool](cmd/z4t) for interacting with that service.
