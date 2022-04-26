@@ -3,7 +3,7 @@ kind: StatefulSet
 metadata:
   name: {{ include "z4.fullname" . }}
   labels:
-    {{- include "z4.labels" . | nindent 4 }}
+    {{- include "z4.selectorLabels" . | nindent 6 }}
 spec:
   selector:
     matchLabels:
@@ -38,6 +38,8 @@ spec:
               name: raft
             - containerPort: 2112
               name: metrics
+            - containerPort: 3306
+              name: sql
           volumeMounts:
             - name: z4-data
               mountPath: /var/lib/z4
