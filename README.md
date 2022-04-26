@@ -13,8 +13,9 @@ Main features
 ## Contents
 * [Architecture](#architecture)
   * [Cluster Configurations](#cluster-configurations)
-* [Deployment]()
-* [Running Locally with Docker Compose](#running-locally-with-docker-compose)
+* [Deployment](#deployment)
+  * [Running Locally with Docker Compose](#running-locally-with-docker-compose)
+  * [Kubernetes Deployment with Helm](#kubernetes-deployment-with-helm)
 * [Cluster Administration](#cluster-administration)
 * [APIs](#apis)
   * [gRPC](#grpc)
