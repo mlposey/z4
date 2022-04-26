@@ -1,0 +1,14 @@
+{{- if .Values.serviceMonitor.enabled -}}
+apiVersion: monitoring.coreos.com/v1
+kind: ServiceMonitor
+metadata:
+  labels:
+    release: prometheus
+  name: {{ include "z4.fullname" . }}
+spec:
+  selector:
+    matchLabels:
+      {{- include "z4.selectorLabels" . | nindent 6 }}
+  endpoints:
+    - port: metrics
+{{- end }}
