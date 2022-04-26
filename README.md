@@ -12,10 +12,10 @@ Main features
 
 ## Contents
 * [Architecture](#architecture)
-  * [Cluster Configurations](#cluster-configurations)
 * [Deployment](#deployment)
   * [Running Locally with Docker Compose](#running-locally-with-docker-compose)
   * [Kubernetes Deployment with Helm](#kubernetes-deployment-with-helm)
+  * [Cluster Configurations](#cluster-configurations)
 * [Cluster Administration](#cluster-administration)
 * [APIs](#apis)
   * [gRPC](#grpc)
@@ -36,19 +36,6 @@ The z4 architecture is focused on providing
 A key part of achieving the above goals is a reliance on the Raft consensus
 algorithm. Raft enables the replication of data as well as the automated
 failover when peers become unreachable.
-
-#### Cluster Configurations
-When choosing the number of peers for a cluster, one must consider quorum needs.
-A cluster needs `(N/2)+1` peers to be available to reach quorum. If it cannot
-reach quorum, the cluster will be become unavailable. This encourages the following
-cluster configurations
-
-|Cluster Size (N)|Tolerated Peer Failures|
-|------------|-----------------------|
-|3|1|
-|5|2|
-|7|3|
-|..|..|
 
 ### Deployment
 #### Running Locally with Docker Compose
@@ -138,6 +125,19 @@ Storage is persisted when restarting individual containers but erased when using
 #### Kubernetes Deployment with Helm
 A [Helm chart](deployments/charts/z4) is provided for Kubernetes deploys. It will deploy z4 as a
 StatefulSet with a headless service.
+
+#### Cluster Configurations
+When choosing the number of peers for a cluster, one must consider quorum needs.
+A cluster needs `(N/2)+1` peers to be available to reach quorum. If it cannot
+reach quorum, the cluster will be become unavailable. This encourages the following
+cluster configurations
+
+|Cluster Size (N)|Tolerated Peer Failures|
+|------------|-----------------------|
+|3|1|
+|5|2|
+|7|3|
+|..|..|
 
 ### Cluster Administration
 z4 provides a gRPC service for managing clusters. This repository
