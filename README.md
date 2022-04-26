@@ -49,7 +49,7 @@ cluster configurations
 |..|..|
 
 ### Running Locally with Docker Compose
-A [docker-compose file](docker/docker-compose.yaml) allows you to test a three-node cluster locally.
+A [docker-compose file](deployments/docker/docker-compose.yaml) allows you to test a three-node cluster locally.
 
 Run `make compose_up` to build and start the cluster.  
 Run `make compose_down` to stop and destroy the cluster.

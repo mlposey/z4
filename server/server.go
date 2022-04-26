@@ -56,7 +56,7 @@ func (s *Server) Start() error {
 	}
 
 	s.server = grpc.NewServer(s.config.Opts...)
-	adminServer := api.NewAdmin(s.peer.Raft, s.config.PeerConfig.ID, handle)
+	adminServer := api.NewAdmin(s.peer.Raft, s.config.PeerConfig, handle)
 	proto.RegisterAdminServer(s.server, adminServer)
 
 	s.fm = feeds.NewManager(s.config.DB)

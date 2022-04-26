@@ -1,0 +1,19 @@
+apiVersion: v1
+kind: Service
+metadata:
+  labels:
+    {{- include "z4.selectorLabels" . | nindent 6 }}
+  name: {{ include "z4.fullname" . }}
+spec:
+  clusterIP: None
+  ports:
+    - port: {{ .Values.service.grpcPort }}
+      name: grpc
+    - port: {{ .Values.service.raftPort }}
+      name: raft
+    - port: {{ .Values.service.metricsPort }}
+      name: metrics
+    - port: {{ .Values.service.sqlPort }}
+      name: sql
+  selector:
+    {{- include "z4.selectorLabels" . | nindent 4 }}

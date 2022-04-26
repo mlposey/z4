@@ -15,16 +15,18 @@ import (
 // Admin implements the gRPC Admin service.
 type Admin struct {
 	proto.UnimplementedAdminServer
-	raft     *raft.Raft
-	handle   *cluster.LeaderHandle
-	serverID string
+	raft          *raft.Raft
+	handle        *cluster.LeaderHandle
+	serverID      string
+	advertiseAddr string
 }
 
-func NewAdmin(raft *raft.Raft, serverID string, handle *cluster.LeaderHandle) *Admin {
+func NewAdmin(raft *raft.Raft, cfg cluster.PeerConfig, handle *cluster.LeaderHandle) *Admin {
 	return &Admin{
-		raft:     raft,
-		serverID: serverID,
-		handle:   handle,
+		raft:          raft,
+		serverID:      cfg.ID,
+		advertiseAddr: cfg.AdvertiseAddr,
+		handle:        handle,
 	}
 }
 
@@ -107,6 +109,26 @@ func (a *Admin) RemoveClusterMember(
 	if err != nil {
 		return new(emptypb.Empty), status.Errorf(codes.Internal,
 			"could not remove member from cluster: %v", err)
+	}
+	return new(emptypb.Empty), nil
+}
+
+func (a *Admin) BootstrapCluster(ctx context.Context, e *emptypb.Empty) (*emptypb.Empty, error) {
+	cfg := raft.Configuration{
+		Servers: []raft.Server{
+			{
+				Suffrage: raft.Voter,
+				ID:       raft.ServerID(a.serverID),
+				Address:  raft.ServerAddress(a.advertiseAddr),
+			},
+		},
+	}
+
+	f := a.raft.BootstrapCluster(cfg)
+	if err := f.Error(); err != nil {
+		telemetry.Logger.Error("failed to bootstrap cluster",
+			zap.Error(err))
+		return nil, status.Errorf(codes.Internal, "failed to bootstrap cluster: %v", err)
 	}
 	return new(emptypb.Empty), nil
 }
