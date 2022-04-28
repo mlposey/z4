@@ -3,7 +3,7 @@ apiVersion: monitoring.coreos.com/v1
 kind: ServiceMonitor
 metadata:
   labels:
-    release: prometheus
+    release: {{ .Release.Name }}
   name: {{ include "z4.fullname" . }}
 spec:
   selector:

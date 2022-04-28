@@ -6,3 +6,4 @@ cpuprofile
 cmd/load/load
 z4_cpu.profile
 cmd/z4t/z4t
+deployments/charts/z4/charts/*.tgz

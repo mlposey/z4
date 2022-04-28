@@ -1,4 +1,21 @@
+DOCKER_REGISTRY := us.gcr.io/colli-304019
+DOCKER_IMAGE := ${DOCKER_REGISTRY}/z4
+
 .PHONY: proto
+
+deploy:
+	helm -n z4 \
+		upgrade --install \
+		--set kubePrometheusStack.enabled=true \
+		z4 deployments/charts/z4
+
+build_and_push_image: build_image push_image
+
+push_image:
+	docker push ${DOCKER_IMAGE}
+
+build_image:
+	docker build -f deployments/docker/Dockerfile -t ${DOCKER_IMAGE} .
 
 compose_up:
 	docker-compose -f deployments/docker/docker-compose.yaml up --build

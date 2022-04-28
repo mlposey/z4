@@ -43,9 +43,6 @@ service:
   metricsPort: 2112
   sqlPort: 3306
 
-serviceMonitor:
-  enabled: true
-
 resources: {}
   # We usually recommend not to specify default resources and to leave this as a conscious
   # choice for the user. This also increases chances charts run on environments with little
@@ -67,3 +64,27 @@ nodeSelector: {}
 tolerations: []
 
 affinity: {}
+
+# Enables a ServiceMonitor for the prometheus operator
+serviceMonitor:
+  enabled: true
+
+kubePrometheusStack:
+  enabled: false
+
+kube-prometheus-stack:
+  grafana:
+    persistence:
+      enabled: true
+      storageClassName: standard
+      size: 2Gi
+  prometheus:
+    prometheusSpec:
+      storageSpec:
+        volumeClaimTemplate:
+          spec:
+            storageClassName: standard
+            accessModes: ["ReadWriteOnce"]
+            resources:
+              requests:
+                storage: 5Gi
