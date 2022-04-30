@@ -231,7 +231,22 @@ func (ti *TaskIterator) Next() (*proto.Task, error) {
 	if !ti.it.Valid() {
 		return nil, io.EOF
 	}
-	defer ti.it.Next()
+
+	task, err := ti.peek(true)
+	if err != io.EOF {
+		ti.it.Next()
+	}
+	return task, err
+}
+
+func (ti *TaskIterator) Peek() (*proto.Task, error) {
+	return ti.peek(false)
+}
+
+func (ti *TaskIterator) peek(skipCheck bool) (*proto.Task, error) {
+	if skipCheck || !ti.it.Valid() {
+		return nil, io.EOF
+	}
 
 	item := ti.it.Item()
 	if bytes.Compare(item.Key(), ti.end) > 0 {
