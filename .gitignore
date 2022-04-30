@@ -7,3 +7,4 @@ cmd/load/load
 z4_cpu.profile
 cmd/z4t/z4t
 deployments/charts/z4/charts/*.tgz
+deployments/charts/z4/prod-values.yaml
