@@ -41,6 +41,11 @@ var (
 		Name:      "create_task_request_total",
 		Help:      "The total number of requests from clients to create a task",
 	}, []string{"method", "namespace"})
+	IsLeader = promauto.NewGauge(prometheus.GaugeOpts{
+		Namespace: prometheusNamespace,
+		Name:      "is_leader",
+		Help:      "A boolean value that indicates if a peer is the cluster leader",
+	})
 )
 
 // StartPromServer exposes prometheus metrics on the given port.

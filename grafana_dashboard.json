@@ -21,7 +21,7 @@
   "editable": true,
   "fiscalYearStartMonth": 0,
   "graphTooltip": 0,
-  "id": 27,
+  "id": 26,
   "links": [],
   "liveNow": false,
   "panels": [
@@ -220,6 +220,133 @@
       "type": "row"
     },
     {
+      "description": "The pod that is the cluster leader",
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "thresholds"
+          },
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              },
+              {
+                "color": "red",
+                "value": 80
+              }
+            ]
+          }
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 0,
+        "y": 10
+      },
+      "id": 20,
+      "options": {
+        "colorMode": "value",
+        "graphMode": "area",
+        "justifyMode": "auto",
+        "orientation": "auto",
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "text": {},
+        "textMode": "name"
+      },
+      "pluginVersion": "8.4.6",
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          },
+          "exemplar": false,
+          "expr": "z4_is_leader == 1",
+          "instant": true,
+          "interval": "",
+          "legendFormat": "{{pod}}",
+          "refId": "A"
+        }
+      ],
+      "title": "Leader",
+      "type": "stat"
+    },
+    {
+      "description": "The number of peers in the cluster",
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "thresholds"
+          },
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              },
+              {
+                "color": "red",
+                "value": 80
+              }
+            ]
+          }
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 12,
+        "y": 10
+      },
+      "id": 22,
+      "options": {
+        "colorMode": "value",
+        "graphMode": "area",
+        "justifyMode": "auto",
+        "orientation": "auto",
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "textMode": "auto"
+      },
+      "pluginVersion": "8.4.6",
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          },
+          "exemplar": false,
+          "expr": "count(kube_pod_info{created_by_name=\"z4\"})",
+          "instant": true,
+          "interval": "",
+          "legendFormat": "",
+          "refId": "A"
+        }
+      ],
+      "title": "Cluster Size",
+      "type": "stat"
+    },
+    {
       "description": "Count of Raft logs received",
       "fieldConfig": {
         "defaults": {
@@ -275,7 +402,7 @@
         "h": 8,
         "w": 12,
         "x": 0,
-        "y": 10
+        "y": 18
       },
       "id": 4,
       "options": {
@@ -361,7 +488,7 @@
         "h": 8,
         "w": 12,
         "x": 12,
-        "y": 10
+        "y": 18
       },
       "id": 2,
       "options": {
@@ -397,7 +524,7 @@
         "h": 1,
         "w": 24,
         "x": 0,
-        "y": 18
+        "y": 26
       },
       "id": 14,
       "panels": [],
@@ -433,11 +560,14 @@
         "h": 8,
         "w": 12,
         "x": 0,
-        "y": 19
+        "y": 27
       },
       "id": 12,
       "options": {
-        "orientation": "auto",
+        "colorMode": "value",
+        "graphMode": "area",
+        "justifyMode": "auto",
+        "orientation": "horizontal",
         "reduceOptions": {
           "calcs": [
             "lastNotNull"
@@ -445,8 +575,7 @@
           "fields": "",
           "values": false
         },
-        "showThresholdLabels": false,
-        "showThresholdMarkers": true
+        "textMode": "auto"
       },
       "pluginVersion": "8.4.6",
       "targets": [
@@ -455,15 +584,17 @@
             "type": "prometheus",
             "uid": "prometheus"
           },
-          "exemplar": true,
+          "exemplar": false,
           "expr": "z4_last_db_gc * 1000",
+          "format": "time_series",
+          "instant": true,
           "interval": "",
           "legendFormat": "{{pod}}",
           "refId": "A"
         }
       ],
       "title": "Last GC Time",
-      "type": "gauge"
+      "type": "stat"
     },
     {
       "description": "The last time a snapshot of the database was taken.",
@@ -494,11 +625,14 @@
         "h": 8,
         "w": 12,
         "x": 12,
-        "y": 19
+        "y": 27
       },
       "id": 16,
       "options": {
-        "orientation": "auto",
+        "colorMode": "value",
+        "graphMode": "area",
+        "justifyMode": "auto",
+        "orientation": "horizontal",
         "reduceOptions": {
           "calcs": [
             "lastNotNull"
@@ -506,8 +640,7 @@
           "fields": "",
           "values": false
         },
-        "showThresholdLabels": false,
-        "showThresholdMarkers": true
+        "textMode": "auto"
       },
       "pluginVersion": "8.4.6",
       "targets": [
@@ -516,15 +649,16 @@
             "type": "prometheus",
             "uid": "prometheus"
           },
-          "exemplar": true,
+          "exemplar": false,
           "expr": "z4_last_fsm_snapshot * 1000",
+          "instant": true,
           "interval": "",
           "legendFormat": "{{pod}}",
           "refId": "A"
         }
       ],
       "title": "Last Snapshot",
-      "type": "gauge"
+      "type": "stat"
     }
   ],
   "schemaVersion": 35,
@@ -540,7 +674,7 @@
   "timepicker": {},
   "timezone": "",
   "title": "z4",
-  "uid": "RtfijEQnk",
-  "version": 4,
+  "uid": "TGc1G_w7z",
+  "version": 5,
   "weekStart": ""
 }

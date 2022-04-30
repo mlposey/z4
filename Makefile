@@ -9,6 +9,9 @@ deploy:
 		--set kubePrometheusStack.enabled=true \
 		z4 deployments/charts/z4
 
+restart_pods:
+	kubectl -n z4 rollout restart statefulset z4
+
 build_and_push_image: build_image push_image
 
 push_image:
