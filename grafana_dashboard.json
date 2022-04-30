@@ -272,9 +272,9 @@
             "type": "prometheus",
             "uid": "prometheus"
           },
-          "exemplar": true,
+          "exemplar": false,
           "expr": "z4_is_leader == 1",
-          "instant": false,
+          "instant": true,
           "interval": "",
           "legendFormat": "{{pod}}",
           "refId": "A"
@@ -661,7 +661,6 @@
       "type": "stat"
     }
   ],
-  "refresh": "5s",
   "schemaVersion": 35,
   "style": "dark",
   "tags": [],
@@ -676,6 +675,6 @@
   "timezone": "",
   "title": "z4",
   "uid": "TGc1G_w7z",
-  "version": 9,
+  "version": 6,
   "weekStart": ""
 }
