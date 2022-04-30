@@ -18,6 +18,7 @@ type stateMachine struct {
 }
 
 func newFSM(db *badger.DB, ts *storage.TaskStore) *stateMachine {
+	// TODO: Do not pass a *badger.DB directly. Create a new type.
 	return &stateMachine{
 		db: db,
 		ts: ts,
