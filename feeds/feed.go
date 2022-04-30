@@ -5,10 +5,10 @@ import (
 	"github.com/mlposey/z4/proto"
 	"github.com/mlposey/z4/storage"
 	"github.com/mlposey/z4/telemetry"
-	"github.com/segmentio/ksuid"
 	"go.uber.org/multierr"
 	"go.uber.org/zap"
 	"google.golang.org/protobuf/types/known/timestamppb"
+	"io"
 	"time"
 )
 
@@ -58,134 +58,98 @@ func (f *Feed) startFeed() {
 		default:
 		}
 
-		deliveredTasks, dErr := f.getDeliveredTasks()
-		undeliveredTasks, uErr := f.getUndeliveredTasks()
-		if dErr != nil || uErr != nil {
-			telemetry.Logger.Error("failed to fetch tasks",
-				zap.Error(multierr.Combine(dErr, uErr)))
+		pushCount, err := f.pullAndPush()
+		if err != nil {
+			telemetry.Logger.Error("feed operation failed", zap.Error(err))
 			time.Sleep(time.Second)
 			continue
 		}
 
-		if len(deliveredTasks) == 0 && len(undeliveredTasks) == 0 {
+		if pushCount == 0 {
 			time.Sleep(time.Millisecond * 50)
 			continue
 		}
-
-		if !f.handleUndeliveredTasks(undeliveredTasks) {
-			return
-		}
-		if !f.handleDeliveredTasks(deliveredTasks) {
-			return
-		}
 	}
 }
 
-func (f *Feed) getDeliveredTasks() ([]*proto.Task, error) {
-	config := f.config.C
-	lastDeliveryTime, err := ksuid.Parse(config.LastDeliveredTask)
-	if err != nil {
-		return nil, err
+// pullAndPush loads ready tasks from storage and delivers them to consumers.
+func (f *Feed) pullAndPush() (int, error) {
+	lastDeliveredTaskID := f.config.C.LastDeliveredTask
+	dc, err1 := f.processDelivered(lastDeliveredTaskID)
+	uc, err2 := f.processUndelivered(lastDeliveredTaskID)
+	return dc + uc, multierr.Combine(err1, err2)
+}
+
+func (f *Feed) push(task *proto.Task) error {
+	select {
+	case <-f.close:
+		return io.EOF
+
+	case f.feed <- task:
+		return nil
+	}
+}
+
+func (f *Feed) processDelivered(lastID string) (int, error) {
+	df := &deliveredTaskFetcher{
+		Tasks:           f.tasks,
+		LastDeliveredID: lastID,
+		Namespace:       f.namespace,
+		AckDeadline:     f.ackDeadline,
 	}
 
-	// TODO: Consider more memory efficient way to do this.
-	// Maybe using iterator so we can filter in place?
-
-	watermark := time.Now().Add(-f.ackDeadline)
-	tasks, err := f.tasks.GetRange(storage.TaskRange{
-		Namespace: f.namespace,
-		StartID:   storage.NewTaskID(ksuid.Nil.Time()),
-		EndID:     storage.NewTaskID(watermark),
-	})
-	if err != nil {
-		return nil, err
-	}
-
-	var filtered []*proto.Task
-	for _, task := range tasks {
-		if f.retryTask(task, watermark, lastDeliveryTime.Time()) {
-			filtered = append(filtered, task)
+	var tasks []*proto.Task
+	err := df.Process(func(task *proto.Task) error {
+		if err := f.push(task); err != nil {
+			return err
 		}
-	}
-	return filtered, nil
-}
 
-func (f *Feed) retryTask(task *proto.Task, watermark, lastDelivery time.Time) bool {
-	ts, err := ksuid.Parse(task.GetId())
-	if err != nil {
-		telemetry.Logger.Error("failed to parse task id",
-			zap.Error(err))
-		return false
-	}
-
-	lastRetry := task.GetLastRetry().AsTime()
-	return !ts.Time().After(lastDelivery) &&
-		(lastRetry.IsZero() || lastRetry.Add(f.ackDeadline).Before(watermark))
-}
-
-func (f *Feed) getUndeliveredTasks() ([]*proto.Task, error) {
-	tasks, err := f.tasks.GetRange(storage.TaskRange{
-		Namespace: f.namespace,
-		StartID:   f.config.C.LastDeliveredTask,
-		EndID:     storage.NewTaskID(time.Now()),
-	})
-	if err != nil {
-		return nil, err
-	}
-
-	if len(tasks) > 0 {
-		// Skip last delivered tasks because we already delivered it :)
-		if tasks[0].GetId() == f.config.C.LastDeliveredTask {
-			// TODO: Determine if we should optimize this.
-			tasks = tasks[1:]
-		}
-	}
-	return tasks, nil
-}
-
-func (f *Feed) handleDeliveredTasks(tasks []*proto.Task) bool {
-	if len(tasks) == 0 {
-		return true
-	}
-
-	for _, task := range tasks {
 		task.LastRetry = timestamppb.New(time.Now())
+		tasks = append(tasks, task)
+		return nil
+	})
+	if err != nil && err != io.EOF {
+		return len(tasks), err
+	}
 
-		select {
-		case <-f.close:
-			return false
-
-		case f.feed <- task:
-		}
+	if len(tasks) == 0 {
+		return 0, nil
 	}
 
 	// TODO: Determine if we want to apply this to the Raft log.
 	// It doesn't seem entirely necessary, and not having it should
 	// improve performance. It could be nice to have though.
-	err := f.tasks.SaveAll(tasks)
+	// TODO: Batch task writes using buffers instead of saving one large slice.
+	err = f.tasks.SaveAll(tasks)
 	if err != nil {
 		telemetry.Logger.Error("failed to update retry tasks",
 			zap.Error(err))
-		return true
+		return len(tasks), err
 	}
-	return true
+	return len(tasks), nil
 }
 
-func (f *Feed) handleUndeliveredTasks(tasks []*proto.Task) bool {
-	if len(tasks) == 0 {
-		return true
+func (f *Feed) processUndelivered(lastID string) (int, error) {
+	uf := &undeliveredTaskFetcher{
+		Tasks:     f.tasks,
+		StartID:   lastID,
+		Namespace: f.namespace,
 	}
 
-	for _, task := range tasks {
-		select {
-		case <-f.close:
-			return false
-
-		case f.feed <- task:
-			f.config.C.LastDeliveredTask = task.GetId()
+	var count int
+	err := uf.Process(func(task *proto.Task) error {
+		if err := f.push(task); err != nil {
+			return err
 		}
+		f.config.C.LastDeliveredTask = task.GetId()
+		count++
+		return nil
+	})
+
+	if err != nil && err != io.EOF {
+		return count, err
 	}
-	return true
+	return count, nil
 }
 
 func (f *Feed) Tasks() TaskStream {

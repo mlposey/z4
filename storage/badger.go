@@ -244,7 +244,7 @@ func (ti *TaskIterator) Peek() (*proto.Task, error) {
 }
 
 func (ti *TaskIterator) peek(skipCheck bool) (*proto.Task, error) {
-	if skipCheck || !ti.it.Valid() {
+	if !skipCheck && !ti.it.Valid() {
 		return nil, io.EOF
 	}
 
