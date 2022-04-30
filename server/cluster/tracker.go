@@ -2,6 +2,7 @@ package cluster
 
 import (
 	"github.com/hashicorp/raft"
+	"github.com/mlposey/z4/telemetry"
 )
 
 type leaderObserver func(addr string)
@@ -19,6 +20,7 @@ func NewTracker(raft *raft.Raft, selfServerID string) *LeaderTracker {
 		leaderUpdates: raft.LeaderCh(),
 	}
 	tracker.detectLeader(selfServerID)
+	tracker.recordLeadership()
 	go tracker.trackLeaderChanges()
 	return tracker
 }
@@ -43,11 +45,20 @@ func (lsc *LeaderTracker) getLeaderServerID() string {
 	return ""
 }
 
+func (lsc *LeaderTracker) recordLeadership() {
+	if lsc.IsLeader() {
+		telemetry.IsLeader.Set(1)
+	} else {
+		telemetry.IsLeader.Set(0)
+	}
+}
+
 func (lsc *LeaderTracker) trackLeaderChanges() {
 	// Track when we become leader
 	go func() {
 		for isLeader := range lsc.leaderUpdates {
 			lsc.isLeader = isLeader
+			lsc.recordLeadership()
 		}
 	}()
 

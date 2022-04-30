@@ -32,11 +32,6 @@ func NewHandle(tracker *LeaderTracker, grpcPort int) (*LeaderHandle, error) {
 		return nil, err
 	}
 
-	handle.recordLeadership()
-	tracker.AddObserver(func(_ string) {
-		handle.recordLeadership()
-	})
-
 	tracker.AddObserver(func(newAddr string) {
 		err := handle.resetConn(newAddr)
 		if err != nil {
@@ -46,14 +41,6 @@ func NewHandle(tracker *LeaderTracker, grpcPort int) (*LeaderHandle, error) {
 		}
 	})
 	return handle, nil
-}
-
-func (lh *LeaderHandle) recordLeadership() {
-	if lh.tracker.IsLeader() {
-		telemetry.IsLeader.Set(1)
-	} else {
-		telemetry.IsLeader.Set(0)
-	}
 }
 
 func (lh *LeaderHandle) resetConn(leaderAddress string) error {
