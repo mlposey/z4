@@ -164,14 +164,6 @@ func (ts *TaskStore) Get(namespace, id string) (*proto.Task, error) {
 	return task, err
 }
 
-func (ts *TaskStore) IterateRange(query TaskRange) (*TaskIterator, error) {
-	err := query.Validate()
-	if err != nil {
-		return nil, fmt.Errorf("failed to fetch tasks due to invalid query: %w", err)
-	}
-	return NewTaskIterator(ts.Client, query), nil
-}
-
 func (ts *TaskStore) GetRange(query TaskRange) ([]*proto.Task, error) {
 	it, err := ts.IterateRange(query)
 	if err != nil {
@@ -180,18 +172,19 @@ func (ts *TaskStore) GetRange(query TaskRange) ([]*proto.Task, error) {
 	defer it.Close()
 
 	var tasks []*proto.Task
-	for {
-		task, err := it.Next()
-		if err != nil {
-			if err == io.EOF {
-				break
-			}
-			return nil, err
-		}
-
+	err = it.ForEach(func(task *proto.Task) error {
 		tasks = append(tasks, task)
+		return nil
+	})
+	return tasks, err
+}
+
+func (ts *TaskStore) IterateRange(query TaskRange) (*TaskIterator, error) {
+	err := query.Validate()
+	if err != nil {
+		return nil, fmt.Errorf("failed to fetch tasks due to invalid query: %w", err)
 	}
-	return tasks, nil
+	return NewTaskIterator(ts.Client, query), nil
 }
 
 type TaskIterator struct {
@@ -213,6 +206,24 @@ func NewTaskIterator(client *BadgerClient, query TaskRange) *TaskIterator {
 		txn: txn,
 		it:  it,
 		end: getTaskFQN(query.Namespace, query.EndID),
+	}
+}
+
+// ForEach calls handle on the result of Next until an error occurs or no tasks remain.
+func (ti *TaskIterator) ForEach(handle func(task *proto.Task) error) error {
+	for {
+		task, err := ti.Next()
+		if err != nil {
+			if err == io.EOF {
+				return nil
+			}
+			return err
+		}
+
+		err = handle(task)
+		if err != nil {
+			return err
+		}
 	}
 }
 
