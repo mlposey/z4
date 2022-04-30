@@ -195,30 +195,25 @@ func (ts *TaskStore) GetRange(query TaskRange) ([]*proto.Task, error) {
 }
 
 type TaskIterator struct {
-	client *BadgerClient
-	query  TaskRange
-	txn    *badger.Txn
-	it     *badger.Iterator
-	end    []byte
+	txn *badger.Txn
+	it  *badger.Iterator
+	end []byte
 }
 
 func NewTaskIterator(client *BadgerClient, query TaskRange) *TaskIterator {
+	// TODO: Consider creating another type to pass in instead of BadgerClient.
+	// We should try to avoid usage of BadgerClient in other packages as much as possible.
+
 	txn := client.DB.NewTransaction(false)
 	it := txn.NewIterator(badger.DefaultIteratorOptions)
 	start := getTaskFQN(query.Namespace, query.StartID)
 	it.Seek(start)
 
 	return &TaskIterator{
-		txn:    txn,
-		it:     it,
-		end:    getTaskFQN(query.Namespace, query.EndID),
-		client: client,
-		query:  query,
+		txn: txn,
+		it:  it,
+		end: getTaskFQN(query.Namespace, query.EndID),
 	}
-}
-
-func getTaskFQN(namespace string, id string) []byte {
-	return []byte(fmt.Sprintf("%s#task#%s", namespace, id))
 }
 
 func (ti *TaskIterator) Next() (*proto.Task, error) {
@@ -254,4 +249,8 @@ func (ti *TaskIterator) Close() error {
 	ti.it.Close()
 	ti.txn.Discard()
 	return nil
+}
+
+func getTaskFQN(namespace string, id string) []byte {
+	return []byte(fmt.Sprintf("%s#task#%s", namespace, id))
 }
