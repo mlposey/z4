@@ -37,7 +37,7 @@
       "type": "row"
     },
     {
-      "description": "Count of tasks created",
+      "description": "Tasks created per second",
       "fieldConfig": {
         "defaults": {
           "color": {
@@ -113,7 +113,7 @@
             "uid": "prometheus"
           },
           "exemplar": true,
-          "expr": "sum(increase(z4_create_task_request_total[2m])) by (pod)",
+          "expr": "sum(rate(z4_create_task_request_total[2m])) by (pod)",
           "interval": "",
           "legendFormat": "",
           "refId": "A"
@@ -123,7 +123,7 @@
       "type": "timeseries"
     },
     {
-      "description": "Count of tasks sent to consumers",
+      "description": "Tasks sent to consumers per second",
       "fieldConfig": {
         "defaults": {
           "color": {
@@ -199,7 +199,7 @@
             "uid": "prometheus"
           },
           "exemplar": true,
-          "expr": "sum(increase(z4_streamed_task_total[2m])) by (pod)",
+          "expr": "sum(rate(z4_streamed_task_total[2m])) by (pod)",
           "interval": "",
           "legendFormat": "",
           "refId": "A"
@@ -347,7 +347,7 @@
       "type": "stat"
     },
     {
-      "description": "Count of Raft logs received",
+      "description": "Number of Raft logs received per second",
       "fieldConfig": {
         "defaults": {
           "color": {
@@ -423,7 +423,7 @@
             "uid": "prometheus"
           },
           "exemplar": true,
-          "expr": "sum(increase(z4_received_log_count[2m])) by (pod)",
+          "expr": "sum(rate(z4_received_log_count[2m])) by (pod)",
           "interval": "",
           "legendFormat": "",
           "refId": "A"
@@ -433,7 +433,7 @@
       "type": "timeseries"
     },
     {
-      "description": "Count of Raft logs successfully applied",
+      "description": "Number of Raft logs successfully applied per second",
       "fieldConfig": {
         "defaults": {
           "color": {
@@ -509,7 +509,7 @@
             "uid": "prometheus"
           },
           "exemplar": true,
-          "expr": "sum(increase(z4_applied_log_count[2m])) by (pod)",
+          "expr": "sum(rate(z4_applied_log_count[2m])) by (pod)",
           "interval": "",
           "legendFormat": "",
           "refId": "A"
@@ -675,6 +675,6 @@
   "timezone": "",
   "title": "z4",
   "uid": "TGc1G_w7z",
-  "version": 5,
+  "version": 6,
   "weekStart": ""
 }
