@@ -100,21 +100,6 @@ func (ts *TaskStore) Get(namespace, id string) (*proto.Task, error) {
 	return task, err
 }
 
-func (ts *TaskStore) GetRange(query TaskRange) ([]*proto.Task, error) {
-	it, err := ts.IterateRange(query)
-	if err != nil {
-		return nil, err
-	}
-	defer it.Close()
-
-	var tasks []*proto.Task
-	err = it.ForEach(func(task *proto.Task) error {
-		tasks = append(tasks, task)
-		return nil
-	})
-	return tasks, err
-}
-
 func (ts *TaskStore) IterateRange(query TaskRange) (*TaskIterator, error) {
 	err := query.Validate()
 	if err != nil {
