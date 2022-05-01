@@ -54,48 +54,48 @@ func (bc *BadgerClient) Close() error {
 	return bc.DB.Close()
 }
 
-// ConfigStore manages persistent storage for feed configurations.
-type ConfigStore struct {
+// NamespaceStore manages persistent storage for namespace configurations.
+type NamespaceStore struct {
 	Client *BadgerClient
 	prefix []byte
 }
 
-func NewConfigStore(client *BadgerClient) *ConfigStore {
-	return &ConfigStore{
+func NewNamespaceStore(client *BadgerClient) *NamespaceStore {
+	return &NamespaceStore{
 		Client: client,
-		prefix: []byte("config#"),
+		prefix: []byte("namespace#"),
 	}
 }
 
-func (cs *ConfigStore) Save(namespace string, config *proto.Namespace) error {
+func (cs *NamespaceStore) Save(namespace *proto.Namespace) error {
 	return cs.Client.DB.Update(func(txn *badger.Txn) error {
-		payload, err := json.Marshal(config)
+		payload, err := json.Marshal(namespace)
 		if err != nil {
-			return fmt.Errorf("could not encode config: %w", err)
+			return fmt.Errorf("could not encode namespace: %w", err)
 		}
-		key := cs.getConfigFQN(namespace)
+		key := cs.getKey(namespace.GetId())
 		return txn.Set(key, payload)
 	})
 }
 
-func (cs *ConfigStore) GetAll() ([]*proto.Namespace, error) {
-	telemetry.Logger.Debug("getting all configs from DB")
+func (cs *NamespaceStore) GetAll() ([]*proto.Namespace, error) {
+	telemetry.Logger.Debug("getting all namespace namespaces from DB")
 
-	var configs []*proto.Namespace
-	return configs, cs.Client.DB.View(func(txn *badger.Txn) error {
+	var namespaces []*proto.Namespace
+	return namespaces, cs.Client.DB.View(func(txn *badger.Txn) error {
 
 		it := txn.NewIterator(badger.DefaultIteratorOptions)
 		for it.Seek(cs.prefix); it.ValidForPrefix(cs.prefix); it.Next() {
 			item := it.Item()
 
 			_ = item.Value(func(val []byte) error {
-				config := new(proto.Namespace)
-				err := pb.Unmarshal(val, config)
+				namespace := new(proto.Namespace)
+				err := pb.Unmarshal(val, namespace)
 				if err != nil {
 					telemetry.Logger.Error("failed to load namespace config from database",
 						zap.String("key", string(item.Key())))
 				} else {
-					configs = append(configs, config)
+					namespaces = append(namespaces, namespace)
 				}
 				return err
 			})
@@ -104,25 +104,25 @@ func (cs *ConfigStore) GetAll() ([]*proto.Namespace, error) {
 	})
 }
 
-func (cs *ConfigStore) Get(namespace string) (*proto.Namespace, error) {
-	telemetry.Logger.Debug("getting config from DB")
-	var config *proto.Namespace
-	return config, cs.Client.DB.View(func(txn *badger.Txn) error {
-		key := cs.getConfigFQN(namespace)
+func (cs *NamespaceStore) Get(id string) (*proto.Namespace, error) {
+	telemetry.Logger.Debug("getting namespace config from DB")
+	var namespace *proto.Namespace
+	return namespace, cs.Client.DB.View(func(txn *badger.Txn) error {
+		key := cs.getKey(id)
 		item, err := txn.Get(key)
 		if err != nil {
 			return err
 		}
 
 		return item.Value(func(val []byte) error {
-			config = new(proto.Namespace)
-			return pb.Unmarshal(val, config)
+			namespace = new(proto.Namespace)
+			return pb.Unmarshal(val, namespace)
 		})
 	})
 }
 
-func (cs *ConfigStore) getConfigFQN(namespace string) []byte {
-	return []byte(fmt.Sprintf("config#%s", namespace))
+func (cs *NamespaceStore) getKey(namespaceID string) []byte {
+	return []byte(fmt.Sprintf("namespace#%s", namespaceID))
 }
 
 // TaskStore manages persistent storage for tasks.
@@ -141,7 +141,7 @@ func (ts *TaskStore) DeleteAll(acks []*proto.Ack) error {
 	defer batch.Cancel()
 
 	for _, ack := range acks {
-		key := getTaskFQN(ack.GetNamespace(), ack.GetTaskId())
+		key := getTaskKey(ack.GetNamespace(), ack.GetTaskId())
 		err := batch.Delete(key)
 		if err != nil {
 			return fmt.Errorf("failed to delete task '%s' in batch: %w", ack.GetTaskId(), err)
@@ -157,7 +157,7 @@ func (ts *TaskStore) Save(task *proto.Task) error {
 		if err != nil {
 			return fmt.Errorf("could not encode task: %w", err)
 		}
-		key := getTaskFQN(task.GetNamespace(), task.GetId())
+		key := getTaskKey(task.GetNamespace(), task.GetId())
 		return txn.Set(key, payload)
 	})
 }
@@ -173,7 +173,7 @@ func (ts *TaskStore) SaveAll(tasks []*proto.Task) error {
 			return fmt.Errorf("count not encode task '%s': %w", task.GetId(), err)
 		}
 		// TODO: Determine if grouping tasks by namespace before writing is beneficial.
-		key := getTaskFQN(task.GetNamespace(), task.GetId())
+		key := getTaskKey(task.GetNamespace(), task.GetId())
 		err = batch.Set(key, payload)
 		if err != nil {
 			return fmt.Errorf("failed to write task '%s' from batch: %w", task.GetId(), err)
@@ -185,7 +185,7 @@ func (ts *TaskStore) SaveAll(tasks []*proto.Task) error {
 func (ts *TaskStore) Get(namespace, id string) (*proto.Task, error) {
 	var task *proto.Task
 	err := ts.Client.DB.View(func(txn *badger.Txn) error {
-		key := getTaskFQN(namespace, id)
+		key := getTaskKey(namespace, id)
 		item, err := txn.Get(key)
 		if err != nil {
 			return err
@@ -234,13 +234,13 @@ func NewTaskIterator(client *BadgerClient, query TaskRange) *TaskIterator {
 
 	txn := client.DB.NewTransaction(false)
 	it := txn.NewIterator(badger.DefaultIteratorOptions)
-	start := getTaskFQN(query.Namespace, query.StartID)
+	start := getTaskKey(query.Namespace, query.StartID)
 	it.Seek(start)
 
 	return &TaskIterator{
 		txn: txn,
 		it:  it,
-		end: getTaskFQN(query.Namespace, query.EndID),
+		end: getTaskKey(query.Namespace, query.EndID),
 	}
 }
 
@@ -312,6 +312,6 @@ func (ti *TaskIterator) Close() error {
 	return nil
 }
 
-func getTaskFQN(namespace string, id string) []byte {
-	return []byte(fmt.Sprintf("task#%s#%s", namespace, id))
+func getTaskKey(namespaceID, taskID string) []byte {
+	return []byte(fmt.Sprintf("task#%s#%s", namespaceID, taskID))
 }
