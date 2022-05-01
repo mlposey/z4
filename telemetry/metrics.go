@@ -35,17 +35,17 @@ var (
 		Namespace: prometheusNamespace,
 		Name:      "pulled_task_total",
 		Help:      "The total number of tasks sent to clients",
-	}, []string{"method", "namespace"})
+	}, []string{"method", "task_namespace"})
 	PushedTasks = promauto.NewCounterVec(prometheus.CounterOpts{
 		Namespace: prometheusNamespace,
 		Name:      "pushed_task_total",
 		Help:      "The total number of tasks pushed from clients to the server",
-	}, []string{"method", "namespace"})
+	}, []string{"method", "task_namespace"})
 	RemovedTasks = promauto.NewCounterVec(prometheus.CounterOpts{
 		Namespace: prometheusNamespace,
 		Name:      "removed_task_total",
 		Help:      "The total number of tasks removed from the queue",
-	}, []string{"method", "namespace"})
+	}, []string{"method", "task_namespace"})
 	IsLeader = promauto.NewGauge(prometheus.GaugeOpts{
 		Namespace: prometheusNamespace,
 		Name:      "is_leader",
