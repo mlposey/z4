@@ -37,7 +37,7 @@
       "type": "row"
     },
     {
-      "description": "Tasks created per second",
+      "description": "Tasks pushed from clients to the server per second",
       "fieldConfig": {
         "defaults": {
           "color": {
@@ -113,17 +113,17 @@
             "uid": "prometheus"
           },
           "exemplar": true,
-          "expr": "sum(rate(z4_push_task_request_total[2m])) by (pod)",
+          "expr": "sum(rate(z4_pushed_task_total[2m])) by (pod, method, task_namespace)",
           "interval": "",
-          "legendFormat": "",
+          "legendFormat": "{{task_namespace}}: {{method}}",
           "refId": "A"
         }
       ],
-      "title": "Tasks Created",
+      "title": "Tasks Pushed",
       "type": "timeseries"
     },
     {
-      "description": "Tasks sent to consumers per second",
+      "description": "Tasks sent from the server to consumers per second",
       "fieldConfig": {
         "defaults": {
           "color": {
@@ -199,13 +199,99 @@
             "uid": "prometheus"
           },
           "exemplar": true,
-          "expr": "sum(rate(z4_streamed_task_total[2m])) by (pod)",
+          "expr": "sum(rate(z4_pulled_task_total[2m])) by (pod, method, task_namespace)",
           "interval": "",
-          "legendFormat": "",
+          "legendFormat": "{{task_namespace}}: {{method}}",
           "refId": "A"
         }
       ],
-      "title": "Tasks Streamed",
+      "title": "Tasks Pulled",
+      "type": "timeseries"
+    },
+    {
+      "description": "Tasks removed from the queue",
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "palette-classic"
+          },
+          "custom": {
+            "axisLabel": "",
+            "axisPlacement": "auto",
+            "barAlignment": 0,
+            "drawStyle": "line",
+            "fillOpacity": 0,
+            "gradientMode": "none",
+            "hideFrom": {
+              "legend": false,
+              "tooltip": false,
+              "viz": false
+            },
+            "lineInterpolation": "linear",
+            "lineWidth": 1,
+            "pointSize": 5,
+            "scaleDistribution": {
+              "type": "linear"
+            },
+            "showPoints": "auto",
+            "spanNulls": false,
+            "stacking": {
+              "group": "A",
+              "mode": "none"
+            },
+            "thresholdsStyle": {
+              "mode": "off"
+            }
+          },
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              },
+              {
+                "color": "red",
+                "value": 80
+              }
+            ]
+          }
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 0,
+        "y": 9
+      },
+      "id": 24,
+      "options": {
+        "legend": {
+          "calcs": [],
+          "displayMode": "list",
+          "placement": "bottom"
+        },
+        "tooltip": {
+          "mode": "single",
+          "sort": "none"
+        }
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          },
+          "exemplar": true,
+          "expr": "sum(rate(z4_removed_task_total[2m])) by (pod, method, task_namespace)",
+          "interval": "",
+          "legendFormat": "{{task_namespace}}: {{method}}",
+          "refId": "A"
+        }
+      ],
+      "title": "Tasks Removed",
       "type": "timeseries"
     },
     {
@@ -213,7 +299,7 @@
         "h": 1,
         "w": 24,
         "x": 0,
-        "y": 9
+        "y": 17
       },
       "id": 6,
       "title": "Replication",
@@ -247,7 +333,7 @@
         "h": 8,
         "w": 12,
         "x": 0,
-        "y": 10
+        "y": 18
       },
       "id": 20,
       "options": {
@@ -311,7 +397,7 @@
         "h": 8,
         "w": 12,
         "x": 12,
-        "y": 10
+        "y": 18
       },
       "id": 22,
       "options": {
@@ -402,7 +488,7 @@
         "h": 8,
         "w": 12,
         "x": 0,
-        "y": 18
+        "y": 26
       },
       "id": 4,
       "options": {
@@ -488,7 +574,7 @@
         "h": 8,
         "w": 12,
         "x": 12,
-        "y": 18
+        "y": 26
       },
       "id": 2,
       "options": {
@@ -524,7 +610,7 @@
         "h": 1,
         "w": 24,
         "x": 0,
-        "y": 26
+        "y": 34
       },
       "id": 14,
       "panels": [],
@@ -560,7 +646,7 @@
         "h": 8,
         "w": 12,
         "x": 0,
-        "y": 27
+        "y": 35
       },
       "id": 12,
       "options": {
@@ -625,7 +711,7 @@
         "h": 8,
         "w": 12,
         "x": 12,
-        "y": 27
+        "y": 35
       },
       "id": 16,
       "options": {
@@ -669,13 +755,13 @@
     "list": []
   },
   "time": {
-    "from": "now-1h",
+    "from": "now-15m",
     "to": "now"
   },
   "timepicker": {},
   "timezone": "",
   "title": "z4",
   "uid": "TGc1G_w7z",
-  "version": 11,
+  "version": 15,
   "weekStart": ""
 }
