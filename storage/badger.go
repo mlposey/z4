@@ -164,14 +164,6 @@ func (ts *TaskStore) Get(namespace, id string) (*proto.Task, error) {
 	return task, err
 }
 
-func (ts *TaskStore) IterateRange(query TaskRange) (*TaskIterator, error) {
-	err := query.Validate()
-	if err != nil {
-		return nil, fmt.Errorf("failed to fetch tasks due to invalid query: %w", err)
-	}
-	return NewTaskIterator(ts.Client, query), nil
-}
-
 func (ts *TaskStore) GetRange(query TaskRange) ([]*proto.Task, error) {
 	it, err := ts.IterateRange(query)
 	if err != nil {
@@ -180,52 +172,81 @@ func (ts *TaskStore) GetRange(query TaskRange) ([]*proto.Task, error) {
 	defer it.Close()
 
 	var tasks []*proto.Task
-	for {
-		task, err := it.Next()
-		if err != nil {
-			if err == io.EOF {
-				break
-			}
-			return nil, err
-		}
-
+	err = it.ForEach(func(task *proto.Task) error {
 		tasks = append(tasks, task)
+		return nil
+	})
+	return tasks, err
+}
+
+func (ts *TaskStore) IterateRange(query TaskRange) (*TaskIterator, error) {
+	err := query.Validate()
+	if err != nil {
+		return nil, fmt.Errorf("failed to fetch tasks due to invalid query: %w", err)
 	}
-	return tasks, nil
+	return NewTaskIterator(ts.Client, query), nil
 }
 
 type TaskIterator struct {
-	client *BadgerClient
-	query  TaskRange
-	txn    *badger.Txn
-	it     *badger.Iterator
-	end    []byte
+	txn *badger.Txn
+	it  *badger.Iterator
+	end []byte
 }
 
 func NewTaskIterator(client *BadgerClient, query TaskRange) *TaskIterator {
+	// TODO: Consider creating another type to pass in instead of BadgerClient.
+	// We should try to avoid usage of BadgerClient in other packages as much as possible.
+
 	txn := client.DB.NewTransaction(false)
 	it := txn.NewIterator(badger.DefaultIteratorOptions)
 	start := getTaskFQN(query.Namespace, query.StartID)
 	it.Seek(start)
 
 	return &TaskIterator{
-		txn:    txn,
-		it:     it,
-		end:    getTaskFQN(query.Namespace, query.EndID),
-		client: client,
-		query:  query,
+		txn: txn,
+		it:  it,
+		end: getTaskFQN(query.Namespace, query.EndID),
 	}
 }
 
-func getTaskFQN(namespace string, id string) []byte {
-	return []byte(fmt.Sprintf("%s#task#%s", namespace, id))
+// ForEach calls handle on the result of Next until an error occurs or no tasks remain.
+func (ti *TaskIterator) ForEach(handle func(task *proto.Task) error) error {
+	for {
+		task, err := ti.Next()
+		if err != nil {
+			if err == io.EOF {
+				return nil
+			}
+			return err
+		}
+
+		err = handle(task)
+		if err != nil {
+			return err
+		}
+	}
 }
 
 func (ti *TaskIterator) Next() (*proto.Task, error) {
 	if !ti.it.Valid() {
 		return nil, io.EOF
 	}
-	defer ti.it.Next()
+
+	task, err := ti.peek(true)
+	if err != io.EOF {
+		ti.it.Next()
+	}
+	return task, err
+}
+
+func (ti *TaskIterator) Peek() (*proto.Task, error) {
+	return ti.peek(false)
+}
+
+func (ti *TaskIterator) peek(skipCheck bool) (*proto.Task, error) {
+	if !skipCheck && !ti.it.Valid() {
+		return nil, io.EOF
+	}
 
 	item := ti.it.Item()
 	if bytes.Compare(item.Key(), ti.end) > 0 {
@@ -254,4 +275,8 @@ func (ti *TaskIterator) Close() error {
 	ti.it.Close()
 	ti.txn.Discard()
 	return nil
+}
+
+func getTaskFQN(namespace string, id string) []byte {
+	return []byte(fmt.Sprintf("%s#task#%s", namespace, id))
 }
