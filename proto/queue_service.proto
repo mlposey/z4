@@ -28,7 +28,7 @@ service Queue {
   // Get retrieves a task by its ID.
   rpc Get(GetTaskRequest) returns (Task) {};
 
-  // Delete removes a task from the queue.
+  // Delete removes a task from the queue before it is delivered.
   //
   // This should be used to delete tasks that are not yet ready
   // for consumption. If consuming tasks using the Pull method,

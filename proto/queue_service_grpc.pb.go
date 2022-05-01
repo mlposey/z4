@@ -40,7 +40,7 @@ type QueueClient interface {
 	Pull(ctx context.Context, opts ...grpc.CallOption) (Queue_PullClient, error)
 	// Get retrieves a task by its ID.
 	Get(ctx context.Context, in *GetTaskRequest, opts ...grpc.CallOption) (*Task, error)
-	// Delete removes a task from the queue.
+	// Delete removes a task from the queue before it is delivered.
 	//
 	// This should be used to delete tasks that are not yet ready
 	// for consumption. If consuming tasks using the Pull method,
@@ -167,7 +167,7 @@ type QueueServer interface {
 	Pull(Queue_PullServer) error
 	// Get retrieves a task by its ID.
 	Get(context.Context, *GetTaskRequest) (*Task, error)
-	// Delete removes a task from the queue.
+	// Delete removes a task from the queue before it is delivered.
 	//
 	// This should be used to delete tasks that are not yet ready
 	// for consumption. If consuming tasks using the Pull method,
