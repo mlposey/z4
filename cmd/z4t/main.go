@@ -50,13 +50,13 @@ func printHelp() {
 	fmt.Println("help")
 }
 
-func makeClients(host string) (proto.AdminClient, proto.CollectionClient, error) {
+func makeClients(host string) (proto.AdminClient, proto.QueueClient, error) {
 	opts := []grpc.DialOption{grpc.WithTransportCredentials(insecure.NewCredentials())}
 	conn, err := grpc.Dial(host, opts...)
 	if err != nil {
 		return nil, nil, err
 	}
-	return proto.NewAdminClient(conn), proto.NewCollectionClient(conn), nil
+	return proto.NewAdminClient(conn), proto.NewQueueClient(conn), nil
 }
 
 func addPeer(client proto.AdminClient, addr, id string) {
@@ -93,14 +93,14 @@ func info(client proto.AdminClient) {
 	fmt.Println(string(out))
 }
 
-func consume(client proto.CollectionClient, namespace string) {
-	stream, err := client.GetTaskStream(context.Background())
+func consume(client proto.QueueClient, namespace string) {
+	stream, err := client.Pull(context.Background())
 	if err != nil {
 		panic(err)
 	}
 
-	err = stream.Send(&proto.StreamTasksRequest{
-		Request: &proto.StreamTasksRequest_StartReq{
+	err = stream.Send(&proto.PullRequest{
+		Request: &proto.PullRequest_StartReq{
 			StartReq: &proto.StartStreamRequest{
 				RequestId: ksuid.New().String(),
 				Namespace: namespace,
@@ -124,8 +124,8 @@ func consume(client proto.CollectionClient, namespace string) {
 		}
 		fmt.Println(string(out))
 
-		err = stream.Send(&proto.StreamTasksRequest{
-			Request: &proto.StreamTasksRequest_Ack{
+		err = stream.Send(&proto.PullRequest{
+			Request: &proto.PullRequest_Ack{
 				Ack: &proto.Ack{
 					TaskId:    task.GetId(),
 					Namespace: task.GetNamespace(),

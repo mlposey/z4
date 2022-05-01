@@ -36,10 +36,10 @@ var (
 		Name:      "streamed_task_total",
 		Help:      "The total number of tasks sent to clients",
 	}, []string{"method", "namespace"})
-	CreateTaskRequests = promauto.NewCounterVec(prometheus.CounterOpts{
+	PushTaskRequests = promauto.NewCounterVec(prometheus.CounterOpts{
 		Namespace: prometheusNamespace,
-		Name:      "create_task_request_total",
-		Help:      "The total number of requests from clients to create a task",
+		Name:      "push_task_request_total",
+		Help:      "The total number of tasks pushed from clients to the server",
 	}, []string{"method", "namespace"})
 	IsLeader = promauto.NewGauge(prometheus.GaugeOpts{
 		Namespace: prometheusNamespace,

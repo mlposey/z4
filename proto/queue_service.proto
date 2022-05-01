@@ -1,0 +1,117 @@
+syntax = "proto3";
+package z4;
+option go_package = "github.com/mlposey/z4/proto;proto";
+
+import "google/protobuf/timestamp.proto";
+
+// The Queue service manages a time-sorted priority queue of tasks.
+service Queue {
+  // Push adds a task to the queue.
+  //
+  // This rpc should be called on the leader.
+  rpc Push(PushTaskRequest) returns (PushTaskResponse) {};
+
+  // PushStream opens a bi-directional stream for adding tasks.
+  //
+  // PushStream offers higher throughput than Push if many tasks need
+  // to be added in quick succession.
+  //
+  // This rpc should be called on the leader.
+  rpc PushStream(stream PushTaskRequest) returns (stream PushStreamResponse) {};
+
+  // Pull opens a bi-directional stream for consuming ready tasks.
+  //
+  // This rpc must be called on the leader.
+  rpc Pull(stream PullRequest) returns (stream Task) {};
+
+  // Get retrieves a task by its ID.
+  rpc Get(GetTaskRequest) returns (Task) {};
+}
+
+// CreateTaskRequest is a request to create a task.
+message PushTaskRequest {
+  // The unique id of this request
+  string request_id = 1;
+
+  // The namespace where the task should be created.
+  string namespace = 2;
+
+  // Whether to asynchronously create the task.
+  //
+  // Asynchronous task creation does not wait for the task to
+  // be persisted on all peers. It is faster but may result in
+  // less durable operations.
+  bool async = 3;
+
+  // Arbitrary key/value metadata for the task.
+  map<string, string> metadata = 4;
+
+  // An arbitrary task payload.
+  bytes payload = 5;
+
+  // The time when the task should be delivered to consumers.
+  //
+  // Use this field or tts_seconds, not both.
+  google.protobuf.Timestamp deliver_at = 6;
+
+  // The amount of time to wait before delivering the task to consumers.
+  //
+  // Use this field or deliver_at, not both.
+  int64 tts_seconds = 7;
+}
+
+// PushTaskResponse is the result of adding a task to the queue.
+message PushTaskResponse {
+  // The task that was added
+  Task task = 1;
+
+  // The peer that handled the task creation
+  //
+  // Under normal circumstances, this field should be an empty string.
+  // If a request to create a task is sent to a follower instead of
+  // a leader, the follower will forward the request to the leader
+  // and set this field to the leader's address. This is a hint to the
+  // client that it should reconnect to the leader.
+  string forwarded_to = 2;
+}
+
+// PushStreamResponse is a stream response from the server when adding a task.
+message PushStreamResponse {
+  Task task = 1;
+  uint32 status = 2;
+  string message = 3;
+  string forwarded_to = 4;
+}
+
+message PullRequest {
+  oneof request {
+    StartStreamRequest start_req = 1;
+    Ack ack = 2;
+  }
+}
+
+message StartStreamRequest {
+  string request_id = 1;
+  string namespace = 2;
+}
+
+message Ack {
+  string namespace = 1;
+  string task_id = 2;
+}
+
+message GetTaskRequest {
+  string request_id = 1;
+  string namespace = 2;
+  string task_id = 3;
+}
+
+message Task {
+  string id = 1;
+  string namespace = 2;
+  map<string, string> metadata = 3;
+  bytes payload = 4;
+  google.protobuf.Timestamp deliver_at = 5;
+  // Last time the task was sent to the client due to not receiving an ack.
+  google.protobuf.Timestamp last_retry = 6;
+}

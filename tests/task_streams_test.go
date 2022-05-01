@@ -25,8 +25,8 @@ type taskStreams struct {
 	peerDataDir   string
 	server        *os.Process
 	serverPort    int
-	client        proto.CollectionClient
-	taskRequest   *proto.CreateTaskRequest
+	client        proto.QueueClient
+	taskRequest   *proto.PushTaskRequest
 	createdTask   *proto.Task
 	receivedTasks []*proto.Task
 }
@@ -112,7 +112,7 @@ func (ts *taskStreams) createClient() error {
 	if err != nil {
 		return err
 	}
-	ts.client = proto.NewCollectionClient(conn)
+	ts.client = proto.NewQueueClient(conn)
 	return nil
 }
 
@@ -154,13 +154,13 @@ func (ts *taskStreams) iBeginStreamingAfterASecondDelay(arg1 int) error {
 }
 
 func (ts *taskStreams) consumeTaskStream() error {
-	stream, err := ts.client.GetTaskStream(context.Background())
+	stream, err := ts.client.Pull(context.Background())
 	if err != nil {
 		return err
 	}
 
-	err = stream.Send(&proto.StreamTasksRequest{
-		Request: &proto.StreamTasksRequest_StartReq{
+	err = stream.Send(&proto.PullRequest{
+		Request: &proto.PullRequest_StartReq{
 			StartReq: &proto.StartStreamRequest{
 				// TODO: Generate this or take it from the gherkin.
 				RequestId: ksuid.New().String(),
@@ -188,8 +188,8 @@ func (ts *taskStreams) consumeTaskStream() error {
 
 			ts.receivedTasks = append(ts.receivedTasks, task)
 
-			err = stream.Send(&proto.StreamTasksRequest{
-				Request: &proto.StreamTasksRequest_Ack{
+			err = stream.Send(&proto.PullRequest{
+				Request: &proto.PullRequest_Ack{
 					Ack: &proto.Ack{
 						TaskId:    task.GetId(),
 						Namespace: task.GetNamespace(),
@@ -211,12 +211,12 @@ func (ts *taskStreams) iHaveCreatedTheTask(arg1 *godog.DocString) error {
 		return err
 	}
 
-	ts.taskRequest = &proto.CreateTaskRequest{
+	ts.taskRequest = &proto.PushTaskRequest{
 		RequestId:  taskDef["request_id"].(string),
 		Namespace:  taskDef["namespace"].(string),
 		TtsSeconds: int64(taskDef["tts_seconds"].(float64)),
 	}
-	task, err := ts.client.CreateTask(context.Background(), ts.taskRequest)
+	task, err := ts.client.Push(context.Background(), ts.taskRequest)
 	ts.createdTask = task.GetTask()
 	return err
 }
