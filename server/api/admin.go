@@ -52,7 +52,20 @@ func (a *Admin) GetNamespace(ctx context.Context, req *proto.GetNamespaceRequest
 }
 
 func (a *Admin) UpdateNamespace(ctx context.Context, req *proto.UpdateNamespaceRequest) (*proto.Namespace, error) {
-	return nil, status.Errorf(codes.Unimplemented, "method UpdateNamespace not implemented")
+	if !a.handle.IsLeader() {
+		client, err := a.handle.AdminClient()
+		if err != nil {
+			return nil, status.Errorf(codes.Internal, "could not forward request: %v", err)
+		}
+		return client.UpdateNamespace(ctx, req)
+	}
+
+	// TODO: Fix bug that will cause task id to be overwritten.
+	err := cluster.ApplyNamespaceCommand(a.raft, req.GetNamespace()).Error()
+	if err != nil {
+		return nil, status.Errorf(codes.Internal, "could not save namespace: %v", err)
+	}
+	return req.GetNamespace(), nil
 }
 
 func (a *Admin) GetClusterInfo(
