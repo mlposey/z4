@@ -17,7 +17,7 @@ type TaskStream <-chan *proto.Task
 // Feed provides access to a stream of tasks that are ready to be delivered.
 type Feed struct {
 	tasks       *storage.TaskStore
-	namespace   *storage.SyncedNamespace
+	Namespace   *storage.SyncedNamespace
 	feed        chan *proto.Task
 	close       chan bool
 	ackDeadline time.Duration
@@ -30,13 +30,13 @@ func New(
 ) (*Feed, error) {
 	q := &Feed{
 		tasks:       storage.NewTaskStore(db),
-		namespace:   storage.NewSyncedNamespace(storage.NewNamespaceStore(db), namespaceID),
+		Namespace:   storage.NewSyncedNamespace(storage.NewNamespaceStore(db), namespaceID),
 		feed:        make(chan *proto.Task),
 		close:       make(chan bool),
 		ackDeadline: ackDeadline,
 	}
 
-	if err := q.namespace.StartSync(); err != nil {
+	if err := q.Namespace.StartSync(); err != nil {
 		return nil, fmt.Errorf("feed creation failed due to namespace error: %w", err)
 	}
 
@@ -47,7 +47,7 @@ func New(
 func (f *Feed) startFeed() {
 	defer close(f.feed)
 	telemetry.Logger.Info("feed started",
-		zap.String("namespace", f.namespace.N.GetId()))
+		zap.String("namespace", f.Namespace.N.GetId()))
 
 	for {
 		select {
@@ -72,7 +72,7 @@ func (f *Feed) startFeed() {
 
 // pullAndPush loads ready tasks from storage and delivers them to consumers.
 func (f *Feed) pullAndPush() (int, error) {
-	lastDeliveredTaskID := f.namespace.N.LastDeliveredTask
+	lastDeliveredTaskID := f.Namespace.N.LastDeliveredTask
 	dc, err1 := f.processDelivered(lastDeliveredTaskID)
 	uc, err2 := f.processUndelivered(lastDeliveredTaskID)
 	return dc + uc, multierr.Combine(err1, err2)
@@ -92,7 +92,7 @@ func (f *Feed) processDelivered(lastID string) (int, error) {
 	df := &deliveredTaskFetcher{
 		Tasks:           f.tasks,
 		LastDeliveredID: lastID,
-		Namespace:       f.namespace.N.GetId(),
+		Namespace:       f.Namespace.N.GetId(),
 		AckDeadline:     f.ackDeadline,
 	}
 
@@ -131,7 +131,7 @@ func (f *Feed) processUndelivered(lastID string) (int, error) {
 	uf := &undeliveredTaskFetcher{
 		Tasks:     f.tasks,
 		StartID:   lastID,
-		Namespace: f.namespace.N.GetId(),
+		Namespace: f.Namespace.N.GetId(),
 	}
 
 	var count int
@@ -139,7 +139,7 @@ func (f *Feed) processUndelivered(lastID string) (int, error) {
 		if err := f.push(task); err != nil {
 			return err
 		}
-		f.namespace.N.LastDeliveredTask = task.GetId()
+		f.Namespace.N.LastDeliveredTask = task.GetId()
 		count++
 		return nil
 	})
@@ -154,22 +154,18 @@ func (f *Feed) Tasks() TaskStream {
 	return f.feed
 }
 
-func (f *Feed) Namespace() string {
-	return f.namespace.N.GetId()
-}
-
 // Close stops the feed from listening to ready tasks.
 //
 // This method must be called once after the feed is no longer
 // needed.
 func (f *Feed) Close() error {
 	f.close <- true
-	err := f.namespace.Close()
+	err := f.Namespace.Close()
 	if err != nil {
-		return fmt.Errorf("failed to close feed for namespace '%s': %w", f.namespace, err)
+		return fmt.Errorf("failed to close feed for namespace '%s': %w", f.Namespace.N.GetId(), err)
 	}
 
 	telemetry.Logger.Info("feed stopped",
-		zap.String("namespace", f.namespace.N.GetId()))
+		zap.String("namespace", f.Namespace.N.GetId()))
 	return nil
 }

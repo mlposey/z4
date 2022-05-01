@@ -3,9 +3,9 @@ package api
 import (
 	"context"
 	"github.com/hashicorp/raft"
+	"github.com/mlposey/z4/feeds"
 	"github.com/mlposey/z4/proto"
 	"github.com/mlposey/z4/server/cluster"
-	"github.com/mlposey/z4/storage"
 	"github.com/mlposey/z4/telemetry"
 	"go.uber.org/zap"
 	"google.golang.org/grpc/codes"
@@ -18,18 +18,23 @@ type Admin struct {
 	proto.UnimplementedAdminServer
 	raft          *raft.Raft
 	handle        *cluster.LeaderHandle
-	namespaces    *storage.NamespaceStore
+	fm            *feeds.Manager
 	serverID      string
 	advertiseAddr string
 }
 
-func NewAdmin(raft *raft.Raft, cfg cluster.PeerConfig, handle *cluster.LeaderHandle) *Admin {
+func NewAdmin(
+	raft *raft.Raft,
+	cfg cluster.PeerConfig,
+	handle *cluster.LeaderHandle,
+	fm *feeds.Manager,
+) *Admin {
 	return &Admin{
 		raft:          raft,
 		serverID:      cfg.ID,
 		advertiseAddr: cfg.AdvertiseAddr,
 		handle:        handle,
-		namespaces:    cfg.Namespaces,
+		fm:            fm,
 	}
 }
 
@@ -44,11 +49,21 @@ func (a *Admin) CheckHealth(
 }
 
 func (a *Admin) GetNamespace(ctx context.Context, req *proto.GetNamespaceRequest) (*proto.Namespace, error) {
-	namespace, err := a.namespaces.Get(req.GetNamespaceId())
-	if err != nil {
-		return nil, status.Errorf(codes.NotFound, "%v", err)
+	if !a.handle.IsLeader() {
+		client, err := a.handle.AdminClient()
+		if err != nil {
+			return nil, status.Errorf(codes.Internal, "could not forward request: %v", err)
+		}
+		return client.GetNamespace(ctx, req)
 	}
-	return namespace, nil
+
+	feed, err := a.fm.Lease(req.GetRequestId())
+	if err != nil {
+		return nil, status.Errorf(codes.Internal, "could not get lease for update: %v", err)
+	}
+	defer feed.Release()
+
+	return feed.Feed().Namespace.N, nil
 }
 
 func (a *Admin) UpdateNamespace(ctx context.Context, req *proto.UpdateNamespaceRequest) (*proto.Namespace, error) {
@@ -60,12 +75,20 @@ func (a *Admin) UpdateNamespace(ctx context.Context, req *proto.UpdateNamespaceR
 		return client.UpdateNamespace(ctx, req)
 	}
 
-	// TODO: Fix bug that will cause task id to be overwritten.
-	err := cluster.ApplyNamespaceCommand(a.raft, req.GetNamespace()).Error()
+	feed, err := a.fm.Lease(req.GetNamespace().GetId())
 	if err != nil {
-		return nil, status.Errorf(codes.Internal, "could not save namespace: %v", err)
+		return nil, status.Errorf(codes.Internal, "could not get lease for update: %v", err)
 	}
-	return req.GetNamespace(), nil
+	defer feed.Release()
+
+	ns := feed.Feed().Namespace.N
+	// Once we're ready to support actual updates, they should be performed
+	// by updating values of ns. Because it is a synced config, changes will be
+	// applied to the raft log behind the scenes.
+	//
+	// Important note: Do not update the value of the namespace id or the
+	// last delivered task.
+	return ns, nil
 }
 
 func (a *Admin) GetClusterInfo(
