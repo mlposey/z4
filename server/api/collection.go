@@ -41,7 +41,7 @@ func NewCollection(
 }
 
 func (q *Queue) Push(ctx context.Context, req *proto.PushTaskRequest) (*proto.PushTaskResponse, error) {
-	telemetry.PushTaskRequests.
+	telemetry.PushedTasks.
 		WithLabelValues("Push", req.GetNamespace()).
 		Inc()
 	return q.createTask(ctx, req)
@@ -56,7 +56,7 @@ func (q *Queue) PushStream(stream proto.Queue_PushStreamServer) error {
 		if err != nil {
 			return status.Errorf(codes.Internal, "failed to get tasks from client: %v", err)
 		}
-		telemetry.PushTaskRequests.
+		telemetry.PushedTasks.
 			WithLabelValues("PushStream", req.GetNamespace()).
 			Inc()
 
@@ -128,7 +128,7 @@ func (q *Queue) GetTask(ctx context.Context, req *proto.GetTaskRequest) (*proto.
 		return nil, status.Errorf(codes.NotFound, "task not found: %v", err)
 	}
 
-	telemetry.StreamedTasks.
+	telemetry.PulledTasks.
 		WithLabelValues("GetTask", req.GetNamespace()).
 		Inc()
 	return task, nil
@@ -152,6 +152,10 @@ func (q *Queue) getRunTime(req *proto.PushTaskRequest) time.Time {
 }
 
 func (q *Queue) Delete(ctx context.Context, req *proto.DeleteTaskRequest) (*emptypb.Empty, error) {
+	telemetry.RemovedTasks.
+		WithLabelValues("Delete", req.GetNamespace()).
+		Inc()
+
 	ack := &proto.Ack{
 		Namespace: req.GetNamespace(),
 		TaskId:    req.GetTaskId(),

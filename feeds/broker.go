@@ -75,9 +75,9 @@ func (tb *TaskBroker) startAckListener() {
 			continue
 		}
 
-		telemetry.Logger.Debug("got ack",
-			zap.String("namespace", tb.namespace),
-			zap.String("task_id", req.GetAck().GetTaskId()))
+		telemetry.RemovedTasks.
+			WithLabelValues("Delete", req.GetAck().GetNamespace()).
+			Inc()
 
 		// This is intentionally async.
 		cluster.ApplyAckCommand(tb.raft, req.GetAck())
@@ -96,7 +96,7 @@ func (tb *TaskBroker) startTaskSender() error {
 				return status.Errorf(codes.Internal, "failed to send tasks to client: %v", err)
 			}
 
-			telemetry.StreamedTasks.
+			telemetry.PulledTasks.
 				WithLabelValues("GetTaskStream", tb.namespace).
 				Inc()
 		}

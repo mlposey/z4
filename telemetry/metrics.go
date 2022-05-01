@@ -31,15 +31,20 @@ var (
 		Name:      "last_db_gc",
 		Help:      "The unix tine in seconds when the last gc phase was run for the database",
 	})
-	StreamedTasks = promauto.NewCounterVec(prometheus.CounterOpts{
+	PulledTasks = promauto.NewCounterVec(prometheus.CounterOpts{
 		Namespace: prometheusNamespace,
-		Name:      "streamed_task_total",
+		Name:      "pulled_task_total",
 		Help:      "The total number of tasks sent to clients",
 	}, []string{"method", "namespace"})
-	PushTaskRequests = promauto.NewCounterVec(prometheus.CounterOpts{
+	PushedTasks = promauto.NewCounterVec(prometheus.CounterOpts{
 		Namespace: prometheusNamespace,
-		Name:      "push_task_request_total",
+		Name:      "pushed_task_total",
 		Help:      "The total number of tasks pushed from clients to the server",
+	}, []string{"method", "namespace"})
+	RemovedTasks = promauto.NewCounterVec(prometheus.CounterOpts{
+		Namespace: prometheusNamespace,
+		Name:      "removed_task_total",
+		Help:      "The total number of tasks removed from the queue",
 	}, []string{"method", "namespace"})
 	IsLeader = promauto.NewGauge(prometheus.GaugeOpts{
 		Namespace: prometheusNamespace,
