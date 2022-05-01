@@ -1,7 +1,6 @@
 package storage
 
 import (
-	"encoding/json"
 	"fmt"
 	"github.com/dgraph-io/badger/v3"
 	"github.com/mlposey/z4/proto"
@@ -25,7 +24,7 @@ func NewNamespaceStore(client *BadgerClient) *NamespaceStore {
 
 func (cs *NamespaceStore) Save(namespace *proto.Namespace) error {
 	return cs.Client.DB.Update(func(txn *badger.Txn) error {
-		payload, err := json.Marshal(namespace)
+		payload, err := pb.Marshal(namespace)
 		if err != nil {
 			return fmt.Errorf("could not encode namespace: %w", err)
 		}
@@ -41,6 +40,7 @@ func (cs *NamespaceStore) GetAll() ([]*proto.Namespace, error) {
 	return namespaces, cs.Client.DB.View(func(txn *badger.Txn) error {
 
 		it := txn.NewIterator(badger.DefaultIteratorOptions)
+		defer it.Close()
 		for it.Seek(cs.prefix); it.ValidForPrefix(cs.prefix); it.Next() {
 			item := it.Item()
 
@@ -49,7 +49,8 @@ func (cs *NamespaceStore) GetAll() ([]*proto.Namespace, error) {
 				err := pb.Unmarshal(val, namespace)
 				if err != nil {
 					telemetry.Logger.Error("failed to load namespace config from database",
-						zap.String("key", string(item.Key())))
+						zap.String("key", string(item.Key())),
+						zap.Error(err))
 				} else {
 					namespaces = append(namespaces, namespace)
 				}

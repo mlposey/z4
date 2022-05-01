@@ -4,6 +4,7 @@ import (
 	"github.com/mlposey/z4/server"
 	"github.com/mlposey/z4/server/cluster"
 	"github.com/mlposey/z4/storage"
+	"github.com/mlposey/z4/storage/sqli"
 	"github.com/mlposey/z4/telemetry"
 	"go.uber.org/zap"
 	"log"
@@ -80,9 +81,10 @@ func initDB(dataDir string, port int) *storage.BadgerClient {
 	if err != nil {
 		log.Fatalf("error initializing database client: %v", err)
 	}
-	go storage.StartWireListener(storage.WireConfig{
-		Port:  port,
-		Store: storage.NewTaskStore(db),
+	go sqli.StartWireListener(sqli.WireConfig{
+		Port:       port,
+		Tasks:      storage.NewTaskStore(db),
+		Namespaces: storage.NewNamespaceStore(db),
 	})
 	return db
 }

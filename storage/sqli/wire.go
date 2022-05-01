@@ -18,13 +18,15 @@ import (
 // of the namespace/timestamp indexing and also add functional tests.
 
 type WireConfig struct {
-	Port  int
-	Tasks *storage.TaskStore
+	Port       int
+	Tasks      *storage.TaskStore
+	Namespaces *storage.NamespaceStore
 }
 
 func StartWireListener(config WireConfig) error {
 	db := NewDatabase("z4")
 	db.AddTable(newTaskTable(config.Tasks))
+	db.AddTable(newNamespaceTable(config.Namespaces))
 
 	engine := sqle.NewDefault(
 		sql.NewDatabaseProvider(
