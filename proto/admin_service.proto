@@ -10,8 +10,10 @@ service Admin {
   // CheckHealth determines whether the service is in a healthy state.
   rpc CheckHealth(CheckHealthRequest) returns (Status) {};
 
+  // GetNamespace gets settings for a task namespace.
   rpc GetNamespace(GetNamespaceRequest) returns (Namespace) {};
 
+  // UpdateNamespace updates the settings of a task namespace.
   rpc UpdateNamespace(UpdateNamespaceRequest) returns (Namespace) {};
 
   // GetClusterInfo returns information about the structure of the Raft cluster.

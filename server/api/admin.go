@@ -5,6 +5,7 @@ import (
 	"github.com/hashicorp/raft"
 	"github.com/mlposey/z4/proto"
 	"github.com/mlposey/z4/server/cluster"
+	"github.com/mlposey/z4/storage"
 	"github.com/mlposey/z4/telemetry"
 	"go.uber.org/zap"
 	"google.golang.org/grpc/codes"
@@ -17,6 +18,7 @@ type Admin struct {
 	proto.UnimplementedAdminServer
 	raft          *raft.Raft
 	handle        *cluster.LeaderHandle
+	namespaces    *storage.NamespaceStore
 	serverID      string
 	advertiseAddr string
 }
@@ -27,6 +29,7 @@ func NewAdmin(raft *raft.Raft, cfg cluster.PeerConfig, handle *cluster.LeaderHan
 		serverID:      cfg.ID,
 		advertiseAddr: cfg.AdvertiseAddr,
 		handle:        handle,
+		namespaces:    cfg.Namespaces,
 	}
 }
 
@@ -41,7 +44,11 @@ func (a *Admin) CheckHealth(
 }
 
 func (a *Admin) GetNamespace(ctx context.Context, req *proto.GetNamespaceRequest) (*proto.Namespace, error) {
-	return nil, status.Errorf(codes.Unimplemented, "method GetNamespace not implemented")
+	namespace, err := a.namespaces.Get(req.GetNamespaceId())
+	if err != nil {
+		return nil, status.Errorf(codes.NotFound, "%v", err)
+	}
+	return namespace, nil
 }
 
 func (a *Admin) UpdateNamespace(ctx context.Context, req *proto.UpdateNamespaceRequest) (*proto.Namespace, error) {

@@ -25,7 +25,9 @@ const _ = grpc.SupportPackageIsVersion7
 type AdminClient interface {
 	// CheckHealth determines whether the service is in a healthy state.
 	CheckHealth(ctx context.Context, in *CheckHealthRequest, opts ...grpc.CallOption) (*Status, error)
+	// GetNamespace gets settings for a task namespace.
 	GetNamespace(ctx context.Context, in *GetNamespaceRequest, opts ...grpc.CallOption) (*Namespace, error)
+	// UpdateNamespace updates the settings of a task namespace.
 	UpdateNamespace(ctx context.Context, in *UpdateNamespaceRequest, opts ...grpc.CallOption) (*Namespace, error)
 	// GetClusterInfo returns information about the structure of the Raft cluster.
 	GetClusterInfo(ctx context.Context, in *GetClusterInfoRequest, opts ...grpc.CallOption) (*ClusterInfo, error)
@@ -119,7 +121,9 @@ func (c *adminClient) BootstrapCluster(ctx context.Context, in *emptypb.Empty, o
 type AdminServer interface {
 	// CheckHealth determines whether the service is in a healthy state.
 	CheckHealth(context.Context, *CheckHealthRequest) (*Status, error)
+	// GetNamespace gets settings for a task namespace.
 	GetNamespace(context.Context, *GetNamespaceRequest) (*Namespace, error)
+	// UpdateNamespace updates the settings of a task namespace.
 	UpdateNamespace(context.Context, *UpdateNamespaceRequest) (*Namespace, error)
 	// GetClusterInfo returns information about the structure of the Raft cluster.
 	GetClusterInfo(context.Context, *GetClusterInfoRequest) (*ClusterInfo, error)
