@@ -11,7 +11,6 @@ import (
 	"go.uber.org/zap"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
-	"google.golang.org/protobuf/types/known/emptypb"
 	"google.golang.org/protobuf/types/known/timestamppb"
 	"io"
 	"time"
@@ -80,9 +79,9 @@ func (q *Queue) PushStream(stream proto.Queue_PushStreamServer) error {
 
 func (q *Queue) createTask(ctx context.Context, req *proto.PushTaskRequest) (*proto.PushTaskResponse, error) {
 	if !q.handle.IsLeader() {
-		leader := q.handle.LeaderAddress()
-		res, err := q.forwardRequest(ctx, req)
+		res, err := q.forwardPushRequest(ctx, req)
 		if err == nil {
+			leader := q.handle.LeaderAddress()
 			// don't overwrite if it was forwarded multiple times
 			if res.GetForwardedTo() == "" {
 				res.ForwardedTo = leader
@@ -110,7 +109,7 @@ func (q *Queue) createTask(ctx context.Context, req *proto.PushTaskRequest) (*pr
 	return &proto.PushTaskResponse{Task: task}, nil
 }
 
-func (q *Queue) forwardRequest(
+func (q *Queue) forwardPushRequest(
 	ctx context.Context,
 	req *proto.PushTaskRequest,
 ) (*proto.PushTaskResponse, error) {
@@ -151,10 +150,22 @@ func (q *Queue) getRunTime(req *proto.PushTaskRequest) time.Time {
 	return req.GetDeliverAt().AsTime()
 }
 
-func (q *Queue) Delete(ctx context.Context, req *proto.DeleteTaskRequest) (*emptypb.Empty, error) {
+func (q *Queue) Delete(ctx context.Context, req *proto.DeleteTaskRequest) (*proto.DeleteTaskResponse, error) {
 	telemetry.RemovedTasks.
 		WithLabelValues("Delete", req.GetNamespace()).
 		Inc()
+
+	if !q.handle.IsLeader() {
+		res, err := q.forwardDeleteRequest(ctx, req)
+		if err == nil {
+			leader := q.handle.LeaderAddress()
+			// don't overwrite if it was forwarded multiple times
+			if res.GetForwardedTo() == "" {
+				res.ForwardedTo = leader
+			}
+		}
+		return res, err
+	}
 
 	ack := &proto.Ack{
 		Namespace: req.GetNamespace(),
@@ -169,5 +180,17 @@ func (q *Queue) Delete(ctx context.Context, req *proto.DeleteTaskRequest) (*empt
 			return nil, status.Errorf(codes.Internal, "failed to delete task: %v", err)
 		}
 	}
-	return new(emptypb.Empty), nil
+	return new(proto.DeleteTaskResponse), nil
+}
+
+func (q *Queue) forwardDeleteRequest(
+	ctx context.Context,
+	req *proto.DeleteTaskRequest,
+) (*proto.DeleteTaskResponse, error) {
+
+	client, err := q.handle.QueueClient()
+	if err != nil {
+		return nil, status.Errorf(codes.Internal, "could not forward request: %v", err)
+	}
+	return client.Delete(ctx, req)
 }

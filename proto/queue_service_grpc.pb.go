@@ -11,7 +11,6 @@ import (
 	grpc "google.golang.org/grpc"
 	codes "google.golang.org/grpc/codes"
 	status "google.golang.org/grpc/status"
-	emptypb "google.golang.org/protobuf/types/known/emptypb"
 )
 
 // This is a compile-time assertion to ensure that this generated file
@@ -46,7 +45,7 @@ type QueueClient interface {
 	// for consumption. If consuming tasks using the Pull method,
 	// the acknowledgement functionality should be used instead of
 	// Delete.
-	Delete(ctx context.Context, in *DeleteTaskRequest, opts ...grpc.CallOption) (*emptypb.Empty, error)
+	Delete(ctx context.Context, in *DeleteTaskRequest, opts ...grpc.CallOption) (*DeleteTaskResponse, error)
 }
 
 type queueClient struct {
@@ -137,8 +136,8 @@ func (c *queueClient) Get(ctx context.Context, in *GetTaskRequest, opts ...grpc.
 	return out, nil
 }
 
-func (c *queueClient) Delete(ctx context.Context, in *DeleteTaskRequest, opts ...grpc.CallOption) (*emptypb.Empty, error) {
-	out := new(emptypb.Empty)
+func (c *queueClient) Delete(ctx context.Context, in *DeleteTaskRequest, opts ...grpc.CallOption) (*DeleteTaskResponse, error) {
+	out := new(DeleteTaskResponse)
 	err := c.cc.Invoke(ctx, "/z4.Queue/Delete", in, out, opts...)
 	if err != nil {
 		return nil, err
@@ -173,7 +172,7 @@ type QueueServer interface {
 	// for consumption. If consuming tasks using the Pull method,
 	// the acknowledgement functionality should be used instead of
 	// Delete.
-	Delete(context.Context, *DeleteTaskRequest) (*emptypb.Empty, error)
+	Delete(context.Context, *DeleteTaskRequest) (*DeleteTaskResponse, error)
 	mustEmbedUnimplementedQueueServer()
 }
 
@@ -193,7 +192,7 @@ func (UnimplementedQueueServer) Pull(Queue_PullServer) error {
 func (UnimplementedQueueServer) Get(context.Context, *GetTaskRequest) (*Task, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method Get not implemented")
 }
-func (UnimplementedQueueServer) Delete(context.Context, *DeleteTaskRequest) (*emptypb.Empty, error) {
+func (UnimplementedQueueServer) Delete(context.Context, *DeleteTaskRequest) (*DeleteTaskResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method Delete not implemented")
 }
 func (UnimplementedQueueServer) mustEmbedUnimplementedQueueServer() {}

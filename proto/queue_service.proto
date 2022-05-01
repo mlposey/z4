@@ -3,7 +3,6 @@ package z4;
 option go_package = "github.com/mlposey/z4/proto;proto";
 
 import "google/protobuf/timestamp.proto";
-import "google/protobuf/empty.proto";
 
 // The Queue service manages a time-sorted priority queue of tasks.
 service Queue {
@@ -34,7 +33,7 @@ service Queue {
   // for consumption. If consuming tasks using the Pull method,
   // the acknowledgement functionality should be used instead of
   // Delete.
-  rpc Delete(DeleteTaskRequest) returns (google.protobuf.Empty) {};
+  rpc Delete(DeleteTaskRequest) returns (DeleteTaskResponse) {};
 }
 
 // PushTaskRequest is a request to add a task to the queue.
@@ -130,4 +129,8 @@ message DeleteTaskRequest {
   bool async = 2;
   string namespace = 3;
   string task_id = 4;
+}
+
+message DeleteTaskResponse {
+  string forwarded_to = 1;
 }
