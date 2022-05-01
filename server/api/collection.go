@@ -11,6 +11,7 @@ import (
 	"go.uber.org/zap"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
+	"google.golang.org/protobuf/types/known/emptypb"
 	"google.golang.org/protobuf/types/known/timestamppb"
 	"io"
 	"time"
@@ -148,4 +149,21 @@ func (q *Queue) getRunTime(req *proto.PushTaskRequest) time.Time {
 		return time.Now().Add(time.Duration(req.GetTtsSeconds()) * time.Second)
 	}
 	return req.GetDeliverAt().AsTime()
+}
+
+func (q *Queue) Delete(ctx context.Context, req *proto.DeleteTaskRequest) (*emptypb.Empty, error) {
+	ack := &proto.Ack{
+		Namespace: req.GetNamespace(),
+		TaskId:    req.GetTaskId(),
+	}
+
+	if req.GetAsync() {
+		cluster.ApplyAckCommand(q.raft, ack)
+	} else {
+		err := cluster.ApplyAckCommand(q.raft, ack).Error()
+		if err != nil {
+			return nil, status.Errorf(codes.Internal, "failed to delete task: %v", err)
+		}
+	}
+	return new(emptypb.Empty), nil
 }

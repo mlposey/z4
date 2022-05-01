@@ -11,6 +11,7 @@ import (
 	grpc "google.golang.org/grpc"
 	codes "google.golang.org/grpc/codes"
 	status "google.golang.org/grpc/status"
+	emptypb "google.golang.org/protobuf/types/known/emptypb"
 )
 
 // This is a compile-time assertion to ensure that this generated file
@@ -39,6 +40,13 @@ type QueueClient interface {
 	Pull(ctx context.Context, opts ...grpc.CallOption) (Queue_PullClient, error)
 	// Get retrieves a task by its ID.
 	Get(ctx context.Context, in *GetTaskRequest, opts ...grpc.CallOption) (*Task, error)
+	// Delete removes a task from the queue.
+	//
+	// This should be used to delete tasks that are not yet ready
+	// for consumption. If consuming tasks using the Pull method,
+	// the acknowledgement functionality should be used instead of
+	// Delete.
+	Delete(ctx context.Context, in *DeleteTaskRequest, opts ...grpc.CallOption) (*emptypb.Empty, error)
 }
 
 type queueClient struct {
@@ -129,6 +137,15 @@ func (c *queueClient) Get(ctx context.Context, in *GetTaskRequest, opts ...grpc.
 	return out, nil
 }
 
+func (c *queueClient) Delete(ctx context.Context, in *DeleteTaskRequest, opts ...grpc.CallOption) (*emptypb.Empty, error) {
+	out := new(emptypb.Empty)
+	err := c.cc.Invoke(ctx, "/z4.Queue/Delete", in, out, opts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
 // QueueServer is the server API for Queue service.
 // All implementations must embed UnimplementedQueueServer
 // for forward compatibility
@@ -150,6 +167,13 @@ type QueueServer interface {
 	Pull(Queue_PullServer) error
 	// Get retrieves a task by its ID.
 	Get(context.Context, *GetTaskRequest) (*Task, error)
+	// Delete removes a task from the queue.
+	//
+	// This should be used to delete tasks that are not yet ready
+	// for consumption. If consuming tasks using the Pull method,
+	// the acknowledgement functionality should be used instead of
+	// Delete.
+	Delete(context.Context, *DeleteTaskRequest) (*emptypb.Empty, error)
 	mustEmbedUnimplementedQueueServer()
 }
 
@@ -168,6 +192,9 @@ func (UnimplementedQueueServer) Pull(Queue_PullServer) error {
 }
 func (UnimplementedQueueServer) Get(context.Context, *GetTaskRequest) (*Task, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method Get not implemented")
+}
+func (UnimplementedQueueServer) Delete(context.Context, *DeleteTaskRequest) (*emptypb.Empty, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method Delete not implemented")
 }
 func (UnimplementedQueueServer) mustEmbedUnimplementedQueueServer() {}
 
@@ -270,6 +297,24 @@ func _Queue_Get_Handler(srv interface{}, ctx context.Context, dec func(interface
 	return interceptor(ctx, in, info, handler)
 }
 
+func _Queue_Delete_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(DeleteTaskRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(QueueServer).Delete(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: "/z4.Queue/Delete",
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(QueueServer).Delete(ctx, req.(*DeleteTaskRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
 // Queue_ServiceDesc is the grpc.ServiceDesc for Queue service.
 // It's only intended for direct use with grpc.RegisterService,
 // and not to be introspected or modified (even as a copy)
@@ -284,6 +329,10 @@ var Queue_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "Get",
 			Handler:    _Queue_Get_Handler,
+		},
+		{
+			MethodName: "Delete",
+			Handler:    _Queue_Delete_Handler,
 		},
 	},
 	Streams: []grpc.StreamDesc{
