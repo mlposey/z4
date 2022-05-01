@@ -40,6 +40,14 @@ func (a *Admin) CheckHealth(
 	return new(proto.Status), nil
 }
 
+func (a *Admin) GetNamespace(ctx context.Context, req *proto.GetNamespaceRequest) (*proto.Namespace, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method GetNamespace not implemented")
+}
+
+func (a *Admin) UpdateNamespace(ctx context.Context, req *proto.UpdateNamespaceRequest) (*proto.Namespace, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method UpdateNamespace not implemented")
+}
+
 func (a *Admin) GetClusterInfo(
 	ctx context.Context,
 	req *proto.GetClusterInfoRequest,

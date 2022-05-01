@@ -24,6 +24,7 @@ type PeerConfig struct {
 	BootstrapCluster bool
 	DB               *storage.BadgerClient
 	Tasks            *storage.TaskStore
+	Namespaces       *storage.NamespaceStore
 }
 
 // Peer controls a node's membership in the raft cluster.
@@ -102,7 +103,7 @@ func (p *Peer) joinNetwork() error {
 		return fmt.Errorf("could not create transport for raft peer: %w", err)
 	}
 
-	fsm := newFSM(p.config.DB.DB, p.config.Tasks)
+	fsm := newFSM(p.config.DB.DB, p.config.Tasks, p.config.Namespaces)
 	p.Raft, err = raft.NewRaft(
 		c,
 		fsm,

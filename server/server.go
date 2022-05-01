@@ -43,6 +43,7 @@ func (s *Server) Start() error {
 		zap.Int("port", s.config.GRPCPort))
 
 	s.config.PeerConfig.Tasks = storage.NewTaskStore(s.config.DB)
+	s.config.PeerConfig.Namespaces = storage.NewNamespaceStore(s.config.DB)
 	s.config.PeerConfig.DB = s.config.DB
 	s.peer, err = cluster.NewPeer(s.config.PeerConfig)
 	if err != nil {
