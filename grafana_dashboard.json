@@ -113,7 +113,7 @@
             "uid": "prometheus"
           },
           "exemplar": true,
-          "expr": "sum(rate(z4_pushed_task_total[2m])) by (pod, method, namespace)",
+          "expr": "sum(rate(z4_pushed_task_total[2m])) by (pod, method, task_namespace)",
           "interval": "",
           "legendFormat": "{{task_namespace}}: {{method}}",
           "refId": "A"
@@ -199,7 +199,7 @@
             "uid": "prometheus"
           },
           "exemplar": true,
-          "expr": "sum(rate(z4_pulled_task_total[2m])) by (pod, method, namespace)",
+          "expr": "sum(rate(z4_pulled_task_total[2m])) by (pod, method, task_namespace)",
           "interval": "",
           "legendFormat": "{{task_namespace}}: {{method}}",
           "refId": "A"
@@ -285,7 +285,7 @@
             "uid": "prometheus"
           },
           "exemplar": true,
-          "expr": "sum(rate(z4_removed_task_total[2m])) by (pod, method, namespace)",
+          "expr": "sum(rate(z4_removed_task_total[2m])) by (pod, method, task_namespace)",
           "interval": "",
           "legendFormat": "{{task_namespace}}: {{method}}",
           "refId": "A"
@@ -762,6 +762,6 @@
   "timezone": "",
   "title": "z4",
   "uid": "TGc1G_w7z",
-  "version": 14,
+  "version": 15,
   "weekStart": ""
 }
