@@ -43,12 +43,12 @@ func (s *Server) Start() error {
 		zap.Int("port", s.config.GRPCPort))
 
 	s.config.PeerConfig.Tasks = storage.NewTaskStore(s.config.DB)
-	s.fm = feeds.NewManager(s.config.DB)
 	s.config.PeerConfig.DB = s.config.DB
 	s.peer, err = cluster.NewPeer(s.config.PeerConfig)
 	if err != nil {
 		return fmt.Errorf("failed to start raft server: %w", err)
 	}
+	s.fm = feeds.NewManager(s.config.DB, s.peer.Raft)
 
 	tracker := cluster.NewTracker(s.peer.Raft, s.config.PeerConfig.ID)
 	handle, err := cluster.NewHandle(tracker, s.config.GRPCPort)

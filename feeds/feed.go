@@ -2,6 +2,7 @@ package feeds
 
 import (
 	"fmt"
+	"github.com/hashicorp/raft"
 	"github.com/mlposey/z4/proto"
 	"github.com/mlposey/z4/storage"
 	"github.com/mlposey/z4/telemetry"
@@ -27,10 +28,11 @@ func New(
 	namespaceID string,
 	db *storage.BadgerClient,
 	ackDeadline time.Duration,
+	raft *raft.Raft,
 ) (*Feed, error) {
 	q := &Feed{
 		tasks:       storage.NewTaskStore(db),
-		Namespace:   storage.NewSyncedNamespace(storage.NewNamespaceStore(db), namespaceID),
+		Namespace:   storage.NewSyncedNamespace(storage.NewNamespaceStore(db), namespaceID, raft),
 		feed:        make(chan *proto.Task),
 		close:       make(chan bool),
 		ackDeadline: ackDeadline,

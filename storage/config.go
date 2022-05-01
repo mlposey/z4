@@ -4,6 +4,7 @@ import (
 	"errors"
 	"fmt"
 	"github.com/dgraph-io/badger/v3"
+	"github.com/hashicorp/raft"
 	"github.com/mlposey/z4/proto"
 	"github.com/mlposey/z4/telemetry"
 	"github.com/segmentio/ksuid"
@@ -23,14 +24,20 @@ type SyncedNamespace struct {
 	namespace  string
 	closeReq   chan interface{}
 	closeRes   chan interface{}
+	raft       *raft.Raft
 }
 
-func NewSyncedNamespace(namespaces *NamespaceStore, namespace string) *SyncedNamespace {
+func NewSyncedNamespace(
+	namespaces *NamespaceStore,
+	namespace string,
+	raft *raft.Raft,
+) *SyncedNamespace {
 	return &SyncedNamespace{
 		namespaces: namespaces,
 		namespace:  namespace,
 		closeReq:   make(chan interface{}),
 		closeRes:   make(chan interface{}),
+		raft:       raft,
 	}
 }
 

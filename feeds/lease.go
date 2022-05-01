@@ -2,6 +2,7 @@ package feeds
 
 import (
 	"fmt"
+	"github.com/hashicorp/raft"
 	"github.com/mlposey/z4/storage"
 	"github.com/mlposey/z4/telemetry"
 	"go.uber.org/zap"
@@ -18,9 +19,14 @@ type leaseHolder struct {
 	onRemove func()
 }
 
-func newLeaseHolder(namespace string, db *storage.BadgerClient, onRemove func()) (*leaseHolder, error) {
+func newLeaseHolder(
+	namespace string,
+	db *storage.BadgerClient,
+	onRemove func(),
+	raft *raft.Raft,
+) (*leaseHolder, error) {
 	// TODO: Make ack deadline configurable.
-	feed, err := New(namespace, db, time.Minute*5)
+	feed, err := New(namespace, db, time.Minute*5, raft)
 	if err != nil {
 		return nil, fmt.Errorf("lease creation failed: %w", err)
 	}
