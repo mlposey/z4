@@ -110,9 +110,10 @@ func (ts *TaskStore) IterateRange(query TaskRange) (*TaskIterator, error) {
 
 // TaskIterator iterates over a range of tasks in the database.
 type TaskIterator struct {
-	txn *badger.Txn
-	it  *badger.Iterator
-	end []byte
+	txn    *badger.Txn
+	it     *badger.Iterator
+	end    []byte
+	prefix []byte
 }
 
 func NewTaskIterator(client *BadgerClient, query TaskRange) *TaskIterator {
@@ -125,9 +126,10 @@ func NewTaskIterator(client *BadgerClient, query TaskRange) *TaskIterator {
 	it.Seek(start)
 
 	return &TaskIterator{
-		txn: txn,
-		it:  it,
-		end: getTaskKey(query.Namespace, query.EndID),
+		txn:    txn,
+		it:     it,
+		end:    getTaskKey(query.Namespace, query.EndID),
+		prefix: []byte(fmt.Sprintf("task#%s#", query.Namespace)),
 	}
 }
 
@@ -150,7 +152,7 @@ func (ti *TaskIterator) ForEach(handle func(task *proto.Task) error) error {
 }
 
 func (ti *TaskIterator) Next() (*proto.Task, error) {
-	if !ti.it.Valid() {
+	if !ti.it.ValidForPrefix(ti.prefix) {
 		return nil, io.EOF
 	}
 
@@ -166,7 +168,7 @@ func (ti *TaskIterator) Peek() (*proto.Task, error) {
 }
 
 func (ti *TaskIterator) peek(skipCheck bool) (*proto.Task, error) {
-	if !skipCheck && !ti.it.Valid() {
+	if !skipCheck && !ti.it.ValidForPrefix(ti.prefix) {
 		return nil, io.EOF
 	}
 
