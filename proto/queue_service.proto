@@ -33,10 +33,10 @@ message PushTaskRequest {
   // The unique id of this request
   string request_id = 1;
 
-  // The namespace where the task should be created.
+  // The namespace where the task should be added.
   string namespace = 2;
 
-  // Whether to asynchronously create the task.
+  // Whether to asynchronously push the task.
   //
   // Asynchronous task creation does not wait for the task to
   // be persisted on all peers. It is faster but may result in

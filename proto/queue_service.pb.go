@@ -21,7 +21,7 @@ const (
 	_ = protoimpl.EnforceVersion(protoimpl.MaxVersion - 20)
 )
 
-// CreateTaskRequest is a request to create a task.
+// PushTaskRequest is a request to add a task to the queue.
 type PushTaskRequest struct {
 	state         protoimpl.MessageState
 	sizeCache     protoimpl.SizeCache
@@ -29,9 +29,9 @@ type PushTaskRequest struct {
 
 	// The unique id of this request
 	RequestId string `protobuf:"bytes,1,opt,name=request_id,json=requestId,proto3" json:"request_id,omitempty"`
-	// The namespace where the task should be created.
+	// The namespace where the task should be added.
 	Namespace string `protobuf:"bytes,2,opt,name=namespace,proto3" json:"namespace,omitempty"`
-	// Whether to asynchronously create the task.
+	// Whether to asynchronously push the task.
 	//
 	// Asynchronous task creation does not wait for the task to
 	// be persisted on all peers. It is faster but may result in
