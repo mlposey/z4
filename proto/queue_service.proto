@@ -28,7 +28,7 @@ service Queue {
   rpc Get(GetTaskRequest) returns (Task) {};
 }
 
-// CreateTaskRequest is a request to create a task.
+// PushTaskRequest is a request to add a task to the queue.
 message PushTaskRequest {
   // The unique id of this request
   string request_id = 1;
