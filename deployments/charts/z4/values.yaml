@@ -5,8 +5,7 @@
 replicaCount: 3
 
 image:
-  # TODO: Use public registry.
-  repository: us.gcr.io/colli-304019/z4
+  repository: mlposey/z4
   pullPolicy: Always
   # Overrides the image tag whose default is the chart appVersion.
   tag: "latest"

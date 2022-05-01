@@ -1,4 +1,4 @@
-DOCKER_REGISTRY := us.gcr.io/colli-304019
+DOCKER_REGISTRY := mlposey
 DOCKER_IMAGE := ${DOCKER_REGISTRY}/z4
 
 .PHONY: proto
