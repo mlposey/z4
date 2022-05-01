@@ -113,7 +113,7 @@
             "uid": "prometheus"
           },
           "exemplar": true,
-          "expr": "sum(rate(z4_create_task_request_total[2m])) by (pod)",
+          "expr": "sum(rate(z4_push_task_request_total[2m])) by (pod)",
           "interval": "",
           "legendFormat": "",
           "refId": "A"
@@ -661,6 +661,7 @@
       "type": "stat"
     }
   ],
+  "refresh": "5s",
   "schemaVersion": 35,
   "style": "dark",
   "tags": [],
@@ -675,6 +676,6 @@
   "timezone": "",
   "title": "z4",
   "uid": "TGc1G_w7z",
-  "version": 6,
+  "version": 11,
   "weekStart": ""
 }

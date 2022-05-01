@@ -14,7 +14,7 @@ import (
 
 type LeaderHandle struct {
 	conn             *grpc.ClientConn
-	collectionClient proto.CollectionClient
+	collectionClient proto.QueueClient
 	adminClient      proto.AdminClient
 	tracker          *LeaderTracker
 	grpcPort         int
@@ -74,7 +74,7 @@ func (lh *LeaderHandle) resetConn(leaderAddress string) error {
 		return err
 	}
 	lh.conn = conn
-	lh.collectionClient = proto.NewCollectionClient(lh.conn)
+	lh.collectionClient = proto.NewQueueClient(lh.conn)
 	lh.adminClient = proto.NewAdminClient(lh.conn)
 	return nil
 }
@@ -87,7 +87,7 @@ func (lh *LeaderHandle) LeaderAddress() string {
 	return lh.tracker.LeaderAddress()
 }
 
-func (lh *LeaderHandle) CollectionClient() (proto.CollectionClient, error) {
+func (lh *LeaderHandle) QueueClient() (proto.QueueClient, error) {
 	lh.mu.RLock()
 	defer lh.mu.RUnlock()
 

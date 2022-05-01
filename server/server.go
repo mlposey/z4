@@ -61,7 +61,7 @@ func (s *Server) Start() error {
 
 	s.fm = feeds.NewManager(s.config.DB)
 	collectionServer := api.NewCollection(s.fm, s.config.PeerConfig.Tasks, s.peer.Raft, handle)
-	proto.RegisterCollectionServer(s.server, collectionServer)
+	proto.RegisterQueueServer(s.server, collectionServer)
 
 	go telemetry.StartPromServer(s.config.MetricsPort)
 	return s.server.Serve(lis)

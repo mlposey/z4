@@ -13,14 +13,14 @@ import (
 // TaskBroker manages the read and ack streams of a task feed.
 type TaskBroker struct {
 	fm        *Manager
-	stream    proto.Collection_GetTaskStreamServer
+	stream    proto.Queue_PullServer
 	raft      *raft.Raft
 	namespace string
 	lease     *Lease
 }
 
 func NewTaskBroker(
-	stream proto.Collection_GetTaskStreamServer,
+	stream proto.Queue_PullServer,
 	fm *Manager,
 	raft *raft.Raft,
 ) *TaskBroker {

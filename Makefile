@@ -6,7 +6,7 @@ DOCKER_IMAGE := ${DOCKER_REGISTRY}/z4
 deploy:
 	helm -n z4 \
 		upgrade --install \
-		--set kubePrometheusStack.enabled=true \
+		-f deployments/charts/z4/values.yaml \
 		z4 deployments/charts/z4
 
 restart_pods:

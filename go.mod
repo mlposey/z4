@@ -13,12 +13,14 @@ require (
 	github.com/prometheus/client_golang v1.4.0
 	github.com/segmentio/ksuid v1.0.4
 	go.uber.org/multierr v1.6.0
+	go.uber.org/ratelimit v0.2.0
 	go.uber.org/zap v1.21.0
 	google.golang.org/grpc v1.45.0
 	google.golang.org/protobuf v1.28.0
 )
 
 require (
+	github.com/andres-erbsen/clock v0.0.0-20160526145045-9e14626cd129 // indirect
 	github.com/armon/go-metrics v0.3.8 // indirect
 	github.com/beorn7/perks v1.0.1 // indirect
 	github.com/boltdb/bolt v1.3.1 // indirect
