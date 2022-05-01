@@ -43,11 +43,13 @@ func (s *Server) Start() error {
 		zap.Int("port", s.config.GRPCPort))
 
 	s.config.PeerConfig.Tasks = storage.NewTaskStore(s.config.DB)
+	s.config.PeerConfig.Namespaces = storage.NewNamespaceStore(s.config.DB)
 	s.config.PeerConfig.DB = s.config.DB
 	s.peer, err = cluster.NewPeer(s.config.PeerConfig)
 	if err != nil {
 		return fmt.Errorf("failed to start raft server: %w", err)
 	}
+	s.fm = feeds.NewManager(s.config.DB, s.peer.Raft)
 
 	tracker := cluster.NewTracker(s.peer.Raft, s.config.PeerConfig.ID)
 	handle, err := cluster.NewHandle(tracker, s.config.GRPCPort)
@@ -56,11 +58,10 @@ func (s *Server) Start() error {
 	}
 
 	s.server = grpc.NewServer(s.config.Opts...)
-	adminServer := api.NewAdmin(s.peer.Raft, s.config.PeerConfig, handle)
+	adminServer := api.NewAdmin(s.peer.Raft, s.config.PeerConfig, handle, s.fm)
 	proto.RegisterAdminServer(s.server, adminServer)
 
-	s.fm = feeds.NewManager(s.config.DB)
-	collectionServer := api.NewCollection(s.fm, s.config.PeerConfig.Tasks, s.peer.Raft, handle)
+	collectionServer := api.NewQueue(s.fm, s.config.PeerConfig.Tasks, s.peer.Raft, handle)
 	proto.RegisterQueueServer(s.server, collectionServer)
 
 	go telemetry.StartPromServer(s.config.MetricsPort)

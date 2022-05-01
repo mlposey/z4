@@ -15,21 +15,26 @@ import (
 type stateMachine struct {
 	db *badger.DB
 	ts *storage.TaskStore
+	ns *storage.NamespaceStore
 }
 
-func newFSM(db *badger.DB, ts *storage.TaskStore) *stateMachine {
+func newFSM(db *badger.DB, ts *storage.TaskStore, ns *storage.NamespaceStore) *stateMachine {
 	// TODO: Do not pass a *badger.DB directly. Create a new type.
 	return &stateMachine{
 		db: db,
 		ts: ts,
+		ns: ns,
 	}
 }
 
 func (f *stateMachine) ApplyBatch(logs []*raft.Log) []interface{} {
+	// TODO: Refactor this method. It has become quite large.
+
 	telemetry.ReceivedLogs.Add(float64(len(logs)))
 
 	var tasks []*proto.Task
 	var acks []*proto.Ack
+	var namespaces []*proto.Namespace
 	res := make([]interface{}, len(logs))
 
 	for i, log := range logs {
@@ -47,6 +52,9 @@ func (f *stateMachine) ApplyBatch(logs []*raft.Log) []interface{} {
 		case *proto.Command_Ack:
 			acks = append(acks, v.Ack)
 
+		case *proto.Command_Namespace:
+			namespaces = append(namespaces, v.Namespace)
+
 		default:
 			res[i] = errors.New("unknown command type: expected ack or task")
 			return res
@@ -55,27 +63,40 @@ func (f *stateMachine) ApplyBatch(logs []*raft.Log) []interface{} {
 
 	// TODO: Determine if concurrently saving and deleting improves performance.
 
+	if len(namespaces) > 0 {
+		// Namespace updates should happen infrequently enough that
+		// saving them individually rather than using a batch should
+		// be more performant.
+		for _, namespace := range namespaces {
+			err := f.ns.Save(namespace)
+			if err != nil {
+				return f.packErrors(err, res)
+			}
+		}
+	}
+
 	if len(tasks) > 0 {
 		err := f.ts.SaveAll(tasks)
 		if err != nil {
-			for i := 0; i < len(res); i++ {
-				res[i] = err
-			}
-			return res
+			return f.packErrors(err, res)
 		}
 	}
 
 	if len(acks) > 0 {
 		err := f.ts.DeleteAll(acks)
 		if err != nil {
-			for i := 0; i < len(res); i++ {
-				res[i] = err
-			}
-			return res
+			return f.packErrors(err, res)
 		}
 	}
 
 	telemetry.AppliedLogs.Add(float64(len(acks) + len(tasks)))
+	return res
+}
+
+func (f *stateMachine) packErrors(err error, res []interface{}) []interface{} {
+	for i := 0; i < len(res); i++ {
+		res[i] = err
+	}
 	return res
 }
 

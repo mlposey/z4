@@ -3,6 +3,7 @@ package api
 import (
 	"context"
 	"github.com/hashicorp/raft"
+	"github.com/mlposey/z4/feeds"
 	"github.com/mlposey/z4/proto"
 	"github.com/mlposey/z4/server/cluster"
 	"github.com/mlposey/z4/telemetry"
@@ -17,16 +18,23 @@ type Admin struct {
 	proto.UnimplementedAdminServer
 	raft          *raft.Raft
 	handle        *cluster.LeaderHandle
+	fm            *feeds.Manager
 	serverID      string
 	advertiseAddr string
 }
 
-func NewAdmin(raft *raft.Raft, cfg cluster.PeerConfig, handle *cluster.LeaderHandle) *Admin {
+func NewAdmin(
+	raft *raft.Raft,
+	cfg cluster.PeerConfig,
+	handle *cluster.LeaderHandle,
+	fm *feeds.Manager,
+) *Admin {
 	return &Admin{
 		raft:          raft,
 		serverID:      cfg.ID,
 		advertiseAddr: cfg.AdvertiseAddr,
 		handle:        handle,
+		fm:            fm,
 	}
 }
 
@@ -38,6 +46,49 @@ func (a *Admin) CheckHealth(
 		return nil, status.Error(codes.Internal, "peer has no leader")
 	}
 	return new(proto.Status), nil
+}
+
+func (a *Admin) GetNamespace(ctx context.Context, req *proto.GetNamespaceRequest) (*proto.Namespace, error) {
+	if !a.handle.IsLeader() {
+		client, err := a.handle.AdminClient()
+		if err != nil {
+			return nil, status.Errorf(codes.Internal, "could not forward request: %v", err)
+		}
+		return client.GetNamespace(ctx, req)
+	}
+
+	feed, err := a.fm.Lease(req.GetRequestId())
+	if err != nil {
+		return nil, status.Errorf(codes.Internal, "could not get lease for update: %v", err)
+	}
+	defer feed.Release()
+
+	return feed.Feed().Namespace.N, nil
+}
+
+func (a *Admin) UpdateNamespace(ctx context.Context, req *proto.UpdateNamespaceRequest) (*proto.Namespace, error) {
+	if !a.handle.IsLeader() {
+		client, err := a.handle.AdminClient()
+		if err != nil {
+			return nil, status.Errorf(codes.Internal, "could not forward request: %v", err)
+		}
+		return client.UpdateNamespace(ctx, req)
+	}
+
+	feed, err := a.fm.Lease(req.GetNamespace().GetId())
+	if err != nil {
+		return nil, status.Errorf(codes.Internal, "could not get lease for update: %v", err)
+	}
+	defer feed.Release()
+
+	ns := feed.Feed().Namespace.N
+	// Once we're ready to support actual updates, they should be performed
+	// by updating values of ns. Because it is a synced config, changes will be
+	// applied to the raft log behind the scenes.
+	//
+	// Important note: Do not update the value of the namespace id or the
+	// last delivered task.
+	return ns, nil
 }
 
 func (a *Admin) GetClusterInfo(

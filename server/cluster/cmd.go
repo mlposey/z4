@@ -6,6 +6,7 @@ import (
 	pb "google.golang.org/protobuf/proto"
 )
 
+// ApplySaveTaskCommand applies a command to save a task to the Raft log.
 func ApplySaveTaskCommand(raft *raft.Raft, task *proto.Task) raft.ApplyFuture {
 	cmd, _ := pb.Marshal(&proto.Command{
 		Cmd: &proto.Command_Task{
@@ -15,10 +16,21 @@ func ApplySaveTaskCommand(raft *raft.Raft, task *proto.Task) raft.ApplyFuture {
 	return raft.Apply(cmd, 0)
 }
 
+// ApplyAckCommand applies a command to save ack a task to the Raft log.
 func ApplyAckCommand(raft *raft.Raft, ack *proto.Ack) raft.ApplyFuture {
 	cmd, _ := pb.Marshal(&proto.Command{
 		Cmd: &proto.Command_Ack{
 			Ack: ack,
+		},
+	})
+	return raft.Apply(cmd, 0)
+}
+
+// ApplyNamespaceCommand applies a command to save a namespace to the Raft log.
+func ApplyNamespaceCommand(raft *raft.Raft, namespace *proto.Namespace) raft.ApplyFuture {
+	cmd, _ := pb.Marshal(&proto.Command{
+		Cmd: &proto.Command_Namespace{
+			Namespace: namespace,
 		},
 	})
 	return raft.Apply(cmd, 0)

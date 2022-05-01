@@ -12,6 +12,9 @@ message Command {
 
     // A request to acknowledge a task so that it is not redelivered.
     Ack ack = 2;
+
+    // A request to save a namespace.
+    Namespace namespace = 3;
   }
 }
 

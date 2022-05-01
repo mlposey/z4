@@ -2,6 +2,7 @@ package feeds
 
 import (
 	"fmt"
+	"github.com/hashicorp/raft"
 	"github.com/mlposey/z4/storage"
 	"github.com/mlposey/z4/telemetry"
 	"go.uber.org/multierr"
@@ -14,12 +15,14 @@ type Manager struct {
 	leases map[string]*leaseHolder
 	db     *storage.BadgerClient
 	mu     sync.Mutex
+	raft   *raft.Raft
 }
 
-func NewManager(db *storage.BadgerClient) *Manager {
+func NewManager(db *storage.BadgerClient, raft *raft.Raft) *Manager {
 	return &Manager{
 		leases: make(map[string]*leaseHolder),
 		db:     db,
+		raft:   raft,
 	}
 }
 
@@ -49,7 +52,7 @@ func (qm *Manager) Lease(namespace string) (*Lease, error) {
 		var err error
 		lease, err = newLeaseHolder(namespace, qm.db, func() {
 			qm.cleanUpLeases(namespace)
-		})
+		}, qm.raft)
 		if err != nil {
 			return nil, fmt.Errorf("failed to acquire lease for namespace %s: %w", namespace, err)
 		}

@@ -25,7 +25,7 @@ type Queue struct {
 	handle *cluster.LeaderHandle
 }
 
-func NewCollection(
+func NewQueue(
 	fm *feeds.Manager,
 	tasks *storage.TaskStore,
 	raft *raft.Raft,

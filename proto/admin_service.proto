@@ -3,11 +3,18 @@ package z4;
 option go_package = "github.com/mlposey/z4/proto;proto";
 
 import "google/protobuf/empty.proto";
+import "misc.proto";
 
 // The Admin service supports administrative/maintenance operations.
 service Admin {
   // CheckHealth determines whether the service is in a healthy state.
   rpc CheckHealth(CheckHealthRequest) returns (Status) {};
+
+  // GetNamespace gets settings for a task namespace.
+  rpc GetNamespace(GetNamespaceRequest) returns (Namespace) {};
+
+  // UpdateNamespace updates the settings of a task namespace.
+  rpc UpdateNamespace(UpdateNamespaceRequest) returns (Namespace) {};
 
   // GetClusterInfo returns information about the structure of the Raft cluster.
   rpc GetClusterInfo(GetClusterInfoRequest) returns (ClusterInfo) {};
@@ -35,8 +42,19 @@ message CheckHealthRequest {
 message Status {
 }
 
-message GetClusterInfoRequest {
+message GetNamespaceRequest {
+  string request_id = 1;
+  string namespace_id = 2;
+}
 
+message UpdateNamespaceRequest {
+  string request_id = 1;
+  Namespace namespace = 2;
+  // TODO: Add field mask support so we can selectively update parts of the namespace.
+}
+
+message GetClusterInfoRequest {
+  string request_id = 1;
 }
 
 // ClusterInfo contains information about the cluster.
