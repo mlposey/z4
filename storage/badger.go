@@ -57,9 +57,17 @@ func (bc *BadgerClient) Close() error {
 // ConfigStore manages persistent storage for feed configurations.
 type ConfigStore struct {
 	Client *BadgerClient
+	prefix []byte
 }
 
-func (cs *ConfigStore) Save(namespace string, config FeedConfig) error {
+func NewConfigStore(client *BadgerClient) *ConfigStore {
+	return &ConfigStore{
+		Client: client,
+		prefix: []byte("config#"),
+	}
+}
+
+func (cs *ConfigStore) Save(namespace string, config *proto.Namespace) error {
 	return cs.Client.DB.Update(func(txn *badger.Txn) error {
 		payload, err := json.Marshal(config)
 		if err != nil {
@@ -70,9 +78,35 @@ func (cs *ConfigStore) Save(namespace string, config FeedConfig) error {
 	})
 }
 
-func (cs *ConfigStore) Get(namespace string) (FeedConfig, error) {
+func (cs *ConfigStore) GetAll() ([]*proto.Namespace, error) {
+	telemetry.Logger.Debug("getting all configs from DB")
+
+	var configs []*proto.Namespace
+	return configs, cs.Client.DB.View(func(txn *badger.Txn) error {
+
+		it := txn.NewIterator(badger.DefaultIteratorOptions)
+		for it.Seek(cs.prefix); it.ValidForPrefix(cs.prefix); it.Next() {
+			item := it.Item()
+
+			_ = item.Value(func(val []byte) error {
+				config := new(proto.Namespace)
+				err := pb.Unmarshal(val, config)
+				if err != nil {
+					telemetry.Logger.Error("failed to load namespace config from database",
+						zap.String("key", string(item.Key())))
+				} else {
+					configs = append(configs, config)
+				}
+				return err
+			})
+		}
+		return nil
+	})
+}
+
+func (cs *ConfigStore) Get(namespace string) (*proto.Namespace, error) {
 	telemetry.Logger.Debug("getting config from DB")
-	var config FeedConfig
+	var config *proto.Namespace
 	return config, cs.Client.DB.View(func(txn *badger.Txn) error {
 		key := cs.getConfigFQN(namespace)
 		item, err := txn.Get(key)
@@ -81,13 +115,14 @@ func (cs *ConfigStore) Get(namespace string) (FeedConfig, error) {
 		}
 
 		return item.Value(func(val []byte) error {
-			return json.Unmarshal(val, &config)
+			config = new(proto.Namespace)
+			return pb.Unmarshal(val, config)
 		})
 	})
 }
 
 func (cs *ConfigStore) getConfigFQN(namespace string) []byte {
-	return []byte(fmt.Sprintf("%s#config", namespace))
+	return []byte(fmt.Sprintf("config#%s", namespace))
 }
 
 // TaskStore manages persistent storage for tasks.
@@ -278,5 +313,5 @@ func (ti *TaskIterator) Close() error {
 }
 
 func getTaskFQN(namespace string, id string) []byte {
-	return []byte(fmt.Sprintf("%s#task#%s", namespace, id))
+	return []byte(fmt.Sprintf("task#%s#%s", namespace, id))
 }

@@ -4,42 +4,22 @@ import (
 	"errors"
 	"fmt"
 	"github.com/dgraph-io/badger/v3"
+	"github.com/mlposey/z4/proto"
 	"github.com/mlposey/z4/telemetry"
 	"github.com/segmentio/ksuid"
 	"go.uber.org/zap"
+	pb "google.golang.org/protobuf/proto"
 	"time"
 )
-
-// FeedConfig defines how a feed should work.
-type FeedConfig struct {
-	// Update Equals and Copy methods if modifying fields in this type.
-
-	LastDeliveredTask string // The ID of the last delivered task
-}
-
-// Equals compares two feeds for equality.
-func (c *FeedConfig) Equals(other *FeedConfig) bool {
-	if other == nil {
-		return false
-	}
-	return c.LastDeliveredTask == other.LastDeliveredTask
-}
-
-// Copy makes a deep copy of the config.
-func (c *FeedConfig) Copy() *FeedConfig {
-	return &FeedConfig{
-		LastDeliveredTask: c.LastDeliveredTask,
-	}
-}
 
 // SyncedConfig is a FeedConfig that syncs to disk.
 type SyncedConfig struct {
 	// C is the config that will be synced to disk.
 	// It is safe to make changes directly to this field.
-	C *FeedConfig
+	C *proto.Namespace
 
 	configs   *ConfigStore
-	lastSaved *FeedConfig
+	lastSaved *proto.Namespace
 	namespace string
 	closeReq  chan interface{}
 	closeRes  chan interface{}
@@ -78,7 +58,7 @@ func (sc *SyncedConfig) loadConfig() error {
 			return fmt.Errorf("failed to load namespace config from database: %w", err)
 		}
 
-		config = FeedConfig{
+		config = &proto.Namespace{
 			LastDeliveredTask: NewTaskID(ksuid.Nil.Time()),
 		}
 		err = sc.configs.Save(sc.namespace, config)
@@ -86,7 +66,7 @@ func (sc *SyncedConfig) loadConfig() error {
 			return fmt.Errorf("failed to save config to database: %w", err)
 		}
 	}
-	sc.C = &config
+	sc.C = config
 	return nil
 }
 
@@ -117,12 +97,12 @@ func (sc *SyncedConfig) startConfigSync() {
 
 // trySave saves the config if it has changed since the last write.
 func (sc *SyncedConfig) trySave() error {
-	if sc.C.Equals(sc.lastSaved) {
+	if pb.Equal(sc.C, sc.lastSaved) {
 		return nil
 	}
 
-	snapshot := sc.C.Copy()
-	err := sc.configs.Save(sc.namespace, *snapshot)
+	snapshot := pb.Clone(sc.C).(*proto.Namespace)
+	err := sc.configs.Save(sc.namespace, snapshot)
 	if err == nil {
 		sc.lastSaved = snapshot
 	}
