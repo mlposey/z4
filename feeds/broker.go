@@ -97,7 +97,7 @@ func (tb *TaskBroker) startTaskSender() error {
 			}
 
 			telemetry.PulledTasks.
-				WithLabelValues("GetTaskStream", tb.namespace).
+				WithLabelValues("Pull", tb.namespace).
 				Inc()
 		}
 	}
