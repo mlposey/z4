@@ -4,109 +4,92 @@ import (
 	"errors"
 	"fmt"
 	"github.com/dgraph-io/badger/v3"
+	"github.com/mlposey/z4/proto"
 	"github.com/mlposey/z4/telemetry"
 	"github.com/segmentio/ksuid"
 	"go.uber.org/zap"
+	pb "google.golang.org/protobuf/proto"
 	"time"
 )
 
-// FeedConfig defines how a feed should work.
-type FeedConfig struct {
-	// Update Equals and Copy methods if modifying fields in this type.
-
-	LastDeliveredTask string // The ID of the last delivered task
-}
-
-// Equals compares two feeds for equality.
-func (c *FeedConfig) Equals(other *FeedConfig) bool {
-	if other == nil {
-		return false
-	}
-	return c.LastDeliveredTask == other.LastDeliveredTask
-}
-
-// Copy makes a deep copy of the config.
-func (c *FeedConfig) Copy() *FeedConfig {
-	return &FeedConfig{
-		LastDeliveredTask: c.LastDeliveredTask,
-	}
-}
-
-// SyncedConfig is a FeedConfig that syncs to disk.
-type SyncedConfig struct {
-	// C is the config that will be synced to disk.
+// SyncedNamespace is a Namespace that syncs to disk.
+type SyncedNamespace struct {
+	// N is the namespace that will be synced to disk.
 	// It is safe to make changes directly to this field.
-	C *FeedConfig
+	N *proto.Namespace
 
-	configs   *ConfigStore
-	lastSaved *FeedConfig
-	namespace string
-	closeReq  chan interface{}
-	closeRes  chan interface{}
+	namespaces *NamespaceStore
+	lastSaved  *proto.Namespace
+	namespace  string
+	closeReq   chan interface{}
+	closeRes   chan interface{}
 }
 
-func NewSyncedConfig(configs *ConfigStore, namespace string) *SyncedConfig {
-	return &SyncedConfig{
-		configs:   configs,
-		namespace: namespace,
-		closeReq:  make(chan interface{}),
-		closeRes:  make(chan interface{}),
+func NewSyncedNamespace(namespaces *NamespaceStore, namespace string) *SyncedNamespace {
+	return &SyncedNamespace{
+		namespaces: namespaces,
+		namespace:  namespace,
+		closeReq:   make(chan interface{}),
+		closeRes:   make(chan interface{}),
 	}
 }
 
-func (sc *SyncedConfig) StartSync() error {
-	if err := sc.loadConfig(); err != nil {
+func (sn *SyncedNamespace) StartSync() error {
+	if err := sn.load(); err != nil {
 		return err
 	}
 
-	go sc.startConfigSync()
+	go sn.startSync()
 	return nil
 }
 
 // Close flushes config changes to disk and stops the sync thread.
 // The object should not be used after a call to Close.
-func (sc *SyncedConfig) Close() error {
-	sc.closeReq <- nil
-	<-sc.closeRes
+func (sn *SyncedNamespace) Close() error {
+	sn.closeReq <- nil
+	<-sn.closeRes
 	return nil
 }
 
-func (sc *SyncedConfig) loadConfig() error {
-	config, err := sc.configs.Get(sc.namespace)
+// load pulls the namespace from the database.
+func (sn *SyncedNamespace) load() error {
+	namespace, err := sn.namespaces.Get(sn.namespace)
 	if err != nil {
 		if !errors.Is(err, badger.ErrKeyNotFound) {
 			return fmt.Errorf("failed to load namespace config from database: %w", err)
 		}
 
-		config = FeedConfig{
+		namespace = &proto.Namespace{
+			Id:                sn.namespace,
 			LastDeliveredTask: NewTaskID(ksuid.Nil.Time()),
 		}
-		err = sc.configs.Save(sc.namespace, config)
+		err = sn.namespaces.Save(namespace)
 		if err != nil {
-			return fmt.Errorf("failed to save config to database: %w", err)
+			return fmt.Errorf("failed to save namespace to database: %w", err)
 		}
 	}
-	sc.C = &config
+	sn.N = namespace
 	return nil
 }
 
-func (sc *SyncedConfig) startConfigSync() {
+// startSync starts a loop that flushes changes to disk on an interval.
+func (sn *SyncedNamespace) startSync() {
 	ticker := time.NewTicker(time.Second * 1)
 	for {
 		select {
-		case <-sc.closeReq:
-			err := sc.trySave()
+		case <-sn.closeReq:
+			err := sn.trySave()
 			if err != nil {
 				telemetry.Logger.Error("failed to save config to database",
 					zap.Error(err))
 			}
-			sc.closeRes <- nil
+			sn.closeRes <- nil
 			return
 
 		// TODO: Consider syncing after X number of changes if before tick.
 
 		case <-ticker.C:
-			err := sc.trySave()
+			err := sn.trySave()
 			if err != nil {
 				telemetry.Logger.Error("failed to save config to database",
 					zap.Error(err))
@@ -116,15 +99,15 @@ func (sc *SyncedConfig) startConfigSync() {
 }
 
 // trySave saves the config if it has changed since the last write.
-func (sc *SyncedConfig) trySave() error {
-	if sc.C.Equals(sc.lastSaved) {
+func (sn *SyncedNamespace) trySave() error {
+	if pb.Equal(sn.N, sn.lastSaved) {
 		return nil
 	}
 
-	snapshot := sc.C.Copy()
-	err := sc.configs.Save(sc.namespace, *snapshot)
+	snapshot := pb.Clone(sn.N).(*proto.Namespace)
+	err := sn.namespaces.Save(snapshot)
 	if err == nil {
-		sc.lastSaved = snapshot
+		sn.lastSaved = snapshot
 	}
 	return err
 }

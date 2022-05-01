@@ -14,3 +14,8 @@ message Command {
     Ack ack = 2;
   }
 }
+
+message Namespace {
+  string id = 1;
+  string last_delivered_task = 2;
+}
