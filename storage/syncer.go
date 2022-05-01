@@ -61,21 +61,24 @@ func (sn *SyncedNamespace) Close() error {
 // load pulls the namespace from the database.
 func (sn *SyncedNamespace) load() error {
 	namespace, err := sn.namespaces.Get(sn.namespace)
-	if err != nil {
-		if !errors.Is(err, badger.ErrKeyNotFound) {
-			return fmt.Errorf("failed to load namespace config from database: %w", err)
-		}
-
-		namespace = &proto.Namespace{
-			Id:                sn.namespace,
-			LastDeliveredTask: NewTaskID(ksuid.Nil.Time()),
-		}
-		err = sn.namespaces.Save(namespace)
-		if err != nil {
-			return fmt.Errorf("failed to save namespace to database: %w", err)
-		}
+	if err == nil {
+		sn.N = namespace
+		return nil
 	}
-	sn.N = namespace
+
+	if !errors.Is(err, badger.ErrKeyNotFound) {
+		return fmt.Errorf("failed to load namespace from database: %w", err)
+	}
+
+	sn.N = &proto.Namespace{
+		Id:                sn.namespace,
+		LastDeliveredTask: NewTaskID(ksuid.Nil.Time()),
+	}
+
+	err = sn.trySave()
+	if err != nil {
+		return fmt.Errorf("failed to save namespace to database: %w", err)
+	}
 	return nil
 }
 
@@ -87,7 +90,7 @@ func (sn *SyncedNamespace) startSync() {
 		case <-sn.closeReq:
 			err := sn.trySave()
 			if err != nil {
-				telemetry.Logger.Error("failed to save config to database",
+				telemetry.Logger.Error("failed to save namespace to database",
 					zap.Error(err))
 			}
 			sn.closeRes <- nil
@@ -98,7 +101,7 @@ func (sn *SyncedNamespace) startSync() {
 		case <-ticker.C:
 			err := sn.trySave()
 			if err != nil {
-				telemetry.Logger.Error("failed to save config to database",
+				telemetry.Logger.Error("failed to save namespace to database",
 					zap.Error(err))
 			}
 		}
@@ -112,7 +115,13 @@ func (sn *SyncedNamespace) trySave() error {
 	}
 
 	snapshot := pb.Clone(sn.N).(*proto.Namespace)
-	err := sn.namespaces.Save(snapshot)
+	cmd, _ := pb.Marshal(&proto.Command{
+		Cmd: &proto.Command_Namespace{
+			Namespace: snapshot,
+		},
+	})
+
+	err := sn.raft.Apply(cmd, 0).Error()
 	if err == nil {
 		sn.lastSaved = snapshot
 	}
