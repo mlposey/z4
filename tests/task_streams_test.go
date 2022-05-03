@@ -27,8 +27,9 @@ func TestTaskStreaming(t *testing.T) {
 
 		sc.Step(`^after (\d+) seconds I should receive the same task$`, ts.afterSecondsIShouldReceiveTheSameTask)
 		sc.Step(`^after (\d+) seconds I should receive (\d+) tasks$`, ts.afterSecondsIShouldReceiveTasks)
-		sc.Step(`^I begin streaming after a (\d+) second delay$`, ts.iBeginStreamingAfterASecondDelay)
 		sc.Step(`^I have created the task:$`, ts.iHaveCreatedTheTask)
+		sc.Step(`^I subscribe to tasks in the "([^"]*)" namespace$`, ts.iSubscribeToTasksInTheNamespace)
+		sc.Step(`^I subscribe to tasks in the "([^"]*)" namespace after a (\d+) second delay$`, ts.iSubscribeToTasksInTheNamespaceAfterASecondDelay)
 	})
 
 }
@@ -88,16 +89,11 @@ func (ts *taskStreams) afterSecondsIShouldReceiveTasks(arg1, arg2 int) error {
 
 func (ts *taskStreams) iBeginStreamingAfterASecondDelay(arg1 int) error {
 	time.Sleep(time.Duration(arg1) * time.Second)
-	return ts.consumeTaskStream()
+	return ts.consumeTaskStream("")
 }
 
-func (ts *taskStreams) consumeTaskStream() error {
-	// TODO: Generate this or take it from the gherkin.
-	requestID := ksuid.New().String()
-	// TODO: Supply namespace in gherkin so we can test failure scenarios.
-	namespace := ts.taskRequest.GetNamespace()
-
-	stream, err := ts.client.PullTasks(requestID, namespace)
+func (ts *taskStreams) consumeTaskStream(namespace string) error {
+	stream, err := ts.client.PullTasks(ksuid.New().String(), namespace)
 	if err != nil {
 		return err
 	}
@@ -128,11 +124,20 @@ func (ts *taskStreams) iHaveCreatedTheTask(arg1 *godog.DocString) error {
 	}
 
 	ts.taskRequest = &proto.PushTaskRequest{
-		RequestId:  taskDef["request_id"].(string),
+		RequestId:  ksuid.New().String(),
 		Namespace:  taskDef["namespace"].(string),
 		TtsSeconds: int64(taskDef["tts_seconds"].(float64)),
 	}
 	task, err := ts.client.Push(ts.taskRequest)
 	ts.createdTask = task.GetTask()
 	return err
+}
+
+func (ts *taskStreams) iSubscribeToTasksInTheNamespace(arg1 string) error {
+	return ts.consumeTaskStream(arg1)
+}
+
+func (ts *taskStreams) iSubscribeToTasksInTheNamespaceAfterASecondDelay(arg1 string, arg2 int) error {
+	time.Sleep(time.Duration(arg2) * time.Second)
+	return ts.consumeTaskStream(arg1)
 }
