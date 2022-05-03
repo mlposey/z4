@@ -8,11 +8,8 @@ import (
 	"github.com/mlposey/z4/proto"
 	"github.com/mlposey/z4/tests/util"
 	"github.com/segmentio/ksuid"
-	"google.golang.org/grpc"
-	"google.golang.org/grpc/credentials/insecure"
+	"go.uber.org/multierr"
 	pb "google.golang.org/protobuf/proto"
-	"io"
-	"log"
 	"testing"
 	"time"
 )
@@ -39,7 +36,7 @@ func TestTaskStreaming(t *testing.T) {
 type taskStreams struct {
 	server        *util.LocalServer
 	serverPort    int
-	client        proto.QueueClient
+	client        *util.Client
 	taskRequest   *proto.PushTaskRequest
 	createdTask   *proto.Task
 	receivedTasks []*proto.Task
@@ -48,35 +45,25 @@ type taskStreams struct {
 func (ts *taskStreams) setupSuite() error {
 	ts.serverPort = 6355
 	ts.server = util.NewLocalServer(ts.serverPort)
-	ts.client = nil
 	ts.taskRequest = nil
 	ts.createdTask = nil
 	ts.receivedTasks = nil
 
-	err := new(error)
-	ts.doIfOK(err, ts.server.Start)
-	ts.doIfOK(err, ts.createClient)
-	return *err
-}
-
-func (ts *taskStreams) doIfOK(err *error, do func() error) {
-	if *err == nil {
-		*err = do()
-	}
-}
-
-func (ts *taskStreams) createClient() error {
-	opts := []grpc.DialOption{grpc.WithTransportCredentials(insecure.NewCredentials())}
-	conn, err := grpc.Dial(fmt.Sprintf("localhost:%d", ts.serverPort), opts...)
-	if err != nil {
+	if err := ts.server.Start(); err != nil {
 		return err
 	}
-	ts.client = proto.NewQueueClient(conn)
-	return nil
+
+	c, err := util.NewClient("localhost", ts.serverPort)
+	if err == nil {
+		ts.client = c
+	}
+	return err
 }
 
 func (ts *taskStreams) teardownSuite() error {
-	return ts.server.Stop()
+	err1 := ts.client.Close()
+	err2 := ts.server.Stop()
+	return multierr.Combine(err1, err2)
 }
 
 func (ts *taskStreams) afterSecondsIShouldReceiveTheSameTask(arg1 int) error {
@@ -105,51 +92,29 @@ func (ts *taskStreams) iBeginStreamingAfterASecondDelay(arg1 int) error {
 }
 
 func (ts *taskStreams) consumeTaskStream() error {
-	stream, err := ts.client.Pull(context.Background())
+	// TODO: Generate this or take it from the gherkin.
+	requestID := ksuid.New().String()
+	// TODO: Supply namespace in gherkin so we can test failure scenarios.
+	namespace := ts.taskRequest.GetNamespace()
+
+	stream, err := ts.client.PullTasks(requestID, namespace)
 	if err != nil {
 		return err
 	}
-
-	err = stream.Send(&proto.PullRequest{
-		Request: &proto.PullRequest_StartReq{
-			StartReq: &proto.StartStreamRequest{
-				// TODO: Generate this or take it from the gherkin.
-				RequestId: ksuid.New().String(),
-				// TODO: Supply namespace in gherkin so we can test failure scenarios.
-				Namespace: ts.taskRequest.GetNamespace(),
-			},
-		},
-	})
+	responses, err := stream.Listen()
 	if err != nil {
 		return err
 	}
 
 	go func() {
-		for {
-			task, err := stream.Recv()
-			if err == io.EOF {
-				fmt.Println("stream closed by server")
-				break
-			}
-			if err != nil {
-				// this is expected when we send the kill signal to the server
-				fmt.Printf("stream error: %v\n", err)
+		for res := range responses {
+			if res.Error != nil {
+				fmt.Println(res.Error)
 				break
 			}
 
-			ts.receivedTasks = append(ts.receivedTasks, task)
-
-			err = stream.Send(&proto.PullRequest{
-				Request: &proto.PullRequest_Ack{
-					Ack: &proto.Ack{
-						TaskId:    task.GetId(),
-						Namespace: task.GetNamespace(),
-					},
-				},
-			})
-			if err != nil {
-				log.Fatalf("ack failed: %v", err)
-			}
+			ts.receivedTasks = append(ts.receivedTasks, res.Task)
+			res.Ack()
 		}
 	}()
 	return nil
@@ -167,7 +132,7 @@ func (ts *taskStreams) iHaveCreatedTheTask(arg1 *godog.DocString) error {
 		Namespace:  taskDef["namespace"].(string),
 		TtsSeconds: int64(taskDef["tts_seconds"].(float64)),
 	}
-	task, err := ts.client.Push(context.Background(), ts.taskRequest)
+	task, err := ts.client.Push(ts.taskRequest)
 	ts.createdTask = task.GetTask()
 	return err
 }
