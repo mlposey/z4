@@ -17,8 +17,28 @@ import (
 	"os/exec"
 	"strings"
 	"syscall"
+	"testing"
 	"time"
 )
+
+// TestTaskStreaming runs the Task Streaming test suite.
+func TestTaskStreaming(t *testing.T) {
+	ts := &taskStreams{}
+	runTestSuite(t, func(sc *godog.ScenarioContext) {
+		sc.Before(func(ctx context.Context, sc *godog.Scenario) (context.Context, error) {
+			return ctx, ts.setupSuite()
+		})
+		sc.After(func(ctx context.Context, sc *godog.Scenario, err error) (context.Context, error) {
+			return ctx, ts.teardownSuite()
+		})
+
+		sc.Step(`^after (\d+) seconds I should receive the same task$`, ts.afterSecondsIShouldReceiveTheSameTask)
+		sc.Step(`^after (\d+) seconds I should receive (\d+) tasks$`, ts.afterSecondsIShouldReceiveTasks)
+		sc.Step(`^I begin streaming after a (\d+) second delay$`, ts.iBeginStreamingAfterASecondDelay)
+		sc.Step(`^I have created the task:$`, ts.iHaveCreatedTheTask)
+	})
+
+}
 
 type taskStreams struct {
 	dbDataDir     string
@@ -219,20 +239,4 @@ func (ts *taskStreams) iHaveCreatedTheTask(arg1 *godog.DocString) error {
 	task, err := ts.client.Push(context.Background(), ts.taskRequest)
 	ts.createdTask = task.GetTask()
 	return err
-}
-
-func InitializeScenario(sc *godog.ScenarioContext) {
-	ts := &taskStreams{}
-
-	sc.Before(func(ctx context.Context, sc *godog.Scenario) (context.Context, error) {
-		return ctx, ts.setupSuite()
-	})
-	sc.After(func(ctx context.Context, sc *godog.Scenario, err error) (context.Context, error) {
-		return ctx, ts.teardownSuite()
-	})
-
-	sc.Step(`^after (\d+) seconds I should receive the same task$`, ts.afterSecondsIShouldReceiveTheSameTask)
-	sc.Step(`^after (\d+) seconds I should receive (\d+) tasks$`, ts.afterSecondsIShouldReceiveTasks)
-	sc.Step(`^I begin streaming after a (\d+) second delay$`, ts.iBeginStreamingAfterASecondDelay)
-	sc.Step(`^I have created the task:$`, ts.iHaveCreatedTheTask)
 }
