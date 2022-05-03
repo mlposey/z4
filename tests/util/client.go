@@ -35,10 +35,12 @@ func NewClient(host string, port int) (*Client, error) {
 	}, nil
 }
 
+// Push sends a task to the queue.
 func (c *Client) Push(req *proto.PushTaskRequest) (*proto.PushTaskResponse, error) {
 	return c.queue.Push(context.Background(), req)
 }
 
+// PullTasks returns a stream for consuming tasks.
 func (c *Client) PullTasks(requestID, namespace string) (*PullTasksStream, error) {
 	return newPullTasksStream(c.queue, requestID, namespace)
 }
@@ -48,6 +50,7 @@ func (c *Client) Close() error {
 	return c.conn.Close()
 }
 
+// PullTasksStream is a handle on a task stream.
 type PullTasksStream struct {
 	stream    proto.Queue_PullClient
 	results   chan StreamTaskResult
@@ -76,6 +79,7 @@ func (s *PullTasksStream) Close() error {
 	return nil
 }
 
+// Listen returns a channel that receives tasks from the server.
 func (s *PullTasksStream) Listen() (<-chan StreamTaskResult, error) {
 	if s.results != nil {
 		return s.results, nil
@@ -134,12 +138,14 @@ func (s *PullTasksStream) startAckHandler() {
 	}
 }
 
+// StreamTaskResult is a task sent from the server.
 type StreamTaskResult struct {
 	Error error
 	Task  *proto.Task
 	acks  chan<- *proto.Ack
 }
 
+// Ack acknowledges the task so that the server does not send it again.
 func (str StreamTaskResult) Ack() {
 	str.acks <- &proto.Ack{
 		Namespace: str.Task.GetNamespace(),
