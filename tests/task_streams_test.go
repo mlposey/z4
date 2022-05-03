@@ -3,20 +3,16 @@ package tests
 import (
 	"context"
 	"encoding/json"
-	"errors"
 	"fmt"
 	"github.com/cucumber/godog"
 	"github.com/mlposey/z4/proto"
+	"github.com/mlposey/z4/tests/util"
 	"github.com/segmentio/ksuid"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials/insecure"
 	pb "google.golang.org/protobuf/proto"
 	"io"
 	"log"
-	"os"
-	"os/exec"
-	"strings"
-	"syscall"
 	"testing"
 	"time"
 )
@@ -41,9 +37,7 @@ func TestTaskStreaming(t *testing.T) {
 }
 
 type taskStreams struct {
-	dbDataDir     string
-	peerDataDir   string
-	server        *os.Process
+	server        *util.LocalServer
 	serverPort    int
 	client        proto.QueueClient
 	taskRequest   *proto.PushTaskRequest
@@ -52,17 +46,15 @@ type taskStreams struct {
 }
 
 func (ts *taskStreams) setupSuite() error {
-	ts.dbDataDir = "/tmp/" + ksuid.New().String()
-	ts.peerDataDir = "/tmp/" + ksuid.New().String()
-	ts.server = nil
 	ts.serverPort = 6355
+	ts.server = util.NewLocalServer(ts.serverPort)
 	ts.client = nil
 	ts.taskRequest = nil
 	ts.createdTask = nil
 	ts.receivedTasks = nil
 
 	err := new(error)
-	ts.doIfOK(err, ts.startServer)
+	ts.doIfOK(err, ts.server.Start)
 	ts.doIfOK(err, ts.createClient)
 	return *err
 }
@@ -71,59 +63,6 @@ func (ts *taskStreams) doIfOK(err *error, do func() error) {
 	if *err == nil {
 		*err = do()
 	}
-}
-
-func (ts *taskStreams) startServer() error {
-	os.Setenv("Z4_DB_DATA_DIR", ts.dbDataDir)
-	os.Setenv("Z4_SERVICE_PORT", fmt.Sprint(ts.serverPort))
-	os.Setenv("Z4_DEBUG_LOGGING_ENABLED", "true")
-	os.Setenv("Z4_PEER_ID", "godog")
-	os.Setenv("Z4_BOOTSTRAP_CLUSTER", "true")
-	os.Setenv("Z4_PEER_DATA_DIR", ts.peerDataDir)
-
-	cmd := exec.Command("bash", "-c", "go run ../cmd/server/*.go")
-
-	// used get print logs later on in this method
-	stdout, err := cmd.StdoutPipe()
-	cmd.Stderr = cmd.Stdout
-	if err != nil {
-		return err
-	}
-
-	// helpful for killing the server / child process
-	// essentially assigns all processes we spawn to this group; we will later
-	// kill the entire group at one time
-	cmd.SysProcAttr = &syscall.SysProcAttr{Setpgid: true}
-
-	err = cmd.Start()
-	if err != nil {
-		return err
-	}
-	ready := make(chan bool)
-	go func() {
-		for {
-			tmp := make([]byte, 1024)
-			_, e := stdout.Read(tmp)
-			fmt.Print("[server]: " + string(tmp))
-			if e != nil {
-				break
-			}
-
-			if strings.Contains(string(tmp), "entering leader state") {
-				ready <- true
-			}
-		}
-	}()
-
-	select {
-	case <-ready:
-		time.Sleep(time.Millisecond * 100)
-	case <-time.NewTimer(time.Second * 10).C:
-		return errors.New("server not started before deadline")
-	}
-
-	ts.server = cmd.Process
-	return nil
 }
 
 func (ts *taskStreams) createClient() error {
@@ -137,15 +76,7 @@ func (ts *taskStreams) createClient() error {
 }
 
 func (ts *taskStreams) teardownSuite() error {
-	if ts.server != nil {
-		err := syscall.Kill(-ts.server.Pid, syscall.SIGKILL)
-		if err != nil {
-			return err
-		}
-		_, err = ts.server.Wait()
-		return err
-	}
-	return nil
+	return ts.server.Stop()
 }
 
 func (ts *taskStreams) afterSecondsIShouldReceiveTheSameTask(arg1 int) error {
