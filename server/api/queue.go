@@ -141,7 +141,6 @@ func (q *Queue) getRunTime(req *proto.PushTaskRequest) time.Time {
 }
 
 func (q *Queue) GetTask(ctx context.Context, req *proto.GetTaskRequest) (*proto.Task, error) {
-	// TODO: Support index query.
 	task, err := q.tasks.Get(req.GetReference().GetNamespace(), req.GetReference().GetTaskId())
 	if err != nil {
 		return nil, status.Errorf(codes.NotFound, "task not found: %v", err)
