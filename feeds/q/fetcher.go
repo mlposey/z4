@@ -1,4 +1,4 @@
-package feeds
+package q
 
 import (
 	"github.com/mlposey/z4/proto"

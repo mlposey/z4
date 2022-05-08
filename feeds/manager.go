@@ -3,6 +3,7 @@ package feeds
 import (
 	"fmt"
 	"github.com/hashicorp/raft"
+	"github.com/mlposey/z4/feeds/q"
 	"github.com/mlposey/z4/storage"
 	"github.com/mlposey/z4/telemetry"
 	"go.uber.org/multierr"
@@ -29,7 +30,7 @@ func NewManager(db *storage.BadgerClient, raft *raft.Raft) *Manager {
 // Tasks provides access to ready tasks from a namespace.
 //
 // This method automatically manages a lease on the feed.
-func (qm *Manager) Tasks(namespace string, handle func(tasks TaskStream) error) error {
+func (qm *Manager) Tasks(namespace string, handle func(tasks q.TaskStream) error) error {
 	lease, err := qm.Lease(namespace)
 	if err != nil {
 		return err

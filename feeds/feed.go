@@ -1,27 +1,25 @@
 package feeds
 
 import (
+	"context"
 	"fmt"
 	"github.com/hashicorp/raft"
+	"github.com/mlposey/z4/feeds/q"
 	"github.com/mlposey/z4/proto"
 	"github.com/mlposey/z4/storage"
 	"github.com/mlposey/z4/telemetry"
-	"go.uber.org/multierr"
 	"go.uber.org/zap"
-	"google.golang.org/protobuf/types/known/timestamppb"
 	"io"
 	"time"
 )
 
-type TaskStream <-chan *proto.Task
-
 // Feed provides access to a stream of tasks that are ready to be delivered.
 type Feed struct {
-	tasks       *storage.TaskStore
-	Namespace   *storage.SyncedNamespace
-	feed        chan *proto.Task
-	close       chan bool
-	ackDeadline time.Duration
+	Namespace      *storage.SyncedNamespace
+	feed           chan *proto.Task
+	scheduledTasks q.TaskReader
+	ctx            context.Context
+	ctxCancel      context.CancelFunc
 }
 
 func New(
@@ -30,20 +28,29 @@ func New(
 	ackDeadline time.Duration,
 	raft *raft.Raft,
 ) (*Feed, error) {
-	q := &Feed{
-		tasks:       storage.NewTaskStore(db),
-		Namespace:   storage.NewSyncedNamespace(storage.NewNamespaceStore(db), namespaceID, raft),
-		feed:        make(chan *proto.Task),
-		close:       make(chan bool),
-		ackDeadline: ackDeadline,
+	ctx, cancel := context.WithCancel(context.Background())
+
+	f := &Feed{
+		Namespace: storage.NewSyncedNamespace(storage.NewNamespaceStore(db), namespaceID, raft),
+		feed:      make(chan *proto.Task),
+		ctx:       ctx,
+		ctxCancel: cancel,
 	}
 
-	if err := q.Namespace.StartSync(); err != nil {
+	if err := f.Namespace.StartSync(); err != nil {
 		return nil, fmt.Errorf("feed creation failed due to namespace error: %w", err)
 	}
 
-	go q.startFeed()
-	return q, nil
+	tasks := storage.NewTaskStore(db)
+	f.scheduledTasks = q.NewScheduledTaskReader(
+		ctx,
+		f.Namespace.N,
+		tasks,
+		ackDeadline,
+	)
+
+	go f.startFeed()
+	return f, nil
 }
 
 func (f *Feed) startFeed() {
@@ -51,38 +58,25 @@ func (f *Feed) startFeed() {
 	telemetry.Logger.Info("feed started",
 		zap.String("namespace", f.Namespace.N.GetId()))
 
+	scheduled := f.scheduledTasks.Tasks()
 	for {
 		select {
-		case <-f.close:
+		case <-f.ctx.Done():
 			return
-		default:
-		}
 
-		pushCount, err := f.pullAndPush()
-		if err != nil {
-			telemetry.Logger.Error("feed operation failed", zap.Error(err))
-			time.Sleep(time.Second)
-			continue
-		}
+		case task := <-scheduled:
+			if err := f.push(task); err != nil {
+				return
+			}
 
-		if pushCount == 0 {
-			time.Sleep(time.Millisecond * 50)
-			continue
+			// TODO: case task := <-fifoTask
 		}
 	}
 }
 
-// pullAndPush loads ready tasks from storage and delivers them to consumers.
-func (f *Feed) pullAndPush() (int, error) {
-	lastDeliveredTaskID := f.Namespace.N.LastDeliveredTask
-	dc, err1 := f.processDelivered(lastDeliveredTaskID)
-	uc, err2 := f.processUndelivered(lastDeliveredTaskID)
-	return dc + uc, multierr.Combine(err1, err2)
-}
-
 func (f *Feed) push(task *proto.Task) error {
 	select {
-	case <-f.close:
+	case <-f.ctx.Done():
 		return io.EOF
 
 	case f.feed <- task:
@@ -90,69 +84,7 @@ func (f *Feed) push(task *proto.Task) error {
 	}
 }
 
-func (f *Feed) processDelivered(lastID string) (int, error) {
-	df := &deliveredTaskFetcher{
-		Tasks:           f.tasks,
-		LastDeliveredID: lastID,
-		Namespace:       f.Namespace.N.GetId(),
-		AckDeadline:     f.ackDeadline,
-	}
-
-	var tasks []*proto.Task
-	err := df.Process(func(task *proto.Task) error {
-		if err := f.push(task); err != nil {
-			return err
-		}
-
-		task.LastRetry = timestamppb.New(time.Now())
-		tasks = append(tasks, task)
-		return nil
-	})
-	if err != nil && err != io.EOF {
-		return len(tasks), err
-	}
-
-	if len(tasks) == 0 {
-		return 0, nil
-	}
-
-	// TODO: Determine if we want to apply this to the Raft log.
-	// It doesn't seem entirely necessary, and not having it should
-	// improve performance. It could be nice to have though.
-	// TODO: Batch task writes using buffers instead of saving one large slice.
-	err = f.tasks.SaveAll(tasks)
-	if err != nil {
-		telemetry.Logger.Error("failed to update retry tasks",
-			zap.Error(err))
-		return len(tasks), err
-	}
-	return len(tasks), nil
-}
-
-func (f *Feed) processUndelivered(lastID string) (int, error) {
-	uf := &undeliveredTaskFetcher{
-		Tasks:     f.tasks,
-		StartID:   lastID,
-		Namespace: f.Namespace.N.GetId(),
-	}
-
-	var count int
-	err := uf.Process(func(task *proto.Task) error {
-		if err := f.push(task); err != nil {
-			return err
-		}
-		f.Namespace.N.LastDeliveredTask = task.GetId()
-		count++
-		return nil
-	})
-
-	if err != nil && err != io.EOF {
-		return count, err
-	}
-	return count, nil
-}
-
-func (f *Feed) Tasks() TaskStream {
+func (f *Feed) Tasks() q.TaskStream {
 	return f.feed
 }
 
@@ -161,7 +93,7 @@ func (f *Feed) Tasks() TaskStream {
 // This method must be called once after the feed is no longer
 // needed.
 func (f *Feed) Close() error {
-	f.close <- true
+	f.ctxCancel()
 	err := f.Namespace.Close()
 	if err != nil {
 		return fmt.Errorf("failed to close feed for namespace '%s': %w", f.Namespace.N.GetId(), err)
