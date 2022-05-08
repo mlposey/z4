@@ -56,11 +56,13 @@ func loadTestStreaming() {
 	for i := 0; i < requestsToSend; i++ {
 		rl.Take()
 		err := stream.Send(&proto.PushTaskRequest{
-			RequestId:  ksuid.New().String(),
-			Namespace:  "load_test",
-			Async:      true,
-			Payload:    []byte("buy eggs"),
-			TtsSeconds: int64(rand.Intn(60)), // 1 hour
+			RequestId: ksuid.New().String(),
+			Namespace: "load_test",
+			Async:     true,
+			Payload:   []byte("buy eggs"),
+			Schedule: &proto.PushTaskRequest_TtsSeconds{
+				TtsSeconds: int64(rand.Intn(60)), // 1 hour
+			},
 		})
 		if err != nil {
 			fmt.Println(err)

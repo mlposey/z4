@@ -149,6 +149,8 @@ type StreamTaskResult struct {
 func (str StreamTaskResult) Ack() {
 	str.acks <- &proto.Ack{
 		Namespace: str.Task.GetNamespace(),
-		TaskId:    str.Task.GetId(),
+		Id: &proto.Ack_TaskId{
+			TaskId: str.Task.GetId(),
+		},
 	}
 }
