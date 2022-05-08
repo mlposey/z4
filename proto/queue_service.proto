@@ -114,7 +114,10 @@ message DeleteTaskRequest {
   string request_id = 1;
   bool async = 2;
   string namespace = 3;
-  string task_id = 4;
+  oneof id {
+    string task_id = 4;
+    uint64 index = 5;
+  }
 }
 
 message DeleteTaskResponse {

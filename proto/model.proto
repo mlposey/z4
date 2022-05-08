@@ -31,7 +31,10 @@ message Task {
 
 message Ack {
   string namespace = 1;
-  string task_id = 2;
+  oneof id {
+    string task_id = 2;
+    uint64 index = 3;
+  }
 }
 
 message Namespace {

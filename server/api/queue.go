@@ -179,7 +179,11 @@ func (q *Queue) Delete(ctx context.Context, req *proto.DeleteTaskRequest) (*prot
 
 	ack := &proto.Ack{
 		Namespace: req.GetNamespace(),
-		TaskId:    req.GetTaskId(),
+	}
+	if req.GetTaskId() == "" {
+		ack.Id = &proto.Ack_Index{Index: req.GetIndex()}
+	} else {
+		ack.Id = &proto.Ack_TaskId{TaskId: req.GetTaskId()}
 	}
 
 	if req.GetAsync() {

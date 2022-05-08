@@ -41,7 +41,7 @@ func (ts *TaskStore) DeleteAll(acks []*proto.Ack) error {
 	defer batch.Cancel()
 
 	for _, ack := range acks {
-		key := getScheduledTaskKey(ack.GetNamespace(), ack.GetTaskId())
+		key := getAckKey(ack)
 		err := batch.Delete(key)
 		if err != nil {
 			return fmt.Errorf("failed to delete task '%s' in batch: %w", ack.GetTaskId(), err)
@@ -60,8 +60,7 @@ func (ts *TaskStore) SaveAll(tasks []*proto.Task) error {
 		if err != nil {
 			return fmt.Errorf("count not encode task '%s': %w", task.GetId(), err)
 		}
-		// TODO: Determine if grouping tasks by namespace before writing is beneficial.
-		key := getScheduledTaskKey(task.GetNamespace(), task.GetId())
+		key := getTaskKey(task)
 		err = batch.Set(key, payload)
 		if err != nil {
 			return fmt.Errorf("failed to write task '%s' from batch: %w", task.GetId(), err)
@@ -93,6 +92,20 @@ func (ts *TaskStore) IterateRange(query TaskRange) (*TaskIterator, error) {
 		return nil, fmt.Errorf("failed to fetch tasks due to invalid query: %w", err)
 	}
 	return NewTaskIterator(ts.Client, query), nil
+}
+
+func getTaskKey(task *proto.Task) []byte {
+	if task.GetScheduleTime() == nil {
+		return getFifoTaskKey(task.GetNamespace(), task.GetIndex())
+	}
+	return getScheduledTaskKey(task.GetNamespace(), task.GetId())
+}
+
+func getAckKey(ack *proto.Ack) []byte {
+	if ack.GetTaskId() == "" {
+		return getFifoTaskKey(ack.GetNamespace(), ack.GetIndex())
+	}
+	return getScheduledTaskKey(ack.GetNamespace(), ack.GetTaskId())
 }
 
 func getScheduledTaskKey(namespaceID, taskID string) []byte {
