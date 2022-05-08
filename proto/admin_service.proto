@@ -3,7 +3,7 @@ package z4;
 option go_package = "github.com/mlposey/z4/proto;proto";
 
 import "google/protobuf/empty.proto";
-import "misc.proto";
+import "model.proto";
 
 // The Admin service supports administrative/maintenance operations.
 service Admin {

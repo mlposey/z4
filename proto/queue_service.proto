@@ -3,6 +3,7 @@ package z4;
 option go_package = "github.com/mlposey/z4/proto;proto";
 
 import "google/protobuf/timestamp.proto";
+import "model.proto";
 
 // The Queue service manages a time-sorted priority queue of tasks.
 service Queue {
@@ -103,25 +104,10 @@ message StartStreamRequest {
   string namespace = 2;
 }
 
-message Ack {
-  string namespace = 1;
-  string task_id = 2;
-}
-
 message GetTaskRequest {
   string request_id = 1;
   string namespace = 2;
   string task_id = 3;
-}
-
-message Task {
-  string id = 1;
-  string namespace = 2;
-  map<string, string> metadata = 3;
-  bytes payload = 4;
-  google.protobuf.Timestamp deliver_at = 5;
-  // Last time the task was sent to the client due to not receiving an ack.
-  google.protobuf.Timestamp last_retry = 6;
 }
 
 message DeleteTaskRequest {
