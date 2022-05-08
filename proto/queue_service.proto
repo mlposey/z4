@@ -106,18 +106,13 @@ message StartStreamRequest {
 
 message GetTaskRequest {
   string request_id = 1;
-  string namespace = 2;
-  string task_id = 3;
+  TaskReference reference = 2;
 }
 
 message DeleteTaskRequest {
   string request_id = 1;
   bool async = 2;
-  string namespace = 3;
-  oneof id {
-    string task_id = 4;
-    uint64 index = 5;
-  }
+  TaskReference reference = 3;
 }
 
 message DeleteTaskResponse {

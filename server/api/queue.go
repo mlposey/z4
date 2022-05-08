@@ -141,13 +141,14 @@ func (q *Queue) getRunTime(req *proto.PushTaskRequest) time.Time {
 }
 
 func (q *Queue) GetTask(ctx context.Context, req *proto.GetTaskRequest) (*proto.Task, error) {
-	task, err := q.tasks.Get(req.GetNamespace(), req.GetTaskId())
+	// TODO: Support index query.
+	task, err := q.tasks.Get(req.GetReference().GetNamespace(), req.GetReference().GetTaskId())
 	if err != nil {
 		return nil, status.Errorf(codes.NotFound, "task not found: %v", err)
 	}
 
 	telemetry.PulledTasks.
-		WithLabelValues("GetTask", req.GetNamespace()).
+		WithLabelValues("GetTask", req.GetReference().GetNamespace()).
 		Inc()
 	return task, nil
 }
@@ -164,7 +165,7 @@ func (q *Queue) Pull(stream proto.Queue_PullServer) error {
 
 func (q *Queue) Delete(ctx context.Context, req *proto.DeleteTaskRequest) (*proto.DeleteTaskResponse, error) {
 	telemetry.RemovedTasks.
-		WithLabelValues("Delete", req.GetNamespace()).
+		WithLabelValues("Delete", req.GetReference().GetNamespace()).
 		Inc()
 
 	if !q.handle.IsLeader() {
@@ -180,12 +181,7 @@ func (q *Queue) Delete(ctx context.Context, req *proto.DeleteTaskRequest) (*prot
 	}
 
 	ack := &proto.Ack{
-		Namespace: req.GetNamespace(),
-	}
-	if req.GetTaskId() == "" {
-		ack.Id = &proto.Ack_Index{Index: req.GetIndex()}
-	} else {
-		ack.Id = &proto.Ack_TaskId{TaskId: req.GetTaskId()}
+		Reference: req.GetReference(),
 	}
 
 	if req.GetAsync() {

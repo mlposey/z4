@@ -148,9 +148,11 @@ type StreamTaskResult struct {
 // Ack acknowledges the task so that the server does not send it again.
 func (str StreamTaskResult) Ack() {
 	str.acks <- &proto.Ack{
-		Namespace: str.Task.GetNamespace(),
-		Id: &proto.Ack_TaskId{
-			TaskId: str.Task.GetId(),
+		Reference: &proto.TaskReference{
+			Namespace: str.Task.GetNamespace(),
+			Id: &proto.TaskReference_TaskId{
+				TaskId: str.Task.GetId(),
+			},
 		},
 	}
 }

@@ -44,7 +44,7 @@ func (ts *TaskStore) DeleteAll(acks []*proto.Ack) error {
 		key := getAckKey(ack)
 		err := batch.Delete(key)
 		if err != nil {
-			return fmt.Errorf("failed to delete task '%s' in batch: %w", ack.GetTaskId(), err)
+			return fmt.Errorf("failed to delete task '%s' in batch: %w", ack.GetReference(), err)
 		}
 	}
 	return batch.Flush()
@@ -102,10 +102,18 @@ func getTaskKey(task *proto.Task) []byte {
 }
 
 func getAckKey(ack *proto.Ack) []byte {
-	if ack.GetTaskId() == "" {
-		return getFifoTaskKey(ack.GetNamespace(), ack.GetIndex())
+	switch v := ack.GetReference().GetId().(type) {
+	case *proto.TaskReference_TaskId:
+		return getScheduledTaskKey(ack.GetReference().GetNamespace(), v.TaskId)
+
+	case *proto.TaskReference_Index:
+		return getFifoTaskKey(ack.GetReference().GetNamespace(), v.Index)
+
+	default:
+		telemetry.Logger.Error("found invalid task reference type",
+			zap.String("namespace", ack.GetReference().GetNamespace()))
+		return nil
 	}
-	return getScheduledTaskKey(ack.GetNamespace(), ack.GetTaskId())
 }
 
 func getScheduledTaskKey(namespaceID, taskID string) []byte {

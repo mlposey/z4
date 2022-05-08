@@ -29,12 +29,23 @@ message Task {
   uint64 index = 7;
 }
 
-message Ack {
+// TaskReference is a unique reference to a task.
+message TaskReference {
+  // The namespace where the task is located.
   string namespace = 1;
+
+  // The id of the task
   oneof id {
+    // The task id if the task was scheduled.
     string task_id = 2;
+
+    // The task index if the task was enqueued.
     uint64 index = 3;
   }
+}
+
+message Ack {
+  TaskReference reference = 1;
 }
 
 message Namespace {
