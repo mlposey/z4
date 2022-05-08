@@ -9,10 +9,13 @@ import (
 )
 
 const (
-	namespaceTableID           = "namespace"
-	namespaceColumnID          = "id"
-	namespaceColumnLastTask    = "last_scheduled_task_id"
-	namespaceColumnLastIndex   = "last_queued_task_index"
+	namespaceTableID  = "namespace"
+	namespaceColumnID = "id"
+
+	// TODO: Find better names for these.
+	namespaceColumnLastTask  = "last_scheduled_task_id"
+	namespaceColumnLastIndex = "last_queued_task_index"
+
 	namespaceColumnAckDeadline = "ack_deadline_seconds"
 )
 
