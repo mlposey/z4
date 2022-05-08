@@ -26,6 +26,7 @@ message Task {
   google.protobuf.Timestamp deliver_at = 5;
   // Last time the task was sent to the client due to not receiving an ack.
   google.protobuf.Timestamp last_retry = 6;
+  uint64 index = 7;
 }
 
 message Ack {
