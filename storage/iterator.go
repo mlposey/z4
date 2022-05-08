@@ -24,14 +24,14 @@ func NewTaskIterator(client *BadgerClient, query TaskRange) *TaskIterator {
 
 	txn := client.DB.NewTransaction(false)
 	it := txn.NewIterator(badger.DefaultIteratorOptions)
-	start := getTaskKey(query.Namespace, query.StartID)
+	start := query.GetStart()
 	it.Seek(start)
 
 	return &TaskIterator{
 		txn:    txn,
 		it:     it,
-		end:    getTaskKey(query.Namespace, query.EndID),
-		prefix: []byte(fmt.Sprintf("task#%s#", query.Namespace)),
+		end:    query.GetEnd(),
+		prefix: query.GetPrefix(),
 	}
 }
 
@@ -103,8 +103,16 @@ func (ti *TaskIterator) Close() error {
 	return nil
 }
 
-// TaskRange is a query for tasks within a time range.
-type TaskRange struct {
+type TaskRange interface {
+	GetNamespace() string
+	GetStart() []byte
+	GetEnd() []byte
+	GetPrefix() []byte
+	Validate() error
+}
+
+// ScheduledRange is a query for tasks within a time range.
+type ScheduledRange struct {
 	// Namespace restricts the search to only tasks in a given namespace.
 	Namespace string
 
@@ -117,13 +125,59 @@ type TaskRange struct {
 	EndID string
 }
 
-// Validate determines whether the TaskRange contains valid properties.
-func (tr TaskRange) Validate() error {
+func (tr *ScheduledRange) GetPrefix() []byte {
+	return []byte(fmt.Sprintf("task#sched#%s#", tr.Namespace))
+}
+
+func (tr *ScheduledRange) GetNamespace() string {
+	return tr.Namespace
+}
+
+func (tr *ScheduledRange) GetStart() []byte {
+	return getScheduledTaskKey(tr.Namespace, tr.StartID)
+}
+
+func (tr *ScheduledRange) GetEnd() []byte {
+	return getScheduledTaskKey(tr.Namespace, tr.EndID)
+}
+
+// Validate determines whether the ScheduledRange contains valid properties.
+func (tr *ScheduledRange) Validate() error {
 	if tr.StartID == "" {
 		return errors.New("missing start id in task range")
 	}
 	if tr.EndID == "" {
 		return errors.New("missing end id in task range")
 	}
+	return nil
+}
+
+// FifoRange is a query for tasks within an index range
+type FifoRange struct {
+	// Namespace restricts the search to only tasks in a given namespace.
+	Namespace string
+
+	StartIndex uint64
+	Limit      uint64
+}
+
+func (fr *FifoRange) GetPrefix() []byte {
+	return []byte(fmt.Sprintf("task#fifo#%s#", fr.Namespace))
+}
+
+func (fr *FifoRange) GetNamespace() string {
+	return fr.Namespace
+}
+
+func (fr *FifoRange) GetStart() []byte {
+	return getFifoTaskKey(fr.Namespace, fr.StartIndex)
+}
+
+func (fr *FifoRange) GetEnd() []byte {
+	return getFifoTaskKey(fr.Namespace, fr.StartIndex+fr.Limit-1)
+}
+
+// Validate determines whether the ScheduledRange contains valid properties.
+func (fr *FifoRange) Validate() error {
 	return nil
 }

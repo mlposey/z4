@@ -1,6 +1,8 @@
 package storage
 
 import (
+	"bytes"
+	"encoding/binary"
 	"fmt"
 	"github.com/dgraph-io/badger/v3"
 	"github.com/mlposey/z4/proto"
@@ -39,7 +41,7 @@ func (ts *TaskStore) DeleteAll(acks []*proto.Ack) error {
 	defer batch.Cancel()
 
 	for _, ack := range acks {
-		key := getTaskKey(ack.GetNamespace(), ack.GetTaskId())
+		key := getScheduledTaskKey(ack.GetNamespace(), ack.GetTaskId())
 		err := batch.Delete(key)
 		if err != nil {
 			return fmt.Errorf("failed to delete task '%s' in batch: %w", ack.GetTaskId(), err)
@@ -59,7 +61,7 @@ func (ts *TaskStore) SaveAll(tasks []*proto.Task) error {
 			return fmt.Errorf("count not encode task '%s': %w", task.GetId(), err)
 		}
 		// TODO: Determine if grouping tasks by namespace before writing is beneficial.
-		key := getTaskKey(task.GetNamespace(), task.GetId())
+		key := getScheduledTaskKey(task.GetNamespace(), task.GetId())
 		err = batch.Set(key, payload)
 		if err != nil {
 			return fmt.Errorf("failed to write task '%s' from batch: %w", task.GetId(), err)
@@ -71,7 +73,7 @@ func (ts *TaskStore) SaveAll(tasks []*proto.Task) error {
 func (ts *TaskStore) Get(namespace, id string) (*proto.Task, error) {
 	var task *proto.Task
 	err := ts.Client.DB.View(func(txn *badger.Txn) error {
-		key := getTaskKey(namespace, id)
+		key := getScheduledTaskKey(namespace, id)
 		item, err := txn.Get(key)
 		if err != nil {
 			return err
@@ -93,6 +95,17 @@ func (ts *TaskStore) IterateRange(query TaskRange) (*TaskIterator, error) {
 	return NewTaskIterator(ts.Client, query), nil
 }
 
-func getTaskKey(namespaceID, taskID string) []byte {
-	return []byte(fmt.Sprintf("task#%s#%s", namespaceID, taskID))
+func getScheduledTaskKey(namespaceID, taskID string) []byte {
+	return []byte(fmt.Sprintf("task#sched#%s#%s", namespaceID, taskID))
+}
+
+func getFifoTaskKey(namespaceID string, index uint64) []byte {
+	buf := bytes.NewBuffer(nil)
+	buf.WriteString(fmt.Sprintf("task#fifo#%s#", namespaceID))
+
+	indexB := make([]byte, 8)
+	binary.BigEndian.PutUint64(indexB, index)
+	buf.Write(indexB)
+
+	return buf.Bytes()
 }
