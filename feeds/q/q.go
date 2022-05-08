@@ -5,8 +5,8 @@ import (
 )
 
 type TaskWriter interface {
-	Push(task *proto.Task) error
-	Acknowledge(taskID *proto.Task)
+	Push(tasks []*proto.Task) error
+	Acknowledge(acks []*proto.Ack) error
 }
 
 type TaskReader interface {
