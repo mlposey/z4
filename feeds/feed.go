@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"github.com/hashicorp/raft"
 	"github.com/mlposey/z4/feeds/q"
+	"github.com/mlposey/z4/feeds/q/fifo"
 	"github.com/mlposey/z4/feeds/q/sched"
 	"github.com/mlposey/z4/proto"
 	"github.com/mlposey/z4/storage"
@@ -18,6 +19,7 @@ type Feed struct {
 	Namespace      *storage.SyncedNamespace
 	feed           chan *proto.Task
 	scheduledTasks q.TaskReader
+	fifoTasks      q.TaskReader
 	ctx            context.Context
 	ctxCancel      context.CancelFunc
 }
@@ -41,11 +43,8 @@ func New(
 	}
 
 	tasks := storage.NewTaskStore(db)
-	f.scheduledTasks = sched.NewScheduledTaskReader(
-		ctx,
-		f.Namespace.N,
-		tasks,
-	)
+	f.scheduledTasks = sched.NewScheduledTaskReader(ctx, f.Namespace.N, tasks)
+	f.fifoTasks = fifo.NewFifoTaskReader(ctx, f.Namespace.N, tasks)
 
 	go f.startFeed()
 	return f, nil
@@ -57,6 +56,7 @@ func (f *Feed) startFeed() {
 		zap.String("namespace", f.Namespace.N.GetId()))
 
 	scheduled := f.scheduledTasks.Tasks()
+	queued := f.fifoTasks.Tasks()
 	for {
 		select {
 		case <-f.ctx.Done():
@@ -67,7 +67,10 @@ func (f *Feed) startFeed() {
 				return
 			}
 
-			// TODO: case task := <-fifoTask
+		case task := <-queued:
+			if err := f.push(task); err != nil {
+				return
+			}
 		}
 	}
 }
