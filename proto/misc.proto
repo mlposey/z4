@@ -21,4 +21,5 @@ message Command {
 message Namespace {
   string id = 1;
   string last_delivered_task = 2;
+  int32 ack_deadline_seconds = 3;
 }

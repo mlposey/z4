@@ -10,7 +10,6 @@ import (
 	"github.com/mlposey/z4/telemetry"
 	"go.uber.org/zap"
 	"io"
-	"time"
 )
 
 // Feed provides access to a stream of tasks that are ready to be delivered.
@@ -25,7 +24,6 @@ type Feed struct {
 func New(
 	namespaceID string,
 	db *storage.BadgerClient,
-	ackDeadline time.Duration,
 	raft *raft.Raft,
 ) (*Feed, error) {
 	ctx, cancel := context.WithCancel(context.Background())
@@ -46,7 +44,6 @@ func New(
 		ctx,
 		f.Namespace.N,
 		tasks,
-		ackDeadline,
 	)
 
 	go f.startFeed()

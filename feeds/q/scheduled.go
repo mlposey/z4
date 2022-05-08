@@ -13,25 +13,22 @@ import (
 )
 
 type scheduledTaskReader struct {
-	namespace   *proto.Namespace
-	tasks       *storage.TaskStore
-	ackDeadline time.Duration
-	ctx         context.Context
-	pipe        chan *proto.Task
+	namespace *proto.Namespace
+	tasks     *storage.TaskStore
+	ctx       context.Context
+	pipe      chan *proto.Task
 }
 
 func NewScheduledTaskReader(
 	ctx context.Context,
 	namespace *proto.Namespace,
 	tasks *storage.TaskStore,
-	ackDeadline time.Duration,
 ) *scheduledTaskReader {
 	reader := &scheduledTaskReader{
-		namespace:   namespace,
-		tasks:       tasks,
-		ackDeadline: ackDeadline,
-		pipe:        make(chan *proto.Task),
-		ctx:         ctx,
+		namespace: namespace,
+		tasks:     tasks,
+		pipe:      make(chan *proto.Task),
+		ctx:       ctx,
 	}
 	go reader.startReadLoop()
 	return reader
@@ -85,11 +82,12 @@ func (q *scheduledTaskReader) push(task *proto.Task) error {
 
 // attempts to redeliver unacknowledged tasks
 func (q *scheduledTaskReader) processDelivered(lastID string) (int, error) {
+	ackDeadline := time.Second * time.Duration(q.namespace.GetAckDeadlineSeconds())
 	df := &deliveredTaskFetcher{
 		Tasks:           q.tasks,
 		LastDeliveredID: lastID,
 		Namespace:       q.namespace.GetId(),
-		AckDeadline:     q.ackDeadline,
+		AckDeadline:     ackDeadline,
 	}
 
 	var tasks []*proto.Task

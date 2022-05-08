@@ -49,7 +49,14 @@ message GetNamespaceRequest {
 
 message UpdateNamespaceRequest {
   string request_id = 1;
+
+  // A new version of the namespace
+  //
+  // The following fields cannot be updated
+  // - id
+  // - last_delivered_task
   Namespace namespace = 2;
+
   // TODO: Add field mask support so we can selectively update parts of the namespace.
 }
 

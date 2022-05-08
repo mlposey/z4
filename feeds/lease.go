@@ -7,7 +7,6 @@ import (
 	"github.com/mlposey/z4/telemetry"
 	"go.uber.org/zap"
 	"sync"
-	"time"
 )
 
 // leaseHolder manages access to a feed.
@@ -25,8 +24,7 @@ func newLeaseHolder(
 	onRemove func(),
 	raft *raft.Raft,
 ) (*leaseHolder, error) {
-	// TODO: Make ack deadline configurable.
-	feed, err := New(namespace, db, time.Minute*5, raft)
+	feed, err := New(namespace, db, raft)
 	if err != nil {
 		return nil, fmt.Errorf("lease creation failed: %w", err)
 	}

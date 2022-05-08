@@ -167,8 +167,13 @@ type UpdateNamespaceRequest struct {
 	sizeCache     protoimpl.SizeCache
 	unknownFields protoimpl.UnknownFields
 
-	RequestId string     `protobuf:"bytes,1,opt,name=request_id,json=requestId,proto3" json:"request_id,omitempty"`
-	Namespace *Namespace `protobuf:"bytes,2,opt,name=namespace,proto3" json:"namespace,omitempty"` // TODO: Add field mask support so we can selectively update parts of the namespace.
+	RequestId string `protobuf:"bytes,1,opt,name=request_id,json=requestId,proto3" json:"request_id,omitempty"`
+	// A new version of the namespace
+	//
+	// The following fields cannot be updated
+	// - id
+	// - last_delivered_task
+	Namespace *Namespace `protobuf:"bytes,2,opt,name=namespace,proto3" json:"namespace,omitempty"`
 }
 
 func (x *UpdateNamespaceRequest) Reset() {
