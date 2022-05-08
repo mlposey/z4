@@ -1,7 +1,8 @@
-package q
+package sched
 
 import (
 	"context"
+	"github.com/mlposey/z4/feeds/q"
 	"github.com/mlposey/z4/proto"
 	"github.com/mlposey/z4/storage"
 	"github.com/mlposey/z4/telemetry"
@@ -12,7 +13,7 @@ import (
 	"time"
 )
 
-type scheduledTaskReader struct {
+type taskReader struct {
 	namespace *proto.Namespace
 	tasks     *storage.TaskStore
 	ctx       context.Context
@@ -23,8 +24,8 @@ func NewScheduledTaskReader(
 	ctx context.Context,
 	namespace *proto.Namespace,
 	tasks *storage.TaskStore,
-) *scheduledTaskReader {
-	reader := &scheduledTaskReader{
+) *taskReader {
+	reader := &taskReader{
 		namespace: namespace,
 		tasks:     tasks,
 		pipe:      make(chan *proto.Task),
@@ -34,21 +35,21 @@ func NewScheduledTaskReader(
 	return reader
 }
 
-func (q *scheduledTaskReader) Tasks() TaskStream {
-	return q.pipe
+func (tr *taskReader) Tasks() q.TaskStream {
+	return tr.pipe
 }
 
-func (q *scheduledTaskReader) startReadLoop() {
+func (tr *taskReader) startReadLoop() {
 	for {
 		select {
-		case <-q.ctx.Done():
+		case <-tr.ctx.Done():
 			telemetry.Logger.Info("scheduled task reader stopped",
-				zap.String("namespace", q.namespace.GetId()))
+				zap.String("namespace", tr.namespace.GetId()))
 			return
 		default:
 		}
 
-		pushCount, err := q.pullAndPush()
+		pushCount, err := tr.pullAndPush()
 		if err != nil {
 			telemetry.Logger.Error("feed operation failed", zap.Error(err))
 			time.Sleep(time.Second)
@@ -63,36 +64,36 @@ func (q *scheduledTaskReader) startReadLoop() {
 }
 
 // pullAndPush loads ready tasks from storage and delivers them to consumers.
-func (q *scheduledTaskReader) pullAndPush() (int, error) {
-	lastDeliveredTaskID := q.namespace.LastDeliveredTask
-	dc, err1 := q.processDelivered(lastDeliveredTaskID)
-	uc, err2 := q.processUndelivered(lastDeliveredTaskID)
+func (tr *taskReader) pullAndPush() (int, error) {
+	lastDeliveredTaskID := tr.namespace.LastDeliveredTask
+	dc, err1 := tr.processDelivered(lastDeliveredTaskID)
+	uc, err2 := tr.processUndelivered(lastDeliveredTaskID)
 	return dc + uc, multierr.Combine(err1, err2)
 }
 
-func (q *scheduledTaskReader) push(task *proto.Task) error {
+func (tr *taskReader) push(task *proto.Task) error {
 	select {
-	case <-q.ctx.Done():
+	case <-tr.ctx.Done():
 		return io.EOF
 
-	case q.pipe <- task:
+	case tr.pipe <- task:
 		return nil
 	}
 }
 
 // attempts to redeliver unacknowledged tasks
-func (q *scheduledTaskReader) processDelivered(lastID string) (int, error) {
-	ackDeadline := time.Second * time.Duration(q.namespace.GetAckDeadlineSeconds())
+func (tr *taskReader) processDelivered(lastID string) (int, error) {
+	ackDeadline := time.Second * time.Duration(tr.namespace.GetAckDeadlineSeconds())
 	df := &deliveredTaskFetcher{
-		Tasks:           q.tasks,
+		Tasks:           tr.tasks,
 		LastDeliveredID: lastID,
-		Namespace:       q.namespace.GetId(),
+		Namespace:       tr.namespace.GetId(),
 		AckDeadline:     ackDeadline,
 	}
 
 	var tasks []*proto.Task
 	err := df.Process(func(task *proto.Task) error {
-		if err := q.push(task); err != nil {
+		if err := tr.push(task); err != nil {
 			return err
 		}
 
@@ -112,7 +113,7 @@ func (q *scheduledTaskReader) processDelivered(lastID string) (int, error) {
 	// It doesn't seem entirely necessary, and not having it should
 	// improve performance. It could be nice to have though.
 	// TODO: Batch task writes using buffers instead of saving one large slice.
-	err = q.tasks.SaveAll(tasks)
+	err = tr.tasks.SaveAll(tasks)
 	if err != nil {
 		telemetry.Logger.Error("failed to update retry tasks",
 			zap.Error(err))
@@ -122,19 +123,19 @@ func (q *scheduledTaskReader) processDelivered(lastID string) (int, error) {
 }
 
 // attempts to deliver new tasks
-func (q *scheduledTaskReader) processUndelivered(lastID string) (int, error) {
+func (tr *taskReader) processUndelivered(lastID string) (int, error) {
 	uf := &undeliveredTaskFetcher{
-		Tasks:     q.tasks,
+		Tasks:     tr.tasks,
 		StartID:   lastID,
-		Namespace: q.namespace.GetId(),
+		Namespace: tr.namespace.GetId(),
 	}
 
 	var count int
 	err := uf.Process(func(task *proto.Task) error {
-		if err := q.push(task); err != nil {
+		if err := tr.push(task); err != nil {
 			return err
 		}
-		q.namespace.LastDeliveredTask = task.GetId()
+		tr.namespace.LastDeliveredTask = task.GetId()
 		count++
 		return nil
 	})

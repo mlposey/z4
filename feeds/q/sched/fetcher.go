@@ -1,4 +1,4 @@
-package q
+package sched
 
 import (
 	"github.com/mlposey/z4/proto"

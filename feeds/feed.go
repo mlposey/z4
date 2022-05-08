@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"github.com/hashicorp/raft"
 	"github.com/mlposey/z4/feeds/q"
+	"github.com/mlposey/z4/feeds/q/sched"
 	"github.com/mlposey/z4/proto"
 	"github.com/mlposey/z4/storage"
 	"github.com/mlposey/z4/telemetry"
@@ -40,7 +41,7 @@ func New(
 	}
 
 	tasks := storage.NewTaskStore(db)
-	f.scheduledTasks = q.NewScheduledTaskReader(
+	f.scheduledTasks = sched.NewScheduledTaskReader(
 		ctx,
 		f.Namespace.N,
 		tasks,
