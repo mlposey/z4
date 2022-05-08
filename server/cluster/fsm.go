@@ -4,6 +4,7 @@ import (
 	"errors"
 	"github.com/dgraph-io/badger/v3"
 	"github.com/hashicorp/raft"
+	"github.com/mlposey/z4/feeds/q"
 	"github.com/mlposey/z4/proto"
 	"github.com/mlposey/z4/storage"
 	"github.com/mlposey/z4/telemetry"
@@ -13,17 +14,17 @@ import (
 
 // stateMachine uses raft logs to modify the task database.
 type stateMachine struct {
-	db *badger.DB
-	ts *storage.TaskStore
-	ns *storage.NamespaceStore
+	db     *badger.DB
+	writer q.TaskWriter
+	ns     *storage.NamespaceStore
 }
 
-func newFSM(db *badger.DB, ts *storage.TaskStore, ns *storage.NamespaceStore) *stateMachine {
+func newFSM(db *badger.DB, ts q.TaskWriter, ns *storage.NamespaceStore) *stateMachine {
 	// TODO: Do not pass a *badger.DB directly. Create a new type.
 	return &stateMachine{
-		db: db,
-		ts: ts,
-		ns: ns,
+		db:     db,
+		writer: ts,
+		ns:     ns,
 	}
 }
 
@@ -47,6 +48,9 @@ func (f *stateMachine) ApplyBatch(logs []*raft.Log) []interface{} {
 
 		switch v := cmd.GetCmd().(type) {
 		case *proto.Command_Task:
+			if v.Task.GetScheduleTime() == nil {
+				v.Task.Index = log.Index
+			}
 			tasks = append(tasks, v.Task)
 
 		case *proto.Command_Ack:
@@ -76,14 +80,14 @@ func (f *stateMachine) ApplyBatch(logs []*raft.Log) []interface{} {
 	}
 
 	if len(tasks) > 0 {
-		err := f.ts.SaveAll(tasks)
+		err := f.writer.Push(tasks)
 		if err != nil {
 			return f.packErrors(err, res)
 		}
 	}
 
 	if len(acks) > 0 {
-		err := f.ts.DeleteAll(acks)
+		err := f.writer.Acknowledge(acks)
 		if err != nil {
 			return f.packErrors(err, res)
 		}

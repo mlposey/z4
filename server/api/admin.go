@@ -82,12 +82,11 @@ func (a *Admin) UpdateNamespace(ctx context.Context, req *proto.UpdateNamespaceR
 	defer feed.Release()
 
 	ns := feed.Feed().Namespace.N
-	// Once we're ready to support actual updates, they should be performed
-	// by updating values of ns. Because it is a synced config, changes will be
-	// applied to the raft log behind the scenes.
-	//
 	// Important note: Do not update the value of the namespace id or the
 	// last delivered task.
+	if req.GetNamespace().GetAckDeadlineSeconds() != 0 {
+		ns.AckDeadlineSeconds = req.GetNamespace().GetAckDeadlineSeconds()
+	}
 	return ns, nil
 }
 

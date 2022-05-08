@@ -10,6 +10,7 @@ import (
 	"github.com/segmentio/ksuid"
 	"go.uber.org/zap"
 	pb "google.golang.org/protobuf/proto"
+	"math"
 	"time"
 )
 
@@ -70,9 +71,12 @@ func (sn *SyncedNamespace) load() error {
 		return fmt.Errorf("failed to load namespace from database: %w", err)
 	}
 
+	// Default settings for new namespaces go here.
 	sn.N = &proto.Namespace{
-		Id:                sn.namespace,
-		LastDeliveredTask: NewTaskID(ksuid.Nil.Time()),
+		Id:                 sn.namespace,
+		LastTask:           NewTaskID(ksuid.Nil.Time()),
+		LastIndex:          math.MaxUint64,
+		AckDeadlineSeconds: 300, // 5 minutes
 	}
 
 	err = sn.trySave()

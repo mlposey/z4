@@ -76,7 +76,7 @@ func (tb *TaskBroker) startAckListener() {
 		}
 
 		telemetry.RemovedTasks.
-			WithLabelValues("Ack", req.GetAck().GetNamespace()).
+			WithLabelValues("Ack", req.GetAck().GetReference().GetNamespace()).
 			Inc()
 
 		// This is intentionally async.

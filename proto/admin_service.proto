@@ -3,7 +3,7 @@ package z4;
 option go_package = "github.com/mlposey/z4/proto;proto";
 
 import "google/protobuf/empty.proto";
-import "misc.proto";
+import "model.proto";
 
 // The Admin service supports administrative/maintenance operations.
 service Admin {
@@ -49,7 +49,14 @@ message GetNamespaceRequest {
 
 message UpdateNamespaceRequest {
   string request_id = 1;
+
+  // A new version of the namespace
+  //
+  // The following fields cannot be updated
+  // - id
+  // - last_delivered_task
   Namespace namespace = 2;
+
   // TODO: Add field mask support so we can selectively update parts of the namespace.
 }
 

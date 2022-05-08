@@ -3,6 +3,7 @@ package z4;
 option go_package = "github.com/mlposey/z4/proto;proto";
 
 import "google/protobuf/timestamp.proto";
+import "model.proto";
 
 // The Queue service manages a time-sorted priority queue of tasks.
 service Queue {
@@ -25,6 +26,8 @@ service Queue {
   rpc Pull(stream PullRequest) returns (stream Task) {};
 
   // Get retrieves a task by its ID.
+  //
+  // This rpc only works for scheduled tasks.
   rpc Get(GetTaskRequest) returns (Task) {};
 
   // Delete removes a task from the queue before it is delivered.
@@ -57,15 +60,15 @@ message PushTaskRequest {
   // An arbitrary task payload.
   bytes payload = 5;
 
-  // The time when the task should be delivered to consumers.
-  //
-  // Use this field or tts_seconds, not both.
-  google.protobuf.Timestamp deliver_at = 6;
+  // Optional schedule for the task if it should be
+  // delivered at a specific time.
+  oneof schedule {
+    // The time when the task should be delivered to consumers.
+    google.protobuf.Timestamp schedule_time = 6;
 
-  // The amount of time to wait before delivering the task to consumers.
-  //
-  // Use this field or deliver_at, not both.
-  int64 tts_seconds = 7;
+    // The amount of time to wait before delivering the task to consumers.
+    int64 tts_seconds = 7;
+  }
 }
 
 // PushTaskResponse is the result of adding a task to the queue.
@@ -103,32 +106,15 @@ message StartStreamRequest {
   string namespace = 2;
 }
 
-message Ack {
-  string namespace = 1;
-  string task_id = 2;
-}
-
 message GetTaskRequest {
   string request_id = 1;
-  string namespace = 2;
-  string task_id = 3;
-}
-
-message Task {
-  string id = 1;
-  string namespace = 2;
-  map<string, string> metadata = 3;
-  bytes payload = 4;
-  google.protobuf.Timestamp deliver_at = 5;
-  // Last time the task was sent to the client due to not receiving an ack.
-  google.protobuf.Timestamp last_retry = 6;
+  TaskReference reference = 2;
 }
 
 message DeleteTaskRequest {
   string request_id = 1;
   bool async = 2;
-  string namespace = 3;
-  string task_id = 4;
+  TaskReference reference = 3;
 }
 
 message DeleteTaskResponse {

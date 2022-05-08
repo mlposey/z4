@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"github.com/hashicorp/raft"
 	boltdb "github.com/hashicorp/raft-boltdb"
+	"github.com/mlposey/z4/feeds/q"
 	"github.com/mlposey/z4/storage"
 	"github.com/mlposey/z4/telemetry"
 	"go.uber.org/multierr"
@@ -103,7 +104,8 @@ func (p *Peer) joinNetwork() error {
 		return fmt.Errorf("could not create transport for raft peer: %w", err)
 	}
 
-	fsm := newFSM(p.config.DB.DB, p.config.Tasks, p.config.Namespaces)
+	writer := q.NewTaskWriter(p.config.Tasks)
+	fsm := newFSM(p.config.DB.DB, writer, p.config.Namespaces)
 	p.Raft, err = raft.NewRaft(
 		c,
 		fsm,

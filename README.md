@@ -1,14 +1,25 @@
 > This project is in an experimental state and not yet ready for production.
 
 # z4
-z4 is a task scheduling service. It accepts information about actions that should take place
-in the future and then informs consumers when the actions should be performed.
+z4 is a distributed task queue.
 
 Main features
-* Distributed database model that offers durability and automated failure recovery
-* High-throughput gRPC service for writing and consuming tasks
-* At-least-once delivery of scheduled tasks
-* SQL interface for use with MySQL-compatible tools
+* Flexible APIs
+  * Tasks are published and consumed using a high-throughput gRPC service.
+  * Tasks can be queried using SQL.
+* Durability
+  * Tasks are persisted until acknowledged by consumers (at-least-once delivery).
+  * Data is replicated across multiple peers in a cluster.
+* Multiple delivery modes
+  * Tasks can be delivered in the order they are published or scheduled for delivery
+    at a specific time.
+* Availability
+  * Clusters automatically recover when replicas fail.
+* Small footprint
+  * z4 does not rely on external dependencies like queues or databases to store tasks. It manages
+    its own data.
+  * Resource consumption is low compared to other open-source queue implementations
+    like Apache Kafka. This enables good performance on cheap hardware.
 
 ## Contents
 * [Architecture](#architecture)

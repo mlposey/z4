@@ -128,7 +128,7 @@ func (r *taskTableIterator) initBounds() error {
 		return fmt.Errorf("missing required namespace in query")
 	}
 
-	r.it = storage.NewTaskIterator(r.store.Client, storage.TaskRange{
+	r.it = storage.NewTaskIterator(r.store.Client, &storage.ScheduledRange{
 		Namespace: r.namespace,
 		StartID:   storage.NewTaskID(r.rangeStart),
 		EndID:     storage.NewTaskID(r.rangeEnd),
@@ -300,7 +300,7 @@ func (r *taskTableIterator) rowFromTask(task *proto.Task) sql.Row {
 	return sql.NewRow(
 		task.GetNamespace(),
 		task.GetId(),
-		task.GetDeliverAt().AsTime(),
+		task.GetScheduleTime().AsTime(),
 		lastRetry,
 		sql.JSONDocument{Val: task.GetMetadata()},
 		task.GetPayload(),

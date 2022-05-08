@@ -1,4 +1,4 @@
-package feeds
+package sched
 
 import (
 	"github.com/mlposey/z4/proto"
@@ -18,7 +18,7 @@ type undeliveredTaskFetcher struct {
 }
 
 func (utf *undeliveredTaskFetcher) Process(handle func(task *proto.Task) error) error {
-	it := storage.NewTaskIterator(utf.Tasks.Client, storage.TaskRange{
+	it := storage.NewTaskIterator(utf.Tasks.Client, &storage.ScheduledRange{
 		Namespace: utf.Namespace,
 		StartID:   utf.StartID,
 		EndID:     storage.NewTaskID(time.Now()),
@@ -57,7 +57,7 @@ func (dtf *deliveredTaskFetcher) Process(handle func(task *proto.Task) error) er
 	dtf.lastDelivery = startTask.Time()
 
 	dtf.watermark = time.Now().Add(-dtf.AckDeadline)
-	it := storage.NewTaskIterator(dtf.Tasks.Client, storage.TaskRange{
+	it := storage.NewTaskIterator(dtf.Tasks.Client, &storage.ScheduledRange{
 		Namespace: dtf.Namespace,
 		StartID:   storage.NewTaskID(ksuid.Nil.Time()),
 		EndID:     storage.NewTaskID(dtf.watermark),

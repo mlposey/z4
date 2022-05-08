@@ -127,8 +127,12 @@ func consume(client proto.QueueClient, namespace string) {
 		err = stream.Send(&proto.PullRequest{
 			Request: &proto.PullRequest_Ack{
 				Ack: &proto.Ack{
-					TaskId:    task.GetId(),
-					Namespace: task.GetNamespace(),
+					Reference: &proto.TaskReference{
+						Namespace: task.GetNamespace(),
+						Id: &proto.TaskReference_TaskId{
+							TaskId: task.GetId(),
+						},
+					},
 				},
 			},
 		})

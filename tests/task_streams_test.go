@@ -124,9 +124,11 @@ func (ts *taskStreams) iHaveCreatedTheTask(arg1 *godog.DocString) error {
 	}
 
 	ts.taskRequest = &proto.PushTaskRequest{
-		RequestId:  ksuid.New().String(),
-		Namespace:  taskDef["namespace"].(string),
-		TtsSeconds: int64(taskDef["tts_seconds"].(float64)),
+		RequestId: ksuid.New().String(),
+		Namespace: taskDef["namespace"].(string),
+		Schedule: &proto.PushTaskRequest_TtsSeconds{
+			TtsSeconds: int64(taskDef["tts_seconds"].(float64)),
+		},
 	}
 	task, err := ts.client.Push(ts.taskRequest)
 	ts.createdTask = task.GetTask()
