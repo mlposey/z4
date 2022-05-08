@@ -3,6 +3,9 @@ package fifo
 import (
 	"github.com/mlposey/z4/proto"
 	"github.com/mlposey/z4/storage"
+	"github.com/mlposey/z4/telemetry"
+	"github.com/segmentio/ksuid"
+	"go.uber.org/zap"
 	"time"
 )
 
@@ -52,7 +55,17 @@ func (dtf *deliveredTaskFetcher) Process(handle func(task *proto.Task) error) er
 }
 
 func (dtf *deliveredTaskFetcher) retryTask(task *proto.Task) bool {
-	lastRetry := task.GetLastRetry().AsTime()
-	return task.GetScheduleTime().AsTime().Before(dtf.watermark) &&
-		(lastRetry.IsZero() || lastRetry.Before(dtf.watermark))
+	id, err := ksuid.Parse(task.GetId())
+	if err != nil {
+		telemetry.Logger.Error("could not parse id from fifo task",
+			zap.Error(err))
+		return false
+	}
+	createdAt := id.Time()
+
+	if task.GetLastRetry() == nil {
+		return createdAt.Before(dtf.watermark)
+	} else {
+		return task.GetLastRetry().AsTime().Before(dtf.watermark)
+	}
 }

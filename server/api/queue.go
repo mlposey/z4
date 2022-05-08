@@ -134,8 +134,10 @@ func (q *Queue) makeTask(req *proto.PushTaskRequest) *proto.Task {
 func (q *Queue) getRunTime(req *proto.PushTaskRequest) time.Time {
 	if req.GetTtsSeconds() > 0 {
 		return time.Now().Add(time.Duration(req.GetTtsSeconds()) * time.Second)
+	} else if req.GetScheduleTime() != nil {
+		return req.GetScheduleTime().AsTime()
 	}
-	return req.GetScheduleTime().AsTime()
+	return time.Time{}
 }
 
 func (q *Queue) GetTask(ctx context.Context, req *proto.GetTaskRequest) (*proto.Task, error) {
