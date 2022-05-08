@@ -104,7 +104,7 @@ func (p *Peer) joinNetwork() error {
 		return fmt.Errorf("could not create transport for raft peer: %w", err)
 	}
 
-	writer := q.NewScheduledTaskWriter(p.config.Tasks)
+	writer := q.NewTaskWriter(p.config.Tasks)
 	fsm := newFSM(p.config.DB.DB, writer, p.config.Namespaces)
 	p.Raft, err = raft.NewRaft(
 		c,
