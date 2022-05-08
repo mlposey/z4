@@ -124,10 +124,9 @@ func getFifoTaskKey(namespaceID string, index uint64) []byte {
 	buf := bytes.NewBuffer(nil)
 	buf.WriteString(fmt.Sprintf("task#fifo#%s#", namespaceID))
 
-	/*indexB := make([]byte, 8)
+	indexB := make([]byte, 8)
 	binary.BigEndian.PutUint64(indexB, index)
-	buf.Write(indexB)*/
-	_ = binary.Write(buf, binary.BigEndian, index)
+	buf.Write(indexB)
 
 	return buf.Bytes()
 }
