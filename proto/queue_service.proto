@@ -58,15 +58,15 @@ message PushTaskRequest {
   // An arbitrary task payload.
   bytes payload = 5;
 
-  // The time when the task should be delivered to consumers.
-  //
-  // Use this field or tts_seconds, not both.
-  google.protobuf.Timestamp deliver_at = 6;
+  // Optional schedule for the task if it should be
+  // delivered at a specific time.
+  oneof schedule {
+    // The time when the task should be delivered to consumers.
+    google.protobuf.Timestamp schedule_time = 6;
 
-  // The amount of time to wait before delivering the task to consumers.
-  //
-  // Use this field or deliver_at, not both.
-  int64 tts_seconds = 7;
+    // The amount of time to wait before delivering the task to consumers.
+    int64 tts_seconds = 7;
+  }
 }
 
 // PushTaskResponse is the result of adding a task to the queue.

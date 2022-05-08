@@ -300,7 +300,7 @@ func (r *taskTableIterator) rowFromTask(task *proto.Task) sql.Row {
 	return sql.NewRow(
 		task.GetNamespace(),
 		task.GetId(),
-		task.GetDeliverAt().AsTime(),
+		task.GetScheduleTime().AsTime(),
 		lastRetry,
 		sql.JSONDocument{Val: task.GetMetadata()},
 		task.GetPayload(),

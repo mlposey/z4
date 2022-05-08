@@ -48,7 +48,7 @@ func (f *stateMachine) ApplyBatch(logs []*raft.Log) []interface{} {
 
 		switch v := cmd.GetCmd().(type) {
 		case *proto.Command_Task:
-			if v.Task.GetDeliverAt() == nil {
+			if v.Task.GetScheduleTime() == nil {
 				v.Task.Index = log.Index
 			}
 			tasks = append(tasks, v.Task)

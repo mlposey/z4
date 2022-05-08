@@ -126,7 +126,7 @@ func (q *Queue) makeTask(req *proto.PushTaskRequest) *proto.Task {
 		task.Id = storage.NewTaskID(time.Now())
 	} else {
 		task.Id = storage.NewTaskID(ts)
-		task.DeliverAt = timestamppb.New(ts)
+		task.ScheduleTime = timestamppb.New(ts)
 	}
 	return task
 }
@@ -135,7 +135,7 @@ func (q *Queue) getRunTime(req *proto.PushTaskRequest) time.Time {
 	if req.GetTtsSeconds() > 0 {
 		return time.Now().Add(time.Duration(req.GetTtsSeconds()) * time.Second)
 	}
-	return req.GetDeliverAt().AsTime()
+	return req.GetScheduleTime().AsTime()
 }
 
 func (q *Queue) GetTask(ctx context.Context, req *proto.GetTaskRequest) (*proto.Task, error) {
