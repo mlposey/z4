@@ -1,4 +1,4 @@
-package sched
+package fifo
 
 import (
 	"context"
@@ -20,7 +20,7 @@ type taskReader struct {
 	pipe      chan *proto.Task
 }
 
-func NewScheduledTaskReader(
+func NewFifoTaskReader(
 	ctx context.Context,
 	namespace *proto.Namespace,
 	tasks *storage.TaskStore,
@@ -43,7 +43,7 @@ func (tr *taskReader) startReadLoop() {
 	for {
 		select {
 		case <-tr.ctx.Done():
-			telemetry.Logger.Info("scheduled task reader stopped",
+			telemetry.Logger.Info("fifo task reader stopped",
 				zap.String("namespace", tr.namespace.GetId()))
 			return
 		default:
@@ -65,9 +65,9 @@ func (tr *taskReader) startReadLoop() {
 
 // pullAndPush loads ready tasks from storage and delivers them to consumers.
 func (tr *taskReader) pullAndPush() (int, error) {
-	lastDeliveredTaskID := tr.namespace.LastDeliveredTask
-	dc, err1 := tr.processDelivered(lastDeliveredTaskID)
-	uc, err2 := tr.processUndelivered(lastDeliveredTaskID)
+	lastIndex := tr.namespace.LastIndex
+	dc, err1 := tr.processDelivered(lastIndex)
+	uc, err2 := tr.processUndelivered(lastIndex)
 	return dc + uc, multierr.Combine(err1, err2)
 }
 
@@ -82,13 +82,13 @@ func (tr *taskReader) push(task *proto.Task) error {
 }
 
 // attempts to redeliver unacknowledged tasks
-func (tr *taskReader) processDelivered(lastID string) (int, error) {
+func (tr *taskReader) processDelivered(lastIndex uint64) (int, error) {
 	ackDeadline := time.Second * time.Duration(tr.namespace.GetAckDeadlineSeconds())
 	df := &deliveredTaskFetcher{
-		Tasks:           tr.tasks,
-		LastDeliveredID: lastID,
-		Namespace:       tr.namespace.GetId(),
-		AckDeadline:     ackDeadline,
+		Tasks:              tr.tasks,
+		LastDeliveredIndex: lastIndex,
+		Namespace:          tr.namespace.GetId(),
+		AckDeadline:        ackDeadline,
 	}
 
 	var tasks []*proto.Task
@@ -123,11 +123,11 @@ func (tr *taskReader) processDelivered(lastID string) (int, error) {
 }
 
 // attempts to deliver new tasks
-func (tr *taskReader) processUndelivered(lastID string) (int, error) {
+func (tr *taskReader) processUndelivered(lastIndex uint64) (int, error) {
 	uf := &undeliveredTaskFetcher{
-		Tasks:     tr.tasks,
-		StartID:   lastID,
-		Namespace: tr.namespace.GetId(),
+		Tasks:      tr.tasks,
+		StartIndex: lastIndex + 1,
+		Namespace:  tr.namespace.GetId(),
 	}
 
 	var count int
@@ -135,7 +135,7 @@ func (tr *taskReader) processUndelivered(lastID string) (int, error) {
 		if err := tr.push(task); err != nil {
 			return err
 		}
-		tr.namespace.LastDeliveredTask = task.GetId()
+		tr.namespace.LastIndex = task.GetIndex()
 		count++
 		return nil
 	})

@@ -9,10 +9,10 @@ import (
 )
 
 const (
-	namespaceTableID                 = "namespace"
-	namespaceColumnID                = "id"
-	namespaceColumnLastDeliveredTask = "last_delivered_task"
-	namespaceColumnAckDeadline       = "ack_deadline_seconds"
+	namespaceTableID           = "namespace"
+	namespaceColumnID          = "id"
+	namespaceColumnLastTask    = "last_delivered_task"
+	namespaceColumnAckDeadline = "ack_deadline_seconds"
 )
 
 type namespaceTable struct {
@@ -28,7 +28,7 @@ func newNamespaceTable(namespaces *storage.NamespaceStore) *namespaceTable {
 		name: namespaceTableID,
 		schema: sql.Schema{
 			{Name: namespaceColumnID, Type: sql.Text, Nullable: false, Source: namespaceTableID},
-			{Name: namespaceColumnLastDeliveredTask, Type: sql.Text, Nullable: true, Source: namespaceTableID},
+			{Name: namespaceColumnLastTask, Type: sql.Text, Nullable: true, Source: namespaceTableID},
 			{Name: namespaceColumnAckDeadline, Type: sql.Uint32, Nullable: false, Source: namespaceTableID},
 		},
 		namespaces: namespaces,
@@ -85,7 +85,7 @@ func (r *namespaceTableIterator) Next() (sql.Row, error) {
 func (r *namespaceTableIterator) rowFromNamespace(namespace *proto.Namespace) sql.Row {
 	return sql.NewRow(
 		namespace.GetId(),
-		namespace.GetLastDeliveredTask(),
+		namespace.GetLastTask(),
 		namespace.GetAckDeadlineSeconds(),
 	)
 }

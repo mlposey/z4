@@ -158,7 +158,7 @@ type FifoRange struct {
 	Namespace string
 
 	StartIndex uint64
-	Limit      uint64
+	EndIndex   uint64
 }
 
 func (fr *FifoRange) GetPrefix() []byte {
@@ -174,7 +174,7 @@ func (fr *FifoRange) GetStart() []byte {
 }
 
 func (fr *FifoRange) GetEnd() []byte {
-	return getFifoTaskKey(fr.Namespace, fr.StartIndex+fr.Limit-1)
+	return getFifoTaskKey(fr.Namespace, fr.EndIndex)
 }
 
 // Validate determines whether the ScheduledRange contains valid properties.
