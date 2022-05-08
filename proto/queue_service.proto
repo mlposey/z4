@@ -26,6 +26,8 @@ service Queue {
   rpc Pull(stream PullRequest) returns (stream Task) {};
 
   // Get retrieves a task by its ID.
+  //
+  // This rpc only works for scheduled tasks.
   rpc Get(GetTaskRequest) returns (Task) {};
 
   // Delete removes a task from the queue before it is delivered.

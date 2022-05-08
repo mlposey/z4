@@ -38,6 +38,8 @@ type QueueClient interface {
 	// This rpc must be called on the leader.
 	Pull(ctx context.Context, opts ...grpc.CallOption) (Queue_PullClient, error)
 	// Get retrieves a task by its ID.
+	//
+	// This rpc only works for scheduled tasks.
 	Get(ctx context.Context, in *GetTaskRequest, opts ...grpc.CallOption) (*Task, error)
 	// Delete removes a task from the queue before it is delivered.
 	//
@@ -165,6 +167,8 @@ type QueueServer interface {
 	// This rpc must be called on the leader.
 	Pull(Queue_PullServer) error
 	// Get retrieves a task by its ID.
+	//
+	// This rpc only works for scheduled tasks.
 	Get(context.Context, *GetTaskRequest) (*Task, error)
 	// Delete removes a task from the queue before it is delivered.
 	//
