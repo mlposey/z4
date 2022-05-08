@@ -51,18 +51,6 @@ func (ts *TaskStore) DeleteAll(acks []*proto.Ack) error {
 	return batch.Flush()
 }
 
-func (ts *TaskStore) Save(task *proto.Task) error {
-	telemetry.Logger.Debug("writing task to DB", zap.Any("task", task))
-	return ts.Client.DB.Update(func(txn *badger.Txn) error {
-		payload, err := pb.Marshal(task)
-		if err != nil {
-			return fmt.Errorf("could not encode task: %w", err)
-		}
-		key := getTaskKey(task.GetNamespace(), task.GetId())
-		return txn.Set(key, payload)
-	})
-}
-
 func (ts *TaskStore) SaveAll(tasks []*proto.Task) error {
 	telemetry.Logger.Debug("writing task batch to DB", zap.Int("count", len(tasks)))
 	batch := ts.Client.DB.NewWriteBatch()
