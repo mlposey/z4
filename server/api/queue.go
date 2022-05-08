@@ -90,13 +90,7 @@ func (q *Queue) createTask(ctx context.Context, req *proto.PushTaskRequest) (*pr
 		return res, err
 	}
 
-	task := &proto.Task{
-		Id:        storage.NewTaskID(q.getRunTime(req)),
-		Namespace: req.GetNamespace(),
-		DeliverAt: timestamppb.New(q.getRunTime(req)),
-		Metadata:  req.GetMetadata(),
-		Payload:   req.GetPayload(),
-	}
+	task := q.makeTask(req)
 
 	if req.GetAsync() {
 		cluster.ApplySaveTaskCommand(q.raft, task)
@@ -121,6 +115,29 @@ func (q *Queue) forwardPushRequest(
 	return client.Push(ctx, req)
 }
 
+func (q *Queue) makeTask(req *proto.PushTaskRequest) *proto.Task {
+	task := &proto.Task{
+		Namespace: req.GetNamespace(),
+		Metadata:  req.GetMetadata(),
+		Payload:   req.GetPayload(),
+	}
+	ts := q.getRunTime(req)
+	if ts.IsZero() {
+		task.Id = storage.NewTaskID(time.Now())
+	} else {
+		task.Id = storage.NewTaskID(ts)
+		task.DeliverAt = timestamppb.New(ts)
+	}
+	return task
+}
+
+func (q *Queue) getRunTime(req *proto.PushTaskRequest) time.Time {
+	if req.GetTtsSeconds() > 0 {
+		return time.Now().Add(time.Duration(req.GetTtsSeconds()) * time.Second)
+	}
+	return req.GetDeliverAt().AsTime()
+}
+
 func (q *Queue) GetTask(ctx context.Context, req *proto.GetTaskRequest) (*proto.Task, error) {
 	task, err := q.tasks.Get(req.GetNamespace(), req.GetTaskId())
 	if err != nil {
@@ -141,13 +158,6 @@ func (q *Queue) Pull(stream proto.Queue_PullServer) error {
 	broker := feeds.NewTaskBroker(stream, q.fm, q.raft)
 	defer broker.Close()
 	return broker.Start()
-}
-
-func (q *Queue) getRunTime(req *proto.PushTaskRequest) time.Time {
-	if req.GetTtsSeconds() > 0 {
-		return time.Now().Add(time.Duration(req.GetTtsSeconds()) * time.Second)
-	}
-	return req.GetDeliverAt().AsTime()
 }
 
 func (q *Queue) Delete(ctx context.Context, req *proto.DeleteTaskRequest) (*proto.DeleteTaskResponse, error) {
