@@ -15,7 +15,7 @@ require (
 	go.uber.org/multierr v1.6.0
 	go.uber.org/ratelimit v0.2.0
 	go.uber.org/zap v1.21.0
-	google.golang.org/grpc v1.45.0
+	google.golang.org/grpc v1.46.0
 	google.golang.org/protobuf v1.28.0
 )
 
