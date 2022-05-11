@@ -15,6 +15,7 @@ type undeliveredTaskFetcher struct {
 	Tasks     *storage.TaskStore
 	StartID   string
 	Namespace string
+	Prefetch  int
 }
 
 func (utf *undeliveredTaskFetcher) Process(handle func(task *proto.Task) error) error {
@@ -22,6 +23,7 @@ func (utf *undeliveredTaskFetcher) Process(handle func(task *proto.Task) error) 
 		Namespace: utf.Namespace,
 		StartID:   utf.StartID,
 		EndID:     storage.NewTaskID(time.Now()),
+		Prefetch:  utf.Prefetch,
 	})
 
 	first, err := it.Peek()
@@ -61,6 +63,7 @@ func (dtf *deliveredTaskFetcher) Process(handle func(task *proto.Task) error) er
 		Namespace: dtf.Namespace,
 		StartID:   storage.NewTaskID(ksuid.Nil.Time()),
 		EndID:     storage.NewTaskID(dtf.watermark),
+		Prefetch:  1_000,
 	})
 
 	return it.ForEach(func(task *proto.Task) error {

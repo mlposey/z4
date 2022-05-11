@@ -14,6 +14,7 @@ type undeliveredTaskFetcher struct {
 	Tasks      *storage.TaskStore
 	StartIndex uint64
 	Namespace  string
+	Prefetch   int
 }
 
 func (utf *undeliveredTaskFetcher) Process(handle func(task *proto.Task) error) error {
@@ -21,7 +22,8 @@ func (utf *undeliveredTaskFetcher) Process(handle func(task *proto.Task) error) 
 		Namespace:  utf.Namespace,
 		StartIndex: utf.StartIndex,
 		// TODO: Make read limit configurable.
-		EndIndex: utf.StartIndex + 1000,
+		EndIndex: utf.StartIndex + 2_000, // must be greater than 1000 because the sequence buffer is 1000
+		Prefetch: utf.Prefetch,
 	})
 	return it.ForEach(handle)
 }
@@ -42,6 +44,7 @@ func (dtf *deliveredTaskFetcher) Process(handle func(task *proto.Task) error) er
 		Namespace:  dtf.Namespace,
 		StartIndex: 0,
 		EndIndex:   dtf.LastDeliveredIndex,
+		Prefetch:   1_000,
 	})
 
 	return it.ForEach(func(task *proto.Task) error {

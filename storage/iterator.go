@@ -23,7 +23,13 @@ func NewTaskIterator(client *BadgerClient, query TaskRange) *TaskIterator {
 	// We should try to avoid usage of BadgerClient in other packages as much as possible.
 
 	txn := client.DB.NewTransaction(false)
-	it := txn.NewIterator(badger.DefaultIteratorOptions)
+	opts := badger.DefaultIteratorOptions
+	if query.GetPrefetch() != 0 {
+		opts.PrefetchSize = query.GetPrefetch()
+	} else {
+		opts.PrefetchValues = false
+	}
+	it := txn.NewIterator(opts)
 	start := query.GetStart()
 	it.Seek(start)
 
@@ -109,6 +115,7 @@ type TaskRange interface {
 	GetEnd() []byte
 	GetPrefix() []byte
 	Validate() error
+	GetPrefetch() int
 }
 
 // ScheduledRange is a query for tasks within a time range.
@@ -123,6 +130,8 @@ type ScheduledRange struct {
 	// EndID restricts the search to all task IDs that are equal to it
 	// or occur before it in ascending sorted order.
 	EndID string
+
+	Prefetch int
 }
 
 func (tr *ScheduledRange) GetPrefix() []byte {
@@ -139,6 +148,10 @@ func (tr *ScheduledRange) GetStart() []byte {
 
 func (tr *ScheduledRange) GetEnd() []byte {
 	return getScheduledTaskKey(tr.Namespace, tr.EndID)
+}
+
+func (tr *ScheduledRange) GetPrefetch() int {
+	return tr.Prefetch
 }
 
 // Validate determines whether the ScheduledRange contains valid properties.
@@ -159,6 +172,8 @@ type FifoRange struct {
 
 	StartIndex uint64
 	EndIndex   uint64
+
+	Prefetch int
 }
 
 func (fr *FifoRange) GetPrefix() []byte {
@@ -175,6 +190,10 @@ func (fr *FifoRange) GetStart() []byte {
 
 func (fr *FifoRange) GetEnd() []byte {
 	return getFifoTaskKey(fr.Namespace, fr.EndIndex)
+}
+
+func (fr *FifoRange) GetPrefetch() int {
+	return fr.Prefetch
 }
 
 // Validate determines whether the ScheduledRange contains valid properties.

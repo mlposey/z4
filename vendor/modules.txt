@@ -10,6 +10,9 @@ github.com/armon/go-metrics
 # github.com/beorn7/perks v1.0.1
 ## explicit; go 1.11
 github.com/beorn7/perks/quantile
+# github.com/bluele/gcache v0.0.2
+## explicit; go 1.15
+github.com/bluele/gcache
 # github.com/boltdb/bolt v1.3.1
 ## explicit
 github.com/boltdb/bolt
