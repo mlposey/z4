@@ -57,7 +57,7 @@ func (a *Admin) GetNamespace(ctx context.Context, req *proto.GetNamespaceRequest
 		return client.GetNamespace(ctx, req)
 	}
 
-	feed, err := a.fm.Lease(req.GetRequestId())
+	feed, err := a.fm.Lease(req.GetNamespaceId())
 	if err != nil {
 		return nil, status.Errorf(codes.Internal, "could not get lease for update: %v", err)
 	}

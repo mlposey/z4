@@ -6,10 +6,11 @@ import (
 	"github.com/mlposey/z4/proto"
 	"github.com/mlposey/z4/storage"
 	"github.com/mlposey/z4/telemetry"
-	"go.uber.org/multierr"
 	"go.uber.org/zap"
 	"google.golang.org/protobuf/types/known/timestamppb"
 	"io"
+	"sync"
+	"sync/atomic"
 	"time"
 )
 
@@ -18,6 +19,9 @@ type taskReader struct {
 	tasks     *storage.TaskStore
 	ctx       context.Context
 	pipe      chan *proto.Task
+	sweepTag  uint64
+	sweep     sync.Mutex
+	lastSweep time.Time
 }
 
 func NewScheduledTaskReader(
@@ -40,6 +44,7 @@ func (tr *taskReader) Tasks() q.TaskStream {
 }
 
 func (tr *taskReader) startReadLoop() {
+	prefetch := 1_000
 	for {
 		select {
 		case <-tr.ctx.Done():
@@ -49,26 +54,43 @@ func (tr *taskReader) startReadLoop() {
 		default:
 		}
 
-		pushCount, err := tr.pullAndPush()
+		pushCount, err := tr.pullAndPush(prefetch)
 		if err != nil {
 			telemetry.Logger.Error("feed operation failed", zap.Error(err))
 			time.Sleep(time.Second)
 			continue
 		}
 
+		// TODO: Intelligently pick prefetch size based on push count.
 		if pushCount == 0 {
-			time.Sleep(time.Millisecond * 50)
-			continue
+			time.Sleep(time.Millisecond * 500)
+			prefetch = 0
+		} else {
+			prefetch = 1_000
 		}
 	}
 }
 
 // pullAndPush loads ready tasks from storage and delivers them to consumers.
-func (tr *taskReader) pullAndPush() (int, error) {
+func (tr *taskReader) pullAndPush(prefetch int) (int, error) {
 	lastDeliveredTaskID := tr.namespace.LastTask
-	dc, err1 := tr.processDelivered(lastDeliveredTaskID)
-	uc, err2 := tr.processUndelivered(lastDeliveredTaskID)
-	return dc + uc, multierr.Combine(err1, err2)
+	if time.Since(tr.lastSweep) > time.Second*30 {
+		tr.lastSweep = time.Now()
+		go func(tag uint64) {
+			tr.sweep.Lock()
+			defer tr.sweep.Unlock()
+			if !atomic.CompareAndSwapUint64(&tr.sweepTag, tag, tag+1) {
+				return
+			}
+
+			err := tr.processDelivered(lastDeliveredTaskID)
+			if err != nil {
+				telemetry.Logger.Error("failed to process delivered scheduled tasks",
+					zap.Error(err))
+			}
+		}(atomic.LoadUint64(&tr.sweepTag))
+	}
+	return tr.processUndelivered(lastDeliveredTaskID, prefetch)
 }
 
 func (tr *taskReader) push(task *proto.Task) error {
@@ -82,7 +104,7 @@ func (tr *taskReader) push(task *proto.Task) error {
 }
 
 // attempts to redeliver unacknowledged tasks
-func (tr *taskReader) processDelivered(lastID string) (int, error) {
+func (tr *taskReader) processDelivered(lastID string) error {
 	ackDeadline := time.Second * time.Duration(tr.namespace.GetAckDeadlineSeconds())
 	df := &deliveredTaskFetcher{
 		Tasks:           tr.tasks,
@@ -102,32 +124,30 @@ func (tr *taskReader) processDelivered(lastID string) (int, error) {
 		return nil
 	})
 	if err != nil && err != io.EOF {
-		return len(tasks), err
+		return err
 	}
 
 	if len(tasks) == 0 {
-		return 0, nil
+		return nil
 	}
 
-	// TODO: Determine if we want to apply this to the Raft log.
-	// It doesn't seem entirely necessary, and not having it should
-	// improve performance. It could be nice to have though.
 	// TODO: Batch task writes using buffers instead of saving one large slice.
 	err = tr.tasks.SaveAll(tasks)
 	if err != nil {
 		telemetry.Logger.Error("failed to update retry tasks",
 			zap.Error(err))
-		return len(tasks), err
+		return err
 	}
-	return len(tasks), nil
+	return nil
 }
 
 // attempts to deliver new tasks
-func (tr *taskReader) processUndelivered(lastID string) (int, error) {
+func (tr *taskReader) processUndelivered(lastID string, prefetch int) (int, error) {
 	uf := &undeliveredTaskFetcher{
 		Tasks:     tr.tasks,
 		StartID:   lastID,
 		Namespace: tr.namespace.GetId(),
+		Prefetch:  prefetch,
 	}
 
 	var count int

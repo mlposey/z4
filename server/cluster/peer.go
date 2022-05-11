@@ -36,6 +36,7 @@ type Peer struct {
 	stableStore *boltdb.BoltStore
 	snapshots   *raft.FileSnapshotStore
 	transport   *raft.NetworkTransport
+	writer      q.TaskWriter
 }
 
 func NewPeer(config PeerConfig) (*Peer, error) {
@@ -104,8 +105,8 @@ func (p *Peer) joinNetwork() error {
 		return fmt.Errorf("could not create transport for raft peer: %w", err)
 	}
 
-	writer := q.NewTaskWriter(p.config.Tasks)
-	fsm := newFSM(p.config.DB.DB, writer, p.config.Namespaces)
+	p.writer = q.NewTaskWriter(p.config.Tasks, p.config.Namespaces)
+	fsm := newFSM(p.config.DB.DB, p.writer, p.config.Namespaces)
 	p.Raft, err = raft.NewRaft(
 		c,
 		fsm,
@@ -149,5 +150,6 @@ func (p *Peer) Close() error {
 		p.Raft.Shutdown().Error(),
 		p.transport.Close(),
 		p.logStore.Close(),
-		p.stableStore.Close())
+		p.stableStore.Close(),
+		p.writer.Close())
 }

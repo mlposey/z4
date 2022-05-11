@@ -120,24 +120,37 @@ func consume(client proto.QueueClient, namespace string) {
 
 		out, err := json.MarshalIndent(task, "", "  ")
 		if err != nil {
-			panic(err)
+			fmt.Println(err)
+			continue
 		}
 		fmt.Println(string(out))
+
+		var ref *proto.TaskReference
+		if task.GetScheduleTime() == nil {
+			ref = &proto.TaskReference{
+				Namespace: task.GetNamespace(),
+				Id: &proto.TaskReference_Index{
+					Index: task.GetIndex(),
+				},
+			}
+		} else {
+			ref = &proto.TaskReference{
+				Namespace: task.GetNamespace(),
+				Id: &proto.TaskReference_TaskId{
+					TaskId: task.GetId(),
+				},
+			}
+		}
 
 		err = stream.Send(&proto.PullRequest{
 			Request: &proto.PullRequest_Ack{
 				Ack: &proto.Ack{
-					Reference: &proto.TaskReference{
-						Namespace: task.GetNamespace(),
-						Id: &proto.TaskReference_TaskId{
-							TaskId: task.GetId(),
-						},
-					},
+					Reference: ref,
 				},
 			},
 		})
 		if err != nil {
-			panic(err)
+			fmt.Println(err)
 		}
 	}
 }

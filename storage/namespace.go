@@ -22,13 +22,22 @@ func NewNamespaceStore(client *BadgerClient) *NamespaceStore {
 	}
 }
 
+func (cs *NamespaceStore) Sequence(namespaceID string) (*badger.Sequence, error) {
+	key := cs.getSeqKey(namespaceID)
+	return cs.Client.DB.GetSequence(key, 1000)
+}
+
+func (cs *NamespaceStore) getSeqKey(namespaceID string) []byte {
+	return []byte(fmt.Sprintf("namespace#seq#%s", namespaceID))
+}
+
 func (cs *NamespaceStore) Save(namespace *proto.Namespace) error {
 	return cs.Client.DB.Update(func(txn *badger.Txn) error {
 		payload, err := pb.Marshal(namespace)
 		if err != nil {
 			return fmt.Errorf("could not encode namespace: %w", err)
 		}
-		key := cs.getKey(namespace.GetId())
+		key := cs.getConfigKey(namespace.GetId())
 		return txn.Set(key, payload)
 	})
 }
@@ -65,7 +74,7 @@ func (cs *NamespaceStore) Get(id string) (*proto.Namespace, error) {
 	telemetry.Logger.Debug("getting namespace config from DB")
 	var namespace *proto.Namespace
 	return namespace, cs.Client.DB.View(func(txn *badger.Txn) error {
-		key := cs.getKey(id)
+		key := cs.getConfigKey(id)
 		item, err := txn.Get(key)
 		if err != nil {
 			return err
@@ -78,6 +87,6 @@ func (cs *NamespaceStore) Get(id string) (*proto.Namespace, error) {
 	})
 }
 
-func (cs *NamespaceStore) getKey(namespaceID string) []byte {
-	return []byte(fmt.Sprintf("namespace#%s", namespaceID))
+func (cs *NamespaceStore) getConfigKey(namespaceID string) []byte {
+	return []byte(fmt.Sprintf("namespace#config#%s", namespaceID))
 }

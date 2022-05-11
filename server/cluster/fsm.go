@@ -49,7 +49,12 @@ func (f *stateMachine) ApplyBatch(logs []*raft.Log) []interface{} {
 		switch v := cmd.GetCmd().(type) {
 		case *proto.Command_Task:
 			if v.Task.GetScheduleTime() == nil {
-				v.Task.Index = log.Index
+				index, err := f.writer.NextIndex(v.Task.GetNamespace())
+				if err != nil {
+					res[i] = err
+					return res
+				}
+				v.Task.Index = index
 			}
 			tasks = append(tasks, v.Task)
 
@@ -68,6 +73,7 @@ func (f *stateMachine) ApplyBatch(logs []*raft.Log) []interface{} {
 	// TODO: Determine if concurrently saving and deleting improves performance.
 
 	if len(namespaces) > 0 {
+		// TODO: If multiple versions of same namespace, pick most recent.
 		// Namespace updates should happen infrequently enough that
 		// saving them individually rather than using a batch should
 		// be more performant.

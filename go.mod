@@ -4,6 +4,7 @@ go 1.17
 
 require (
 	github.com/araddon/dateparse v0.0.0-20210429162001-6b43995a97de
+	github.com/bluele/gcache v0.0.2
 	github.com/cucumber/godog v0.12.5
 	github.com/dgraph-io/badger/v3 v3.2103.2
 	github.com/dolthub/go-mysql-server v0.11.0
@@ -15,7 +16,7 @@ require (
 	go.uber.org/multierr v1.6.0
 	go.uber.org/ratelimit v0.2.0
 	go.uber.org/zap v1.21.0
-	google.golang.org/grpc v1.45.0
+	google.golang.org/grpc v1.46.0
 	google.golang.org/protobuf v1.28.0
 )
 

@@ -8,11 +8,10 @@ import (
 	"go.uber.org/ratelimit"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials/insecure"
-	"math/rand"
 	"time"
 )
 
-const rps = 1_000
+const rps = 10_000
 
 func main() {
 	loadTestStreaming()
@@ -31,7 +30,7 @@ func loadTestStreaming() {
 	}
 
 	const (
-		requestsToSend = 10_000_000
+		requestsToSend = 1_000_000
 	)
 
 	done := make(chan bool)
@@ -60,9 +59,9 @@ func loadTestStreaming() {
 			Namespace: "load_test",
 			Async:     true,
 			Payload:   []byte("buy eggs"),
-			Schedule: &proto.PushTaskRequest_TtsSeconds{
+			/*Schedule: &proto.PushTaskRequest_TtsSeconds{
 				TtsSeconds: int64(rand.Intn(60)), // 1 hour
-			},
+			},*/
 		})
 		if err != nil {
 			fmt.Println(err)
