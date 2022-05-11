@@ -126,7 +126,7 @@ func consume(client proto.QueueClient, namespace string) {
 		fmt.Println(string(out))
 
 		var ref *proto.TaskReference
-		if task.GetIndex() != 0 {
+		if task.GetScheduleTime() == nil {
 			ref = &proto.TaskReference{
 				Namespace: task.GetNamespace(),
 				Id: &proto.TaskReference_Index{
