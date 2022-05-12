@@ -4,12 +4,14 @@ import (
 	"fmt"
 	"github.com/dgraph-io/badger/v3"
 	"github.com/mlposey/z4/telemetry"
+	"go.uber.org/multierr"
 	"time"
 )
 
 // BadgerClient manages a connection to a BadgerDB file store.
 type BadgerClient struct {
 	DB *badger.DB
+	r  *reporter
 }
 
 func NewBadgerClient(dataDir string) (*BadgerClient, error) {
@@ -18,7 +20,9 @@ func NewBadgerClient(dataDir string) (*BadgerClient, error) {
 		return nil, fmt.Errorf("could not open badger database: %w", err)
 	}
 	client := &BadgerClient{DB: db}
+	client.r = newReporter(client)
 	go client.handleGC()
+	go client.r.StartReporter()
 	return client, nil
 }
 
@@ -44,5 +48,8 @@ func (bc *BadgerClient) handleGC() {
 // It must be called when the client is no longer needed or else
 // pending writes may be canceled when the application terminates.
 func (bc *BadgerClient) Close() error {
-	return bc.DB.Close()
+	return multierr.Combine(
+		bc.r.Close(),
+		bc.DB.Close(),
+	)
 }

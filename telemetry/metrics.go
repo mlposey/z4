@@ -51,6 +51,11 @@ var (
 		Name:      "is_leader",
 		Help:      "A boolean value that indicates if a peer is the cluster leader",
 	})
+	NamespaceSize = promauto.NewGaugeVec(prometheus.GaugeOpts{
+		Namespace: prometheusNamespace,
+		Name:      "namespace_size_bytes",
+		Help:      "The estimated size of a namespace in bytes",
+	}, []string{"task_namespace"})
 )
 
 // StartPromServer exposes prometheus metrics on the given port.

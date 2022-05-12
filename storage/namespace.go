@@ -18,7 +18,7 @@ type NamespaceStore struct {
 func NewNamespaceStore(client *BadgerClient) *NamespaceStore {
 	return &NamespaceStore{
 		Client: client,
-		prefix: []byte("namespace#"),
+		prefix: []byte("namespace#config#"),
 	}
 }
 
