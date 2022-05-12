@@ -35,6 +35,20 @@ func NewTaskStore(db *BadgerClient) *TaskStore {
 	return store
 }
 
+func (ts *TaskStore) PurgeTasks(namespace string) error {
+	fifoPrefix := getFifoPrefix(namespace)
+	schedPrefix := getSchedPrefix(namespace)
+	return ts.Client.DB.DropPrefix(fifoPrefix, schedPrefix)
+}
+
+func getFifoPrefix(namespace string) []byte {
+	return []byte(fmt.Sprintf("task#fifo#%s#", namespace))
+}
+
+func getSchedPrefix(namespace string) []byte {
+	return []byte(fmt.Sprintf("task#sched#%s#", namespace))
+}
+
 func (ts *TaskStore) DeleteAll(acks []*proto.Ack) error {
 	telemetry.Logger.Debug("deleting task batch from DB", zap.Int("count", len(acks)))
 	batch := ts.Client.DB.NewWriteBatch()

@@ -247,3 +247,4 @@ Prometheus metrics are exposed on a configurable port that defaults to 2112.
 |----|----|-----------|
 |z4_last_db_gc|Gauge|The unix tine in seconds when the last gc phase was run for the database|
 |z4_last_fsm_snapshot|Gauge|The unix time in seconds when the last fsm snapshot was taken|
+|z4_namespace_size_bytes|Gauge|The estimated size of a namespace in bytes|

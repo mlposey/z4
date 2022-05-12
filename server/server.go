@@ -3,6 +3,7 @@ package server
 import (
 	"fmt"
 	"github.com/mlposey/z4/feeds"
+	"github.com/mlposey/z4/feeds/q"
 	"github.com/mlposey/z4/proto"
 	"github.com/mlposey/z4/server/api"
 	"github.com/mlposey/z4/server/cluster"
@@ -44,6 +45,10 @@ func (s *Server) Start() error {
 
 	s.config.PeerConfig.Tasks = storage.NewTaskStore(s.config.DB)
 	s.config.PeerConfig.Namespaces = storage.NewNamespaceStore(s.config.DB)
+	s.config.PeerConfig.Writer = q.NewTaskWriter(
+		s.config.PeerConfig.Tasks,
+		s.config.PeerConfig.Namespaces,
+	)
 	s.config.PeerConfig.DB = s.config.DB
 	s.peer, err = cluster.NewPeer(s.config.PeerConfig)
 	if err != nil {
@@ -58,7 +63,8 @@ func (s *Server) Start() error {
 	}
 
 	s.server = grpc.NewServer(s.config.Opts...)
-	adminServer := api.NewAdmin(s.peer.Raft, s.config.PeerConfig, handle, s.fm)
+	adminServer := api.NewAdmin(s.peer.Raft, s.config.PeerConfig, handle, s.fm,
+		s.config.PeerConfig.Writer)
 	proto.RegisterAdminServer(s.server, adminServer)
 
 	collectionServer := api.NewQueue(s.fm, s.config.PeerConfig.Tasks, s.peer.Raft, handle)
@@ -74,7 +80,8 @@ func (s *Server) Close() error {
 	// s.server.GracefulStop() - doesnt stop streams, causing server to stay running
 	err := multierr.Combine(
 		s.peer.Close(),
-		s.fm.Close())
+		s.fm.Close(),
+		s.config.PeerConfig.Writer.Close())
 	telemetry.Logger.Info("server stopped")
 	return err
 }

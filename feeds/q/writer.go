@@ -52,6 +52,10 @@ func NewTaskWriter(tasks *storage.TaskStore, namespaces *storage.NamespaceStore)
 	return w
 }
 
+func (s *taskWriter) PurgeTasks(namespace string) error {
+	return s.tasks.PurgeTasks(namespace)
+}
+
 func (s *taskWriter) NextIndex(namespace string) (uint64, error) {
 	seq, err := s.seqCache.Get(namespace)
 	if err != nil {
