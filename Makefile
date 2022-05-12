@@ -9,10 +9,22 @@ deploy:
 		-f deployments/charts/z4/values.yaml \
 		z4 deployments/charts/z4
 
+deploy_tests:
+	helm -n z4 \
+    	upgrade --install \
+    	load-test deployments/charts/load-test
+
 restart_pods:
 	kubectl -n z4 rollout restart statefulset z4
 
-build_and_push_image: build_image push_image
+build_and_push_server_image: build_image push_image
+
+build_and_push_load_images:
+	docker build -f cmd/load/publisher/Dockerfile -t ${DOCKER_REGISTRY}/z4-load-publisher .
+	docker push ${DOCKER_REGISTRY}/z4-load-publisher
+
+	docker build -f cmd/load/consumer/Dockerfile -t ${DOCKER_REGISTRY}/z4-load-consumer .
+	docker push ${DOCKER_REGISTRY}/z4-load-consumer
 
 push_image:
 	docker push ${DOCKER_IMAGE}
