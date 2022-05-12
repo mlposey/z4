@@ -36,6 +36,7 @@ func (f *stateMachine) ApplyBatch(logs []*raft.Log) []interface{} {
 	var tasks []*proto.Task
 	var acks []*proto.Ack
 	var namespaces []*proto.Namespace
+	var purges []*proto.PurgeTasksRequest
 	res := make([]interface{}, len(logs))
 
 	for i, log := range logs {
@@ -63,6 +64,9 @@ func (f *stateMachine) ApplyBatch(logs []*raft.Log) []interface{} {
 
 		case *proto.Command_Namespace:
 			namespaces = append(namespaces, v.Namespace)
+
+		case *proto.Command_Purge:
+			purges = append(purges, v.Purge)
 
 		default:
 			res[i] = errors.New("unknown command type: expected ack or task")
@@ -96,6 +100,15 @@ func (f *stateMachine) ApplyBatch(logs []*raft.Log) []interface{} {
 		err := f.writer.Acknowledge(acks)
 		if err != nil {
 			return f.packErrors(err, res)
+		}
+	}
+
+	if len(purges) > 0 {
+		for _, req := range purges {
+			err := f.writer.PurgeTasks(req.GetNamespaceId())
+			if err != nil {
+				return f.packErrors(err, res)
+			}
 		}
 	}
 

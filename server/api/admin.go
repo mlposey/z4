@@ -4,6 +4,7 @@ import (
 	"context"
 	"github.com/hashicorp/raft"
 	"github.com/mlposey/z4/feeds"
+	"github.com/mlposey/z4/feeds/q"
 	"github.com/mlposey/z4/proto"
 	"github.com/mlposey/z4/server/cluster"
 	"github.com/mlposey/z4/telemetry"
@@ -21,6 +22,7 @@ type Admin struct {
 	fm            *feeds.Manager
 	serverID      string
 	advertiseAddr string
+	writer        q.TaskWriter
 }
 
 func NewAdmin(
@@ -28,6 +30,7 @@ func NewAdmin(
 	cfg cluster.PeerConfig,
 	handle *cluster.LeaderHandle,
 	fm *feeds.Manager,
+	writer q.TaskWriter,
 ) *Admin {
 	return &Admin{
 		raft:          raft,
@@ -35,6 +38,7 @@ func NewAdmin(
 		advertiseAddr: cfg.AdvertiseAddr,
 		handle:        handle,
 		fm:            fm,
+		writer:        writer,
 	}
 }
 
@@ -88,6 +92,34 @@ func (a *Admin) UpdateNamespace(ctx context.Context, req *proto.UpdateNamespaceR
 		ns.AckDeadlineSeconds = req.GetNamespace().GetAckDeadlineSeconds()
 	}
 	return ns, nil
+}
+
+func (a *Admin) PurgeTasks(ctx context.Context, req *proto.PurgeTasksRequest) (*emptypb.Empty, error) {
+	if !a.handle.IsLeader() {
+		client, err := a.handle.AdminClient()
+		if err != nil {
+			return nil, status.Errorf(codes.Internal, "could not forward request: %v", err)
+		}
+		return client.PurgeTasks(ctx, req)
+	}
+
+	feed, err := a.fm.Lease(req.GetNamespaceId())
+	if err != nil {
+		return nil, status.Errorf(codes.Internal, "could not get lease for update: %v", err)
+	}
+	defer feed.Release()
+
+	skip, err := a.writer.NextIndex(req.GetNamespaceId())
+	if err != nil {
+		return nil, status.Errorf(codes.Internal, "purge failed: %v", err)
+	}
+	feed.Feed().Namespace.N.LastIndex = skip
+
+	err = cluster.ApplyPurgeTasksCommand(a.raft, req).Error()
+	if err != nil {
+		return nil, status.Errorf(codes.Internal, "purge failed: %v", err)
+	}
+	return new(emptypb.Empty), nil
 }
 
 func (a *Admin) GetClusterInfo(

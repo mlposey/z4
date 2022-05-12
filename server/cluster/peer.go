@@ -26,6 +26,7 @@ type PeerConfig struct {
 	DB               *storage.BadgerClient
 	Tasks            *storage.TaskStore
 	Namespaces       *storage.NamespaceStore
+	Writer           q.TaskWriter
 }
 
 // Peer controls a node's membership in the raft cluster.
@@ -36,7 +37,6 @@ type Peer struct {
 	stableStore *boltdb.BoltStore
 	snapshots   *raft.FileSnapshotStore
 	transport   *raft.NetworkTransport
-	writer      q.TaskWriter
 }
 
 func NewPeer(config PeerConfig) (*Peer, error) {
@@ -105,8 +105,7 @@ func (p *Peer) joinNetwork() error {
 		return fmt.Errorf("could not create transport for raft peer: %w", err)
 	}
 
-	p.writer = q.NewTaskWriter(p.config.Tasks, p.config.Namespaces)
-	fsm := newFSM(p.config.DB.DB, p.writer, p.config.Namespaces)
+	fsm := newFSM(p.config.DB.DB, p.config.Writer, p.config.Namespaces)
 	p.Raft, err = raft.NewRaft(
 		c,
 		fsm,
@@ -150,6 +149,5 @@ func (p *Peer) Close() error {
 		p.Raft.Shutdown().Error(),
 		p.transport.Close(),
 		p.logStore.Close(),
-		p.stableStore.Close(),
-		p.writer.Close())
+		p.stableStore.Close())
 }
