@@ -8,18 +8,22 @@ import (
 	"go.uber.org/ratelimit"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials/insecure"
+	"os"
+	"strconv"
 	"time"
 )
 
-const rps = 10_000
-
 func main() {
-	loadTestStreaming()
+	rps, err := strconv.Atoi(os.Getenv("RPS"))
+	if err != nil {
+		panic(err)
+	}
+	loadTestStreaming(rps)
 }
 
-func loadTestStreaming() {
+func loadTestStreaming(rps int) {
 	opts := []grpc.DialOption{grpc.WithTransportCredentials(insecure.NewCredentials())}
-	conn, err := grpc.Dial("localhost:6355", opts...)
+	conn, err := grpc.Dial(os.Getenv("TARGET"), opts...)
 	if err != nil {
 		panic(err)
 	}
@@ -30,7 +34,7 @@ func loadTestStreaming() {
 	}
 
 	const (
-		requestsToSend = 1_000_000
+		requestsToSend = 10_000_000
 	)
 
 	done := make(chan bool)
@@ -50,13 +54,13 @@ func loadTestStreaming() {
 		}
 	}()
 
-	rl := ratelimit.NewUnlimited()
+	rl := ratelimit.New(rps)
 	start := time.Now()
 	for i := 0; i < requestsToSend; i++ {
 		rl.Take()
 		err := stream.Send(&proto.PushTaskRequest{
 			RequestId: ksuid.New().String(),
-			Namespace: "load_test",
+			Namespace: os.Getenv("NAMESPACE"),
 			Async:     true,
 			Payload:   []byte("buy eggs"),
 			/*Schedule: &proto.PushTaskRequest_TtsSeconds{
