@@ -1,5 +1,3 @@
-replicaCount: 1
-
 publisherImage:
   repository: mlposey/z4-load-publisher
   pullPolicy: Always
