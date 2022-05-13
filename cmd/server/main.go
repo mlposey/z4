@@ -8,9 +8,9 @@ import (
 	"github.com/mlposey/z4/telemetry"
 	"go.uber.org/zap"
 	"log"
+	_ "net/http/pprof"
 	"os"
 	"os/signal"
-	"runtime/pprof"
 	"syscall"
 )
 
@@ -23,14 +23,6 @@ func main() {
 		syscall.SIGQUIT)
 
 	config := configFromEnv()
-	if config.ProfilerEnabled {
-		f, err := os.Create("./z4_cpu.profile")
-		if err != nil {
-			log.Fatal(err)
-		}
-		pprof.StartCPUProfile(f)
-		defer pprof.StopCPUProfile()
-	}
 
 	initLogger(config.DebugLoggingEnabled)
 	db := initDB(config.DBDataDir, config.SQLPort)
