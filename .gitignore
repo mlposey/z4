@@ -3,7 +3,8 @@ z4_server
 z4data
 z4peer
 cpuprofile
-cmd/load/load
+cmd/load/consumer/consumer
+cmd/load/publisher/publisher
 z4_cpu.profile
 cmd/z4t/z4t
 deployments/charts/z4/charts/*.tgz

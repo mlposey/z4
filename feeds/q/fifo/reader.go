@@ -32,7 +32,7 @@ func NewFifoTaskReader(
 	reader := &taskReader{
 		namespace: namespace,
 		tasks:     tasks,
-		pipe:      make(chan *proto.Task),
+		pipe:      make(chan *proto.Task, 100_000),
 		ctx:       ctx,
 	}
 	go reader.startReadLoop()

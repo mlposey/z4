@@ -19,7 +19,7 @@ func newReporter(client *BadgerClient) *reporter {
 }
 
 func (r *reporter) StartReporter() {
-	tick := time.Tick(time.Second * 10)
+	tick := time.Tick(time.Minute)
 	for {
 		select {
 		case <-r.close:

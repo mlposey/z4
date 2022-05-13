@@ -4,15 +4,14 @@ import (
 	"errors"
 	"fmt"
 	"github.com/hashicorp/raft"
-	boltdb "github.com/hashicorp/raft-boltdb"
 	"github.com/mlposey/z4/feeds/q"
 	"github.com/mlposey/z4/storage"
+	"github.com/mlposey/z4/storage/raftutil"
 	"github.com/mlposey/z4/telemetry"
 	"go.uber.org/multierr"
 	"go.uber.org/zap"
 	"net"
 	"os"
-	"path/filepath"
 )
 
 // PeerConfig defines how a node will take part in the raft cluster.
@@ -33,8 +32,8 @@ type PeerConfig struct {
 type Peer struct {
 	Raft        *raft.Raft
 	config      PeerConfig
-	logStore    *boltdb.BoltStore
-	stableStore *boltdb.BoltStore
+	logStore    raft.LogStore
+	stableStore raft.StableStore
 	snapshots   *raft.FileSnapshotStore
 	transport   *raft.NetworkTransport
 }
@@ -65,17 +64,11 @@ func (p *Peer) initStorage() error {
 		}
 	}
 
-	logStorePath := filepath.Join(p.config.DataDir, "logs.dat")
-	p.logStore, err = boltdb.NewBoltStore(logStorePath)
+	p.logStore, err = raftutil.NewLogStore(p.config.DB.DB)
 	if err != nil {
-		return fmt.Errorf(`boltdb.NewBoltStore(%q): %v`, logStorePath, err)
+		return fmt.Errorf("failed to load log store: %w", err)
 	}
-
-	stableStorePath := filepath.Join(p.config.DataDir, "stable.dat")
-	p.stableStore, err = boltdb.NewBoltStore(stableStorePath)
-	if err != nil {
-		return fmt.Errorf(`boltdb.NewBoltStore(%q): %v`, stableStorePath, err)
-	}
+	p.stableStore = raftutil.NewStableStore(p.config.DB.DB)
 
 	p.snapshots, err = raft.NewFileSnapshotStore(p.config.DataDir, 3, os.Stderr)
 	if err != nil {
@@ -147,7 +140,5 @@ func (p *Peer) tryBootstrap() {
 func (p *Peer) Close() error {
 	return multierr.Combine(
 		p.Raft.Shutdown().Error(),
-		p.transport.Close(),
-		p.logStore.Close(),
-		p.stableStore.Close())
+		p.transport.Close())
 }

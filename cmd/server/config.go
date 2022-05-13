@@ -15,7 +15,6 @@ type Config struct {
 	PeerPort            int    `envconfig:"PEER_PORT" default:"6356"`
 	PeerID              string `envconfig:"PEER_ID" required:"true"`
 	PeerAdvertiseAddr   string `envconfig:"PEER_ADVERTISE_ADDR" default:"127.0.0.1:6356"`
-	ProfilerEnabled     bool   `envconfig:"PROFILER_ENABLED" default:"false"`
 	MetricsPort         int    `envconfig:"METRICS_PORT" default:"2112"`
 }
 
