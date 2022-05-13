@@ -33,7 +33,7 @@ func New(
 
 	f := &Feed{
 		Namespace: storage.NewSyncedNamespace(storage.NewNamespaceStore(db), namespaceID, raft),
-		feed:      make(chan *proto.Task),
+		feed:      make(chan *proto.Task, 100_000),
 		ctx:       ctx,
 		ctxCancel: cancel,
 	}
