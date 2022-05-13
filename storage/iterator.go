@@ -16,6 +16,7 @@ type TaskIterator struct {
 	it     *badger.Iterator
 	end    []byte
 	prefix []byte
+	buf    []byte
 }
 
 func NewTaskIterator(client *BadgerClient, query TaskRange) *TaskIterator {
@@ -85,20 +86,20 @@ func (ti *TaskIterator) peek(skipCheck bool) (*proto.Task, error) {
 		return nil, io.EOF
 	}
 
-	task := new(proto.Task)
-	err := item.Value(func(val []byte) error {
-		err := pb.Unmarshal(val, task)
-		if err != nil {
-			return err
-		}
-
-		if task.GetId() == "" {
-			return errors.New("invalid task: empty id")
-		}
-		return nil
-	})
+	var err error
+	ti.buf, err = item.ValueCopy(ti.buf)
 	if err != nil {
 		return nil, err
+	}
+
+	task := new(proto.Task)
+	err = pb.Unmarshal(ti.buf, task)
+	if err != nil {
+		return nil, err
+	}
+
+	if task.GetId() == "" {
+		return nil, errors.New("invalid task: empty id")
 	}
 	return task, nil
 }
