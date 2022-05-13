@@ -1,0 +1,35 @@
+{{- if .Values.consumer.enabled -}}
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: {{ include "load-test.fullname" . }}-consumer
+  labels:
+    {{- include "load-test.labels" . | nindent 4 }}
+spec:
+  parallelism: {{ .Values.consumer.replicas }}
+  template:
+    spec:
+      containers:
+        - name: {{ .Chart.Name }}
+          image: "{{ .Values.consumerImage.repository }}:{{ .Values.consumerImage.tag | default .Chart.AppVersion }}"
+          imagePullPolicy: {{ .Values.consumerImage.pullPolicy }}
+          env:
+            - name: TARGET
+              value: {{ .Values.env.target }}
+            - name: NAMESPACE
+              value: {{ .Values.env.namespace }}
+      {{- with .Values.nodeSelector }}
+      nodeSelector:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.affinity }}
+      affinity:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.tolerations }}
+      tolerations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      restartPolicy: Never
+  backoffLimit: 4
+{{- end }}
