@@ -10,6 +10,7 @@ import (
 	"github.com/mlposey/z4/telemetry"
 	pb "google.golang.org/protobuf/proto"
 	"io"
+	"sync"
 )
 
 // stateMachine uses raft logs to modify the task database.
@@ -29,22 +30,40 @@ func newFSM(db *badger.DB, ts q.TaskWriter, ns *storage.NamespaceStore) *stateMa
 }
 
 func (f *stateMachine) ApplyBatch(logs []*raft.Log) []interface{} {
-	// TODO: Refactor this method. It has become quite large.
-
 	telemetry.ReceivedLogs.Add(float64(len(logs)))
-
-	var tasks []*proto.Task
-	var acks []*proto.Ack
-	var namespaces []*proto.Namespace
-	var purges []*proto.PurgeTasksRequest
 	res := make([]interface{}, len(logs))
 
-	for i, log := range logs {
+	batch, err := f.splitLogs(logs)
+	if err != nil {
+		return f.packErrors(err, res)
+	}
+
+	var wg sync.WaitGroup
+	var errs [4]error
+
+	f.applyNamespaces(batch.Namespaces, &wg, &errs[0])
+	f.applyTasks(batch.Tasks, &wg, &errs[1])
+	f.applyAcks(batch.Acks, &wg, &errs[2])
+	f.applyPurges(batch.Purges, &wg, &errs[3])
+
+	wg.Wait()
+	for _, err := range errs {
+		if err != nil {
+			return f.packErrors(err, res)
+		}
+	}
+
+	telemetry.AppliedLogs.Add(float64(batch.Size()))
+	return res
+}
+
+func (f *stateMachine) splitLogs(logs []*raft.Log) (*splitBatch, error) {
+	sb := new(splitBatch)
+	for _, log := range logs {
 		cmd := new(proto.Command)
 		err := pb.Unmarshal(log.Data, cmd)
 		if err != nil {
-			res[i] = err
-			return res
+			return nil, err
 		}
 
 		switch v := cmd.GetCmd().(type) {
@@ -52,68 +71,91 @@ func (f *stateMachine) ApplyBatch(logs []*raft.Log) []interface{} {
 			if v.Task.GetScheduleTime() == nil {
 				index, err := f.writer.NextIndex(v.Task.GetNamespace())
 				if err != nil {
-					res[i] = err
-					return res
+					return nil, err
 				}
 				v.Task.Index = index
 			}
-			tasks = append(tasks, v.Task)
+			sb.Tasks = append(sb.Tasks, v.Task)
 
 		case *proto.Command_Ack:
-			acks = append(acks, v.Ack)
+			sb.Acks = append(sb.Acks, v.Ack)
 
 		case *proto.Command_Namespace:
-			namespaces = append(namespaces, v.Namespace)
+			sb.Namespaces = append(sb.Namespaces, v.Namespace)
 
 		case *proto.Command_Purge:
-			purges = append(purges, v.Purge)
+			sb.Purges = append(sb.Purges, v.Purge)
 
 		default:
-			res[i] = errors.New("unknown command type: expected ack or task")
-			return res
+			return nil, errors.New("unknown command type: expected ack or task")
 		}
 	}
+	return sb, nil
+}
 
-	// TODO: Determine if concurrently saving and deleting improves performance.
+type splitBatch struct {
+	Acks       []*proto.Ack
+	Tasks      []*proto.Task
+	Purges     []*proto.PurgeTasksRequest
+	Namespaces []*proto.Namespace
+}
 
+func (s *splitBatch) Size() int {
+	return len(s.Acks) + len(s.Tasks) + len(s.Purges) + len(s.Namespaces)
+}
+
+func (f *stateMachine) applyNamespaces(namespaces []*proto.Namespace, wg *sync.WaitGroup, err *error) {
 	if len(namespaces) > 0 {
-		// TODO: If multiple versions of same namespace, pick most recent.
-		// Namespace updates should happen infrequently enough that
-		// saving them individually rather than using a batch should
-		// be more performant.
-		for _, namespace := range namespaces {
-			err := f.ns.Save(namespace)
-			if err != nil {
-				return f.packErrors(err, res)
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			// TODO: If multiple versions of same namespace, pick most recent.
+			// Namespace updates should happen infrequently enough that
+			// saving them individually rather than using a batch should
+			// be more performant.
+			for _, namespace := range namespaces {
+				*err = f.ns.Save(namespace)
+				if *err != nil {
+					return
+				}
 			}
-		}
+		}()
 	}
+}
 
+func (f *stateMachine) applyTasks(tasks []*proto.Task, wg *sync.WaitGroup, err *error) {
 	if len(tasks) > 0 {
-		err := f.writer.Push(tasks)
-		if err != nil {
-			return f.packErrors(err, res)
-		}
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			*err = f.writer.Push(tasks)
+		}()
 	}
+}
 
+func (f *stateMachine) applyAcks(acks []*proto.Ack, wg *sync.WaitGroup, err *error) {
 	if len(acks) > 0 {
-		err := f.writer.Acknowledge(acks)
-		if err != nil {
-			return f.packErrors(err, res)
-		}
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			*err = f.writer.Acknowledge(acks)
+		}()
 	}
+}
 
+func (f *stateMachine) applyPurges(purges []*proto.PurgeTasksRequest, wg *sync.WaitGroup, err *error) {
 	if len(purges) > 0 {
-		for _, req := range purges {
-			err := f.writer.PurgeTasks(req.GetNamespaceId())
-			if err != nil {
-				return f.packErrors(err, res)
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			for _, req := range purges {
+				*err = f.writer.PurgeTasks(req.GetNamespaceId())
+				if *err != nil {
+					return
+				}
 			}
-		}
+		}()
 	}
-
-	telemetry.AppliedLogs.Add(float64(len(acks) + len(tasks)))
-	return res
 }
 
 func (f *stateMachine) packErrors(err error, res []interface{}) []interface{} {
