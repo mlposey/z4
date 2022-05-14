@@ -115,10 +115,7 @@ func (a *Admin) PurgeTasks(ctx context.Context, req *proto.PurgeTasksRequest) (*
 	}
 	feed.Feed().Namespace.N.LastIndex = skip
 
-	err = cluster.ApplyPurgeTasksCommand(a.raft, req).Error()
-	if err != nil {
-		return nil, status.Errorf(codes.Internal, "purge failed: %v", err)
-	}
+	cluster.ApplyPurgeTasksCommand(a.raft, req)
 	return new(emptypb.Empty), nil
 }
 
