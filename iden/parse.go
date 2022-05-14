@@ -1,22 +1,19 @@
 package iden
 
 import (
-	"encoding/base64"
 	"fmt"
+	"math/big"
 )
 
 func ParseString(v string) (TaskID, error) {
-	dec, err := base64.StdEncoding.DecodeString(v)
-	if err != nil {
-		return TaskID{}, err
-	}
-
-	if len(dec) != 16 {
+	var i big.Int
+	_, ok := i.SetString(v, 62)
+	if !ok {
 		return TaskID{}, fmt.Errorf("invalid task id: %s", v)
 	}
 
 	var id TaskID
-	copy(id[:], dec)
+	copy(id[:], i.Bytes())
 	return id, nil
 }
 
