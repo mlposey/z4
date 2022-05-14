@@ -150,9 +150,7 @@ func (str StreamTaskResult) Ack() {
 	str.acks <- &proto.Ack{
 		Reference: &proto.TaskReference{
 			Namespace: str.Task.GetNamespace(),
-			Id: &proto.TaskReference_TaskId{
-				TaskId: str.Task.GetId(),
-			},
+			TaskId:    str.Task.GetId(),
 		},
 	}
 }
