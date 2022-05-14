@@ -70,7 +70,7 @@ func (p *Peer) initStorage() error {
 	}
 	p.stableStore = raftutil.NewStableStore(p.config.DB.DB)
 
-	p.snapshots, err = raft.NewFileSnapshotStore(p.config.DataDir, 3, os.Stderr)
+	p.snapshots, err = raft.NewFileSnapshotStore(p.config.DataDir, 1, os.Stderr)
 	if err != nil {
 		return fmt.Errorf(`raft.NewFileSnapshotStore(%q, ...): %v`, p.config.DataDir, err)
 	}
