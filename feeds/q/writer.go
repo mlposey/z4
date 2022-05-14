@@ -1,8 +1,6 @@
 package q
 
 import (
-	"github.com/bluele/gcache"
-	"github.com/dgraph-io/badger/v3"
 	"github.com/mlposey/z4/proto"
 	"github.com/mlposey/z4/storage"
 	"github.com/mlposey/z4/telemetry"
@@ -12,9 +10,9 @@ import (
 )
 
 type taskWriter struct {
-	tasks    *storage.TaskStore
-	seqCache gcache.Cache
-	close    chan bool
+	tasks   *storage.TaskStore
+	indexes *storage.IndexStore
+	close   chan bool
 
 	ackBuffer     []*proto.Ack
 	ackMu         sync.Mutex
@@ -22,31 +20,10 @@ type taskWriter struct {
 }
 
 func NewTaskWriter(tasks *storage.TaskStore, namespaces *storage.NamespaceStore) TaskWriter {
-	release := func(namespace string, seq *badger.Sequence) {
-		telemetry.Logger.Info("closing seq")
-		err := seq.Release()
-		if err != nil {
-			telemetry.Logger.Error("failed to close sequence",
-				zap.Error(err),
-				zap.String("namespace", namespace))
-		}
-	}
-
 	w := &taskWriter{
-		tasks: tasks,
-		close: make(chan bool),
-		seqCache: gcache.New(100).
-			ARC().
-			LoaderFunc(func(i interface{}) (interface{}, error) {
-				return namespaces.Sequence(i.(string))
-			}).
-			EvictedFunc(func(key interface{}, value interface{}) {
-				release(key.(string), value.(*badger.Sequence))
-			}).
-			PurgeVisitorFunc(func(key interface{}, value interface{}) {
-				release(key.(string), value.(*badger.Sequence))
-			}).
-			Build(),
+		tasks:   tasks,
+		close:   make(chan bool),
+		indexes: storage.NewIndexStore(namespaces),
 	}
 	go w.handleAckFlush()
 	return w
@@ -57,11 +34,7 @@ func (s *taskWriter) PurgeTasks(namespace string) error {
 }
 
 func (s *taskWriter) NextIndex(namespace string) (uint64, error) {
-	seq, err := s.seqCache.Get(namespace)
-	if err != nil {
-		return 0, err
-	}
-	return seq.(*badger.Sequence).Next()
+	return s.indexes.Next(namespace)
 }
 
 func (s *taskWriter) Push(tasks []*proto.Task) error {
@@ -111,6 +84,5 @@ func (s *taskWriter) flush() {
 
 func (s *taskWriter) Close() error {
 	s.close <- true
-	s.seqCache.Purge()
-	return nil
+	return s.indexes.Close()
 }
