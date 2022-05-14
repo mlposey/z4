@@ -10,8 +10,6 @@ import (
 
 var ErrNoTime = errors.New("id contains no time component")
 
-// TODO: Expand id bytes to fill padding?
-
 type TaskID [16]byte
 
 func New(ts time.Time, index uint64) TaskID {
