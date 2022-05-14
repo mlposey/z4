@@ -10,20 +10,18 @@ import (
 )
 
 type taskWriter struct {
-	tasks   *storage.TaskStore
-	indexes *storage.IndexStore
-	close   chan bool
+	tasks *storage.TaskStore
+	close chan bool
 
 	ackBuffer     []*proto.Ack
 	ackMu         sync.Mutex
 	flushInterval *time.Ticker
 }
 
-func NewTaskWriter(tasks *storage.TaskStore, namespaces *storage.NamespaceStore) TaskWriter {
+func NewTaskWriter(tasks *storage.TaskStore) TaskWriter {
 	w := &taskWriter{
-		tasks:   tasks,
-		close:   make(chan bool),
-		indexes: storage.NewIndexStore(namespaces),
+		tasks: tasks,
+		close: make(chan bool),
 	}
 	go w.handleAckFlush()
 	return w
@@ -31,10 +29,6 @@ func NewTaskWriter(tasks *storage.TaskStore, namespaces *storage.NamespaceStore)
 
 func (s *taskWriter) PurgeTasks(namespace string) error {
 	return s.tasks.PurgeTasks(namespace)
-}
-
-func (s *taskWriter) NextIndex(namespace string) (uint64, error) {
-	return s.indexes.Next(namespace)
 }
 
 func (s *taskWriter) Push(tasks []*proto.Task) error {
@@ -84,5 +78,5 @@ func (s *taskWriter) flush() {
 
 func (s *taskWriter) Close() error {
 	s.close <- true
-	return s.indexes.Close()
+	return nil
 }

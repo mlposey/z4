@@ -136,10 +136,8 @@ func (q *Queue) makeTask(req *proto.PushTaskRequest) (*proto.Task, error) {
 		return nil, err
 	}
 
-	if ts.IsZero() {
-		task.Id = id.String()
-	} else {
-		task.Id = id.String()
+	task.Id = id.String()
+	if !ts.IsZero() {
 		task.ScheduleTime = timestamppb.New(ts)
 	}
 	return task, nil

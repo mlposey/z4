@@ -3,7 +3,6 @@ package storage
 import (
 	"bytes"
 	"errors"
-	"fmt"
 	"github.com/dgraph-io/badger/v3"
 	"github.com/mlposey/z4/iden"
 	"github.com/mlposey/z4/proto"
@@ -136,7 +135,7 @@ type ScheduledRange struct {
 }
 
 func (tr *ScheduledRange) GetPrefix() []byte {
-	return []byte(fmt.Sprintf("task#sched#%s#", tr.Namespace))
+	return getSchedPrefix(tr.Namespace)
 }
 
 func (tr *ScheduledRange) GetNamespace() string {
@@ -167,7 +166,7 @@ type FifoRange struct {
 }
 
 func (fr *FifoRange) GetPrefix() []byte {
-	return []byte(fmt.Sprintf("task#fifo#%s#", fr.Namespace))
+	return getFifoPrefix(fr.Namespace)
 }
 
 func (fr *FifoRange) GetNamespace() string {

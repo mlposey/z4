@@ -50,7 +50,7 @@ type deliveredTaskFetcher struct {
 }
 
 func (dtf *deliveredTaskFetcher) Process(handle func(task *proto.Task) error) error {
-	dtf.lastDelivery = dtf.LastDeliveredID.Time()
+	dtf.lastDelivery = dtf.LastDeliveredID.MustTime()
 
 	dtf.watermark = time.Now().Add(-dtf.AckDeadline)
 	it := storage.NewTaskIterator(dtf.Tasks.Client, &storage.ScheduledRange{
@@ -71,7 +71,7 @@ func (dtf *deliveredTaskFetcher) Process(handle func(task *proto.Task) error) er
 }
 
 func (dtf *deliveredTaskFetcher) retryTask(task *proto.Task) bool {
-	scheduleTime := iden.MustParseString(task.GetId()).Time()
+	scheduleTime := iden.MustParseString(task.GetId()).MustTime()
 	lastRetry := task.GetLastRetry().AsTime()
 
 	return !scheduleTime.After(dtf.lastDelivery) &&

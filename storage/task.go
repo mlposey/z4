@@ -3,6 +3,7 @@ package storage
 import (
 	"bytes"
 	"encoding/binary"
+	"errors"
 	"fmt"
 	"github.com/dgraph-io/badger/v3"
 	"github.com/mlposey/z4/iden"
@@ -109,7 +110,8 @@ func getAckKey(ack *proto.Ack) ([]byte, error) {
 		return nil, err
 	}
 
-	if id.Time().IsZero() {
+	_, err = id.Time()
+	if errors.Is(err, iden.ErrNoTime) {
 		return getFifoTaskKey(ack.GetReference().GetNamespace(), id), nil
 	} else {
 		return getScheduledTaskKey(ack.GetReference().GetNamespace(), id), nil

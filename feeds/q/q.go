@@ -7,7 +7,6 @@ import (
 type TaskWriter interface {
 	Push(tasks []*proto.Task) error
 	Acknowledge(acks []*proto.Ack) error
-	NextIndex(namespace string) (uint64, error)
 	PurgeTasks(namespace string) error
 	Close() error
 }

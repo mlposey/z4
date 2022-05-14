@@ -148,27 +148,27 @@ func (r *taskTableIterator) detectTimeBounds(f sql.Expression) bool {
 	case *expression.GreaterThan:
 		if r.isFieldExpression(v.Left(), taskColumnDeliverAt) {
 			r.rangeStart = r.getTime(v.Right())
-			r.rangeEnd = iden.Max.Time()
+			r.rangeEnd = iden.Max.MustTime()
 			return true
 		}
 
 	case *expression.GreaterThanOrEqual:
 		if r.isFieldExpression(v.Left(), taskColumnDeliverAt) {
 			r.rangeStart = r.getTime(v.Right())
-			r.rangeEnd = iden.Max.Time()
+			r.rangeEnd = iden.Max.MustTime()
 			return true
 		}
 
 	case *expression.LessThan:
 		if r.isFieldExpression(v.Left(), taskColumnDeliverAt) {
-			r.rangeStart = iden.Min.Time()
+			r.rangeStart = iden.Min.MustTime()
 			r.rangeEnd = r.getTime(v.Right())
 			return true
 		}
 
 	case *expression.LessThanOrEqual:
 		if r.isFieldExpression(v.Left(), taskColumnDeliverAt) {
-			r.rangeStart = iden.Min.Time()
+			r.rangeStart = iden.Min.MustTime()
 			r.rangeEnd = r.getTime(v.Right())
 			return true
 		}

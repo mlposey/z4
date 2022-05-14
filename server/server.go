@@ -45,10 +45,8 @@ func (s *Server) Start() error {
 
 	s.config.PeerConfig.Tasks = storage.NewTaskStore(s.config.DB)
 	s.config.PeerConfig.Namespaces = storage.NewNamespaceStore(s.config.DB)
-	s.config.PeerConfig.Writer = q.NewTaskWriter(
-		s.config.PeerConfig.Tasks,
-		s.config.PeerConfig.Namespaces,
-	)
+	s.config.PeerConfig.Writer = q.NewTaskWriter(s.config.PeerConfig.Tasks)
+
 	s.config.PeerConfig.DB = s.config.DB
 	s.peer, err = cluster.NewPeer(s.config.PeerConfig)
 	if err != nil {
