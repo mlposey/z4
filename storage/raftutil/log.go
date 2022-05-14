@@ -90,6 +90,7 @@ func (b *BadgerLogStore) StoreLogs(logs []*raft.Log) error {
 		if err != nil {
 			return err
 		}
+
 		err = batch.Set(getLogKey(log.Index), payload)
 		if err != nil {
 			return err
