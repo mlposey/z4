@@ -3,7 +3,7 @@ package util
 import (
 	"errors"
 	"fmt"
-	"github.com/segmentio/ksuid"
+	"github.com/google/uuid"
 	"io"
 	"os"
 	"os/exec"
@@ -24,8 +24,8 @@ type LocalServer struct {
 
 func NewLocalServer(port int) *LocalServer {
 	return &LocalServer{
-		dbDataDir:   "/tmp/" + ksuid.New().String(),
-		peerDataDir: "/tmp/" + ksuid.New().String(),
+		dbDataDir:   "/tmp/" + uuid.New().String(),
+		peerDataDir: "/tmp/" + uuid.New().String(),
 		serverPort:  port,
 	}
 }

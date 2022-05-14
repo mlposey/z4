@@ -5,9 +5,9 @@ import (
 	"encoding/json"
 	"fmt"
 	"github.com/cucumber/godog"
+	"github.com/google/uuid"
 	"github.com/mlposey/z4/proto"
 	"github.com/mlposey/z4/tests/util"
-	"github.com/segmentio/ksuid"
 	"go.uber.org/multierr"
 	pb "google.golang.org/protobuf/proto"
 	"testing"
@@ -93,7 +93,7 @@ func (ts *taskStreams) iBeginStreamingAfterASecondDelay(arg1 int) error {
 }
 
 func (ts *taskStreams) consumeTaskStream(namespace string) error {
-	stream, err := ts.client.PullTasks(ksuid.New().String(), namespace)
+	stream, err := ts.client.PullTasks(uuid.New().String(), namespace)
 	if err != nil {
 		return err
 	}
@@ -124,7 +124,7 @@ func (ts *taskStreams) iHaveCreatedTheTask(arg1 *godog.DocString) error {
 	}
 
 	ts.taskRequest = &proto.PushTaskRequest{
-		RequestId: ksuid.New().String(),
+		RequestId: uuid.New().String(),
 		Namespace: taskDef["namespace"].(string),
 		Schedule: &proto.PushTaskRequest_TtsSeconds{
 			TtsSeconds: int64(taskDef["tts_seconds"].(float64)),

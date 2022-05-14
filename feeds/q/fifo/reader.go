@@ -3,6 +3,7 @@ package fifo
 import (
 	"context"
 	"github.com/mlposey/z4/feeds/q"
+	"github.com/mlposey/z4/iden"
 	"github.com/mlposey/z4/proto"
 	"github.com/mlposey/z4/storage"
 	"github.com/mlposey/z4/telemetry"
@@ -73,7 +74,8 @@ func (tr *taskReader) startReadLoop() {
 
 // pullAndPush loads ready tasks from storage and delivers them to consumers.
 func (tr *taskReader) pullAndPush(prefetch int) (int, error) {
-	lastIndex := tr.namespace.LastIndex
+	lastID := tr.namespace.LastDeliveredQueuedTask
+	lastIndex := iden.MustParseString(lastID).Index()
 	if time.Since(tr.lastSweep) > time.Second*30 {
 		tr.lastSweep = time.Now()
 		go func(tag uint64) {
@@ -131,8 +133,7 @@ func (tr *taskReader) processDelivered(lastIndex uint64) error {
 		return nil
 	}
 
-	// TODO: Batch task writes using buffers instead of saving one large slice.
-	err = tr.tasks.SaveAll(tasks)
+	err = tr.tasks.SaveAll(tasks, false)
 	if err != nil {
 		telemetry.Logger.Error("failed to update retry tasks",
 			zap.Error(err))
@@ -155,7 +156,7 @@ func (tr *taskReader) processUndelivered(lastIndex uint64, prefetch int) (int, e
 		if err := tr.push(task); err != nil {
 			return err
 		}
-		tr.namespace.LastIndex = task.GetIndex()
+		tr.namespace.LastDeliveredQueuedTask = task.GetId()
 		count++
 		return nil
 	})

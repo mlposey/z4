@@ -12,9 +12,8 @@ const (
 	namespaceTableID  = "namespace"
 	namespaceColumnID = "id"
 
-	// TODO: Find better names for these.
-	namespaceColumnLastTask  = "last_scheduled_task_id"
-	namespaceColumnLastIndex = "last_queued_task_index"
+	namespaceColumnLastScheduled = "last_delivered_scheduled_task"
+	namespaceColumnLastQueued    = "last_delivered_queued_task"
 
 	namespaceColumnAckDeadline = "ack_deadline_seconds"
 )
@@ -32,8 +31,8 @@ func newNamespaceTable(namespaces *storage.NamespaceStore) *namespaceTable {
 		name: namespaceTableID,
 		schema: sql.Schema{
 			{Name: namespaceColumnID, Type: sql.Text, Nullable: false, Source: namespaceTableID},
-			{Name: namespaceColumnLastTask, Type: sql.Text, Nullable: true, Source: namespaceTableID},
-			{Name: namespaceColumnLastIndex, Type: sql.Uint64, Nullable: true, Source: namespaceTableID},
+			{Name: namespaceColumnLastScheduled, Type: sql.Text, Nullable: true, Source: namespaceTableID},
+			{Name: namespaceColumnLastQueued, Type: sql.Text, Nullable: true, Source: namespaceTableID},
 			{Name: namespaceColumnAckDeadline, Type: sql.Uint32, Nullable: false, Source: namespaceTableID},
 		},
 		namespaces: namespaces,
@@ -90,8 +89,8 @@ func (r *namespaceTableIterator) Next() (sql.Row, error) {
 func (r *namespaceTableIterator) rowFromNamespace(namespace *proto.Namespace) sql.Row {
 	return sql.NewRow(
 		namespace.GetId(),
-		namespace.GetLastTask(),
-		namespace.GetLastIndex(),
+		namespace.GetLastDeliveredScheduledTask(),
+		namespace.GetLastDeliveredQueuedTask(),
 		namespace.GetAckDeadlineSeconds(),
 	)
 }

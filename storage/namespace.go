@@ -23,11 +23,11 @@ func NewNamespaceStore(client *BadgerClient) *NamespaceStore {
 }
 
 func (cs *NamespaceStore) Sequence(namespaceID string) (*badger.Sequence, error) {
-	key := cs.getSeqKey(namespaceID)
+	key := getSeqKey(namespaceID)
 	return cs.Client.DB.GetSequence(key, 1000)
 }
 
-func (cs *NamespaceStore) getSeqKey(namespaceID string) []byte {
+func getSeqKey(namespaceID string) []byte {
 	return []byte(fmt.Sprintf("namespace#seq#%s", namespaceID))
 }
 

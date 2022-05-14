@@ -6,9 +6,9 @@ import (
 	"flag"
 	"fmt"
 	"github.com/mlposey/z4/proto"
-	"github.com/segmentio/ksuid"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials/insecure"
+	"google.golang.org/grpc/metadata"
 )
 
 func main() {
@@ -94,19 +94,10 @@ func info(client proto.AdminClient) {
 }
 
 func consume(client proto.QueueClient, namespace string) {
-	stream, err := client.Pull(context.Background())
-	if err != nil {
-		panic(err)
-	}
+	md := metadata.New(map[string]string{"namespace": namespace})
+	ctx := metadata.NewOutgoingContext(context.Background(), md)
 
-	err = stream.Send(&proto.PullRequest{
-		Request: &proto.PullRequest_StartReq{
-			StartReq: &proto.StartStreamRequest{
-				RequestId: ksuid.New().String(),
-				Namespace: namespace,
-			},
-		},
-	})
+	stream, err := client.Pull(ctx)
 	if err != nil {
 		panic(err)
 	}
@@ -125,28 +116,10 @@ func consume(client proto.QueueClient, namespace string) {
 		}
 		fmt.Println(string(out))
 
-		var ref *proto.TaskReference
-		if task.GetScheduleTime() == nil {
-			ref = &proto.TaskReference{
+		err = stream.Send(&proto.Ack{
+			Reference: &proto.TaskReference{
 				Namespace: task.GetNamespace(),
-				Id: &proto.TaskReference_Index{
-					Index: task.GetIndex(),
-				},
-			}
-		} else {
-			ref = &proto.TaskReference{
-				Namespace: task.GetNamespace(),
-				Id: &proto.TaskReference_TaskId{
-					TaskId: task.GetId(),
-				},
-			}
-		}
-
-		err = stream.Send(&proto.PullRequest{
-			Request: &proto.PullRequest_Ack{
-				Ack: &proto.Ack{
-					Reference: ref,
-				},
+				TaskId:    task.GetId(),
 			},
 		})
 		if err != nil {

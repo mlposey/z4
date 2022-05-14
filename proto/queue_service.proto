@@ -22,8 +22,12 @@ service Queue {
 
   // Pull opens a bi-directional stream for consuming ready tasks.
   //
+  // Metadata must be passed to the server to indicate which
+  // namespace to consume from. The metadata key must be "namespace"
+  // and its value a single string that identifies the namespace.
+  //
   // This rpc must be called on the leader.
-  rpc Pull(stream PullRequest) returns (stream Task) {};
+  rpc Pull(stream Ack) returns (stream Task) {};
 
   // Get retrieves a task by its ID.
   //
@@ -92,18 +96,6 @@ message PushStreamResponse {
   uint32 status = 2;
   string message = 3;
   string forwarded_to = 4;
-}
-
-message PullRequest {
-  oneof request {
-    StartStreamRequest start_req = 1;
-    Ack ack = 2;
-  }
-}
-
-message StartStreamRequest {
-  string request_id = 1;
-  string namespace = 2;
 }
 
 message GetTaskRequest {

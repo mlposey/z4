@@ -5,10 +5,10 @@ import (
 	"github.com/araddon/dateparse"
 	"github.com/dolthub/go-mysql-server/sql"
 	"github.com/dolthub/go-mysql-server/sql/expression"
+	"github.com/mlposey/z4/iden"
 	"github.com/mlposey/z4/proto"
 	"github.com/mlposey/z4/storage"
 	"github.com/mlposey/z4/telemetry"
-	"github.com/segmentio/ksuid"
 	"go.uber.org/zap"
 	"io"
 	"time"
@@ -130,8 +130,8 @@ func (r *taskTableIterator) initBounds() error {
 
 	r.it = storage.NewTaskIterator(r.store.Client, &storage.ScheduledRange{
 		Namespace: r.namespace,
-		StartID:   storage.NewTaskID(r.rangeStart),
-		EndID:     storage.NewTaskID(r.rangeEnd),
+		StartID:   iden.New(r.rangeStart, 0),
+		EndID:     iden.New(r.rangeEnd, 0),
 	})
 	return nil
 }
@@ -148,27 +148,27 @@ func (r *taskTableIterator) detectTimeBounds(f sql.Expression) bool {
 	case *expression.GreaterThan:
 		if r.isFieldExpression(v.Left(), taskColumnDeliverAt) {
 			r.rangeStart = r.getTime(v.Right())
-			r.rangeEnd = ksuid.Max.Time()
+			r.rangeEnd = iden.Max.MustTime()
 			return true
 		}
 
 	case *expression.GreaterThanOrEqual:
 		if r.isFieldExpression(v.Left(), taskColumnDeliverAt) {
 			r.rangeStart = r.getTime(v.Right())
-			r.rangeEnd = ksuid.Max.Time()
+			r.rangeEnd = iden.Max.MustTime()
 			return true
 		}
 
 	case *expression.LessThan:
 		if r.isFieldExpression(v.Left(), taskColumnDeliverAt) {
-			r.rangeStart = ksuid.Nil.Time()
+			r.rangeStart = iden.Min.MustTime()
 			r.rangeEnd = r.getTime(v.Right())
 			return true
 		}
 
 	case *expression.LessThanOrEqual:
 		if r.isFieldExpression(v.Left(), taskColumnDeliverAt) {
-			r.rangeStart = ksuid.Nil.Time()
+			r.rangeStart = iden.Min.MustTime()
 			r.rangeEnd = r.getTime(v.Right())
 			return true
 		}

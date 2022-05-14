@@ -35,6 +35,10 @@ type QueueClient interface {
 	PushStream(ctx context.Context, opts ...grpc.CallOption) (Queue_PushStreamClient, error)
 	// Pull opens a bi-directional stream for consuming ready tasks.
 	//
+	// Metadata must be passed to the server to indicate which
+	// namespace to consume from. The metadata key must be "namespace"
+	// and its value a single string that identifies the namespace.
+	//
 	// This rpc must be called on the leader.
 	Pull(ctx context.Context, opts ...grpc.CallOption) (Queue_PullClient, error)
 	// Get retrieves a task by its ID.
@@ -108,7 +112,7 @@ func (c *queueClient) Pull(ctx context.Context, opts ...grpc.CallOption) (Queue_
 }
 
 type Queue_PullClient interface {
-	Send(*PullRequest) error
+	Send(*Ack) error
 	Recv() (*Task, error)
 	grpc.ClientStream
 }
@@ -117,7 +121,7 @@ type queuePullClient struct {
 	grpc.ClientStream
 }
 
-func (x *queuePullClient) Send(m *PullRequest) error {
+func (x *queuePullClient) Send(m *Ack) error {
 	return x.ClientStream.SendMsg(m)
 }
 
@@ -163,6 +167,10 @@ type QueueServer interface {
 	// This rpc should be called on the leader.
 	PushStream(Queue_PushStreamServer) error
 	// Pull opens a bi-directional stream for consuming ready tasks.
+	//
+	// Metadata must be passed to the server to indicate which
+	// namespace to consume from. The metadata key must be "namespace"
+	// and its value a single string that identifies the namespace.
 	//
 	// This rpc must be called on the leader.
 	Pull(Queue_PullServer) error
@@ -262,7 +270,7 @@ func _Queue_Pull_Handler(srv interface{}, stream grpc.ServerStream) error {
 
 type Queue_PullServer interface {
 	Send(*Task) error
-	Recv() (*PullRequest, error)
+	Recv() (*Ack, error)
 	grpc.ServerStream
 }
 
@@ -274,8 +282,8 @@ func (x *queuePullServer) Send(m *Task) error {
 	return x.ServerStream.SendMsg(m)
 }
 
-func (x *queuePullServer) Recv() (*PullRequest, error) {
-	m := new(PullRequest)
+func (x *queuePullServer) Recv() (*Ack, error) {
+	m := new(Ack)
 	if err := x.ServerStream.RecvMsg(m); err != nil {
 		return nil, err
 	}

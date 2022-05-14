@@ -45,10 +45,8 @@ func (s *Server) Start() error {
 
 	s.config.PeerConfig.Tasks = storage.NewTaskStore(s.config.DB)
 	s.config.PeerConfig.Namespaces = storage.NewNamespaceStore(s.config.DB)
-	s.config.PeerConfig.Writer = q.NewTaskWriter(
-		s.config.PeerConfig.Tasks,
-		s.config.PeerConfig.Namespaces,
-	)
+	s.config.PeerConfig.Writer = q.NewTaskWriter(s.config.PeerConfig.Tasks)
+
 	s.config.PeerConfig.DB = s.config.DB
 	s.peer, err = cluster.NewPeer(s.config.PeerConfig)
 	if err != nil {
@@ -61,13 +59,16 @@ func (s *Server) Start() error {
 	if err != nil {
 		return fmt.Errorf("failed to obtain leader handle: %w", err)
 	}
+	s.peer.LoadHandle(handle)
+
+	gen := storage.NewGenerator(storage.NewIndexStore(s.config.PeerConfig.Namespaces))
 
 	s.server = grpc.NewServer(s.config.Opts...)
-	adminServer := api.NewAdmin(s.peer.Raft, s.config.PeerConfig, handle, s.fm,
-		s.config.PeerConfig.Writer)
+	adminServer := api.NewAdmin(s.peer.Raft, s.config.PeerConfig, handle, s.fm, gen)
 	proto.RegisterAdminServer(s.server, adminServer)
 
-	collectionServer := api.NewQueue(s.fm, s.config.PeerConfig.Tasks, s.peer.Raft, handle)
+	collectionServer := api.NewQueue(s.fm, s.config.PeerConfig.Tasks,
+		s.peer.Raft, handle, gen)
 	proto.RegisterQueueServer(s.server, collectionServer)
 
 	go telemetry.StartPromServer(s.config.MetricsPort)

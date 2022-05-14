@@ -5,12 +5,11 @@ import (
 	"fmt"
 	"github.com/dgraph-io/badger/v3"
 	"github.com/hashicorp/raft"
+	"github.com/mlposey/z4/iden"
 	"github.com/mlposey/z4/proto"
 	"github.com/mlposey/z4/telemetry"
-	"github.com/segmentio/ksuid"
 	"go.uber.org/zap"
 	pb "google.golang.org/protobuf/proto"
-	"math"
 	"time"
 )
 
@@ -73,10 +72,10 @@ func (sn *SyncedNamespace) load() error {
 
 	// Default settings for new namespaces go here.
 	sn.N = &proto.Namespace{
-		Id:                 sn.namespace,
-		LastTask:           NewTaskID(ksuid.Nil.Time()),
-		LastIndex:          math.MaxUint64,
-		AckDeadlineSeconds: 300, // 5 minutes
+		Id:                         sn.namespace,
+		LastDeliveredQueuedTask:    iden.Max.String(),
+		LastDeliveredScheduledTask: iden.Min.String(),
+		AckDeadlineSeconds:         300, // 5 minutes
 	}
 
 	err = sn.trySave()

@@ -7,6 +7,7 @@ import (
 	"github.com/mlposey/z4/telemetry"
 	"go.uber.org/zap"
 	"google.golang.org/grpc/codes"
+	"google.golang.org/grpc/metadata"
 	"google.golang.org/grpc/status"
 )
 
@@ -32,19 +33,19 @@ func NewTaskBroker(
 }
 
 func (tb *TaskBroker) Start() error {
-	start, err := tb.stream.Recv()
-	if err != nil {
-		return status.Errorf(codes.Internal, "failed to start GetTaskStream stream")
+	md, ok := metadata.FromIncomingContext(tb.stream.Context())
+	if !ok {
+		return status.Errorf(codes.InvalidArgument, "missing metadata")
 	}
-
-	if start.GetStartReq() == nil {
-		return status.Error(codes.InvalidArgument, "got unexpected start request")
+	ns := md.Get("namespace")
+	if len(ns) != 1 {
+		return status.Errorf(codes.InvalidArgument, "expected one namespace in metadata")
 	}
+	tb.namespace = ns[0]
 
-	tb.namespace = start.GetStartReq().GetNamespace()
 	l, err := tb.fm.Lease(tb.namespace)
 	if err != nil {
-		return status.Errorf(codes.Internal, "could not start task feed")
+		return status.Errorf(codes.Internal, "could not start task feed: %v", err)
 	}
 	tb.lease = l
 
@@ -61,7 +62,7 @@ func (tb *TaskBroker) Close() error {
 
 func (tb *TaskBroker) startAckListener() {
 	for {
-		req, err := tb.stream.Recv()
+		ack, err := tb.stream.Recv()
 		if err != nil {
 			telemetry.Logger.Debug("closing ack stream",
 				zap.Error(err),
@@ -69,18 +70,12 @@ func (tb *TaskBroker) startAckListener() {
 			return
 		}
 
-		if req.GetAck() == nil {
-			telemetry.Logger.Warn("got invalid ack",
-				zap.String("namespace", tb.namespace))
-			continue
-		}
-
 		telemetry.RemovedTasks.
-			WithLabelValues("Ack", req.GetAck().GetReference().GetNamespace()).
+			WithLabelValues("Ack", ack.GetReference().GetNamespace()).
 			Inc()
 
 		// This is intentionally async.
-		cluster.ApplyAckCommand(tb.raft, req.GetAck())
+		cluster.ApplyAckCommand(tb.raft, ack)
 	}
 }
 

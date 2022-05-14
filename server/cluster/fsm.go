@@ -18,15 +18,24 @@ type stateMachine struct {
 	db     *badger.DB
 	writer q.TaskWriter
 	ns     *storage.NamespaceStore
+	handle *LeaderHandle
 }
 
-func newFSM(db *badger.DB, ts q.TaskWriter, ns *storage.NamespaceStore) *stateMachine {
+func newFSM(
+	db *badger.DB,
+	ts q.TaskWriter,
+	ns *storage.NamespaceStore,
+) *stateMachine {
 	// TODO: Do not pass a *badger.DB directly. Create a new type.
 	return &stateMachine{
 		db:     db,
 		writer: ts,
 		ns:     ns,
 	}
+}
+
+func (f *stateMachine) SetHandle(handle *LeaderHandle) {
+	f.handle = handle
 }
 
 func (f *stateMachine) ApplyBatch(logs []*raft.Log) []interface{} {
@@ -68,13 +77,6 @@ func (f *stateMachine) splitLogs(logs []*raft.Log) (*splitBatch, error) {
 
 		switch v := cmd.GetCmd().(type) {
 		case *proto.Command_Task:
-			if v.Task.GetScheduleTime() == nil {
-				index, err := f.writer.NextIndex(v.Task.GetNamespace())
-				if err != nil {
-					return nil, err
-				}
-				v.Task.Index = index
-			}
 			sb.Tasks = append(sb.Tasks, v.Task)
 
 		case *proto.Command_Ack:
@@ -128,7 +130,11 @@ func (f *stateMachine) applyTasks(tasks []*proto.Task, wg *sync.WaitGroup, err *
 		wg.Add(1)
 		go func() {
 			defer wg.Done()
-			*err = f.writer.Push(tasks)
+			if f.handle == nil {
+				*err = f.writer.Push(tasks, true)
+			} else {
+				*err = f.writer.Push(tasks, !f.handle.IsLeader())
+			}
 		}()
 	}
 }

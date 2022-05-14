@@ -3,20 +3,20 @@ package storage
 import (
 	"bytes"
 	"errors"
-	"fmt"
 	"github.com/dgraph-io/badger/v3"
+	"github.com/mlposey/z4/iden"
 	"github.com/mlposey/z4/proto"
 	pb "google.golang.org/protobuf/proto"
 	"io"
+	"time"
 )
 
 // TaskIterator iterates over a range of tasks in the database.
 type TaskIterator struct {
-	txn    *badger.Txn
-	it     *badger.Iterator
-	end    []byte
-	prefix []byte
-	buf    []byte
+	txn *badger.Txn
+	it  *badger.Iterator
+	end []byte
+	buf []byte
 }
 
 func NewTaskIterator(client *BadgerClient, query TaskRange) *TaskIterator {
@@ -25,6 +25,7 @@ func NewTaskIterator(client *BadgerClient, query TaskRange) *TaskIterator {
 
 	txn := client.DB.NewTransaction(false)
 	opts := badger.DefaultIteratorOptions
+	opts.Prefix = query.GetPrefix()
 	if query.GetPrefetch() != 0 {
 		opts.PrefetchSize = query.GetPrefetch()
 	} else {
@@ -35,10 +36,9 @@ func NewTaskIterator(client *BadgerClient, query TaskRange) *TaskIterator {
 	it.Seek(start)
 
 	return &TaskIterator{
-		txn:    txn,
-		it:     it,
-		end:    query.GetEnd(),
-		prefix: query.GetPrefix(),
+		txn: txn,
+		it:  it,
+		end: query.GetEnd(),
 	}
 }
 
@@ -61,7 +61,7 @@ func (ti *TaskIterator) ForEach(handle func(task *proto.Task) error) error {
 }
 
 func (ti *TaskIterator) Next() (*proto.Task, error) {
-	if !ti.it.ValidForPrefix(ti.prefix) {
+	if !ti.it.Valid() {
 		return nil, io.EOF
 	}
 
@@ -77,7 +77,7 @@ func (ti *TaskIterator) Peek() (*proto.Task, error) {
 }
 
 func (ti *TaskIterator) peek(skipCheck bool) (*proto.Task, error) {
-	if !skipCheck && !ti.it.ValidForPrefix(ti.prefix) {
+	if !skipCheck && !ti.it.Valid() {
 		return nil, io.EOF
 	}
 
@@ -115,7 +115,6 @@ type TaskRange interface {
 	GetStart() []byte
 	GetEnd() []byte
 	GetPrefix() []byte
-	Validate() error
 	GetPrefetch() int
 }
 
@@ -126,17 +125,17 @@ type ScheduledRange struct {
 
 	// StartID restricts the search to all task IDs that are equal to it
 	// or occur after it in ascending sorted order.
-	StartID string
+	StartID iden.TaskID
 
 	// EndID restricts the search to all task IDs that are equal to it
 	// or occur before it in ascending sorted order.
-	EndID string
+	EndID iden.TaskID
 
 	Prefetch int
 }
 
 func (tr *ScheduledRange) GetPrefix() []byte {
-	return []byte(fmt.Sprintf("task#sched#%s#", tr.Namespace))
+	return getSchedPrefix(tr.Namespace)
 }
 
 func (tr *ScheduledRange) GetNamespace() string {
@@ -155,17 +154,6 @@ func (tr *ScheduledRange) GetPrefetch() int {
 	return tr.Prefetch
 }
 
-// Validate determines whether the ScheduledRange contains valid properties.
-func (tr *ScheduledRange) Validate() error {
-	if tr.StartID == "" {
-		return errors.New("missing start id in task range")
-	}
-	if tr.EndID == "" {
-		return errors.New("missing end id in task range")
-	}
-	return nil
-}
-
 // FifoRange is a query for tasks within an index range
 type FifoRange struct {
 	// Namespace restricts the search to only tasks in a given namespace.
@@ -178,7 +166,7 @@ type FifoRange struct {
 }
 
 func (fr *FifoRange) GetPrefix() []byte {
-	return []byte(fmt.Sprintf("task#fifo#%s#", fr.Namespace))
+	return getFifoPrefix(fr.Namespace)
 }
 
 func (fr *FifoRange) GetNamespace() string {
@@ -186,18 +174,15 @@ func (fr *FifoRange) GetNamespace() string {
 }
 
 func (fr *FifoRange) GetStart() []byte {
-	return getFifoTaskKey(fr.Namespace, fr.StartIndex)
+	id := iden.New(time.Time{}, fr.StartIndex)
+	return getFifoTaskKey(fr.Namespace, id)
 }
 
 func (fr *FifoRange) GetEnd() []byte {
-	return getFifoTaskKey(fr.Namespace, fr.EndIndex)
+	id := iden.New(time.Time{}, fr.EndIndex)
+	return getFifoTaskKey(fr.Namespace, id)
 }
 
 func (fr *FifoRange) GetPrefetch() int {
 	return fr.Prefetch
-}
-
-// Validate determines whether the ScheduledRange contains valid properties.
-func (fr *FifoRange) Validate() error {
-	return nil
 }

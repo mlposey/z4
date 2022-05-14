@@ -10,16 +10,17 @@ import (
 )
 
 type BadgerLogStore struct {
-	db     *badger.DB
-	prefix []byte
+	db    *badger.DB
+	cache *logCache
 }
 
 var _ raft.LogStore = (*BadgerLogStore)(nil)
+var logStorePrefix = []byte("raft#logstore#")
 
-func NewLogStore(db *badger.DB) (*BadgerLogStore, error) {
+func NewLogStore(db *badger.DB, prefetch int) (*BadgerLogStore, error) {
 	return &BadgerLogStore{
-		db:     db,
-		prefix: []byte("raft#logstore#"),
+		db:    db,
+		cache: newLogCache(db, prefetch),
 	}, nil
 }
 
@@ -28,11 +29,12 @@ func (b *BadgerLogStore) FirstIndex() (uint64, error) {
 	return index, b.db.View(func(txn *badger.Txn) error {
 		opts := badger.DefaultIteratorOptions
 		opts.PrefetchValues = false
+		opts.Prefix = logStorePrefix
 
 		it := txn.NewIterator(opts)
 		defer it.Close()
-		it.Seek(b.getKey(0))
-		if !it.ValidForPrefix(b.prefix) {
+		it.Seek(getLogKey(0))
+		if !it.Valid() {
 			return nil
 		}
 
@@ -49,11 +51,12 @@ func (b *BadgerLogStore) LastIndex() (uint64, error) {
 		opts := badger.DefaultIteratorOptions
 		opts.PrefetchValues = false
 		opts.Reverse = true
+		opts.Prefix = logStorePrefix
 
 		it := txn.NewIterator(opts)
 		defer it.Close()
-		it.Seek(b.getKey(math.MaxUint64))
-		if !it.ValidForPrefix(b.prefix) {
+		it.Seek(getLogKey(math.MaxUint64))
+		if !it.Valid() {
 			return nil
 		}
 
@@ -65,16 +68,7 @@ func (b *BadgerLogStore) LastIndex() (uint64, error) {
 }
 
 func (b *BadgerLogStore) GetLog(index uint64, log *raft.Log) error {
-	return b.db.View(func(txn *badger.Txn) error {
-		item, err := txn.Get(b.getKey(index))
-		if err != nil {
-			return err
-		}
-
-		return item.Value(func(val []byte) error {
-			return msgpack.Unmarshal(val, log)
-		})
-	})
+	return b.cache.Get(index, log)
 }
 
 func (b *BadgerLogStore) StoreLog(log *raft.Log) error {
@@ -83,7 +77,7 @@ func (b *BadgerLogStore) StoreLog(log *raft.Log) error {
 		if err != nil {
 			return err
 		}
-		return txn.Set(b.getKey(log.Index), payload)
+		return txn.Set(getLogKey(log.Index), payload)
 	})
 }
 
@@ -96,7 +90,8 @@ func (b *BadgerLogStore) StoreLogs(logs []*raft.Log) error {
 		if err != nil {
 			return err
 		}
-		err = batch.Set(b.getKey(log.Index), payload)
+
+		err = batch.Set(getLogKey(log.Index), payload)
 		if err != nil {
 			return err
 		}
@@ -109,7 +104,7 @@ func (b *BadgerLogStore) DeleteRange(min, max uint64) error {
 	defer batch.Cancel()
 
 	for i := min; i <= max; i++ {
-		err := batch.Delete(b.getKey(i))
+		err := batch.Delete(getLogKey(i))
 		if err != nil {
 			return err
 		}
@@ -117,9 +112,9 @@ func (b *BadgerLogStore) DeleteRange(min, max uint64) error {
 	return batch.Flush()
 }
 
-func (b *BadgerLogStore) getKey(index uint64) []byte {
+func getLogKey(index uint64) []byte {
 	k := bytes.NewBuffer(nil)
-	k.Write(b.prefix)
+	k.Write(logStorePrefix)
 	_ = binary.Write(k, binary.BigEndian, index)
 	return k.Bytes()
 }
