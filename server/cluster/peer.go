@@ -36,6 +36,7 @@ type Peer struct {
 	stableStore raft.StableStore
 	snapshots   *raft.FileSnapshotStore
 	transport   *raft.NetworkTransport
+	fsm         *stateMachine
 }
 
 func NewPeer(config PeerConfig) (*Peer, error) {
@@ -98,10 +99,10 @@ func (p *Peer) joinNetwork() error {
 		return fmt.Errorf("could not create transport for raft peer: %w", err)
 	}
 
-	fsm := newFSM(p.config.DB.DB, p.config.Writer, p.config.Namespaces)
+	p.fsm = newFSM(p.config.DB.DB, p.config.Writer, p.config.Namespaces)
 	p.Raft, err = raft.NewRaft(
 		c,
-		fsm,
+		p.fsm,
 		p.logStore,
 		p.stableStore,
 		p.snapshots,
@@ -132,6 +133,10 @@ func (p *Peer) tryBootstrap() {
 		telemetry.Logger.Error("failed to bootstrap cluster",
 			zap.Error(err))
 	}
+}
+
+func (p *Peer) LoadHandle(handle *LeaderHandle) {
+	p.fsm.SetHandle(handle)
 }
 
 // Close stops the raft server and flushes writes to disk.

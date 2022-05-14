@@ -31,8 +31,8 @@ func (s *taskWriter) PurgeTasks(namespace string) error {
 	return s.tasks.PurgeTasks(namespace)
 }
 
-func (s *taskWriter) Push(tasks []*proto.Task) error {
-	return s.tasks.SaveAll(tasks)
+func (s *taskWriter) Push(tasks []*proto.Task, isFollower bool) error {
+	return s.tasks.SaveAll(tasks, isFollower)
 }
 
 func (s *taskWriter) Acknowledge(acks []*proto.Ack) error {

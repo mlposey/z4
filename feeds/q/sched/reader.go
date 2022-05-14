@@ -132,8 +132,7 @@ func (tr *taskReader) processDelivered(lastID iden.TaskID) error {
 		return nil
 	}
 
-	// TODO: Batch task writes using buffers instead of saving one large slice.
-	err = tr.tasks.SaveAll(tasks)
+	err = tr.tasks.SaveAll(tasks, false)
 	if err != nil {
 		telemetry.Logger.Error("failed to update retry tasks",
 			zap.Error(err))

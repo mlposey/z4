@@ -59,20 +59,40 @@ func (ts *TaskStore) DeleteAll(acks []*proto.Ack) error {
 	return batch.Flush()
 }
 
-func (ts *TaskStore) SaveAll(tasks []*proto.Task) error {
+func (ts *TaskStore) SaveAll(tasks []*proto.Task, saveIndex bool) error {
 	telemetry.Logger.Debug("writing task batch to DB", zap.Int("count", len(tasks)))
 	batch := ts.Client.DB.NewWriteBatch()
 	defer batch.Cancel()
 
+	maxIndexes := make(map[string]uint64)
 	for _, task := range tasks {
+		id := iden.MustParseString(task.GetId())
+		if saveIndex && id.Index() > maxIndexes[task.GetNamespace()] {
+			maxIndexes[task.GetNamespace()] = id.Index()
+		}
+
 		payload, err := pb.Marshal(task)
 		if err != nil {
 			return fmt.Errorf("count not encode task '%s': %w", task.GetId(), err)
 		}
-		key := getTaskKey(task)
+
+		key := getTaskKey(task, id)
 		err = batch.Set(key, payload)
 		if err != nil {
 			return fmt.Errorf("failed to write task '%s' from batch: %w", task.GetId(), err)
+		}
+	}
+
+	// Save max indexes on followers in case they need to become a leader
+	// and pick up the count.
+	if saveIndex {
+		for ns, index := range maxIndexes {
+			var payload [8]byte
+			binary.BigEndian.PutUint64(payload[:], index)
+			err := batch.Set(getSeqKey(ns), payload[:])
+			if err != nil {
+				return fmt.Errorf("failed to save index for namespace %s: %w", ns, err)
+			}
 		}
 	}
 	return batch.Flush()
@@ -99,12 +119,11 @@ func (ts *TaskStore) IterateRange(query TaskRange) (*TaskIterator, error) {
 	return NewTaskIterator(ts.Client, query), nil
 }
 
-func getTaskKey(task *proto.Task) []byte {
-	id := iden.MustParseString(task.GetId())
+func getTaskKey(task *proto.Task, parsedID iden.TaskID) []byte {
 	if task.GetScheduleTime() == nil {
-		return getFifoTaskKey(task.GetNamespace(), id)
+		return getFifoTaskKey(task.GetNamespace(), parsedID)
 	}
-	return getScheduledTaskKey(task.GetNamespace(), id)
+	return getScheduledTaskKey(task.GetNamespace(), parsedID)
 }
 
 func getAckKey(ack *proto.Ack) ([]byte, error) {

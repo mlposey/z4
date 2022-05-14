@@ -59,6 +59,7 @@ func (s *Server) Start() error {
 	if err != nil {
 		return fmt.Errorf("failed to obtain leader handle: %w", err)
 	}
+	s.peer.LoadHandle(handle)
 
 	gen := storage.NewGenerator(storage.NewIndexStore(s.config.PeerConfig.Namespaces))
 
