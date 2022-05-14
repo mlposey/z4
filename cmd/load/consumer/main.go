@@ -4,10 +4,10 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"github.com/google/uuid"
 	"github.com/mlposey/z4/proto"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials/insecure"
+	"google.golang.org/grpc/metadata"
 	"os"
 )
 
@@ -22,19 +22,9 @@ func main() {
 }
 
 func consume(client proto.QueueClient, namespace string) {
-	stream, err := client.Pull(context.Background())
-	if err != nil {
-		panic(err)
-	}
-
-	err = stream.Send(&proto.PullRequest{
-		Request: &proto.PullRequest_StartReq{
-			StartReq: &proto.StartStreamRequest{
-				RequestId: uuid.New().String(),
-				Namespace: namespace,
-			},
-		},
-	})
+	md := metadata.New(map[string]string{"namespace": namespace})
+	ctx := metadata.NewOutgoingContext(context.Background(), md)
+	stream, err := client.Pull(ctx)
 	if err != nil {
 		panic(err)
 	}
@@ -53,14 +43,10 @@ func consume(client proto.QueueClient, namespace string) {
 		}
 		fmt.Println(string(out))
 
-		err = stream.Send(&proto.PullRequest{
-			Request: &proto.PullRequest_Ack{
-				Ack: &proto.Ack{
-					Reference: &proto.TaskReference{
-						Namespace: task.GetNamespace(),
-						TaskId:    task.GetId(),
-					},
-				},
+		err = stream.Send(&proto.Ack{
+			Reference: &proto.TaskReference{
+				Namespace: task.GetNamespace(),
+				TaskId:    task.GetId(),
 			},
 		})
 		if err != nil {

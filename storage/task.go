@@ -45,7 +45,10 @@ func (ts *TaskStore) DeleteAll(acks []*proto.Ack) error {
 	for _, ack := range acks {
 		key, err := getAckKey(ack)
 		if err != nil {
-			return fmt.Errorf("failed to delete task '%s' in batch: %w", ack.GetReference(), err)
+			telemetry.Logger.Error("invalid ack key",
+				zap.Error(err), zap.String("namespace", ack.GetReference().GetNamespace()),
+				zap.String("task_id", ack.GetReference().GetTaskId()))
+			continue
 		}
 
 		err = batch.Delete(key)

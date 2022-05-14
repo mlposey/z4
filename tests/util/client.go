@@ -6,6 +6,7 @@ import (
 	"github.com/mlposey/z4/proto"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials/insecure"
+	"google.golang.org/grpc/metadata"
 	"io"
 )
 
@@ -61,7 +62,9 @@ type PullTasksStream struct {
 }
 
 func newPullTasksStream(queue proto.QueueClient, requestID, namespace string) (*PullTasksStream, error) {
-	stream, err := queue.Pull(context.Background())
+	md := metadata.New(map[string]string{"namespace": namespace})
+	ctx := metadata.NewOutgoingContext(context.Background(), md)
+	stream, err := queue.Pull(ctx)
 	if err != nil {
 		return nil, err
 	}
@@ -95,18 +98,6 @@ func (s *PullTasksStream) Listen() (<-chan StreamTaskResult, error) {
 }
 
 func (s *PullTasksStream) startStream() error {
-	err := s.stream.Send(&proto.PullRequest{
-		Request: &proto.PullRequest_StartReq{
-			StartReq: &proto.StartStreamRequest{
-				RequestId: s.requestID,
-				Namespace: s.namespace,
-			},
-		},
-	})
-	if err != nil {
-		return err
-	}
-
 	go func() {
 		for !s.closed {
 			task, err := s.stream.Recv()
@@ -126,12 +117,7 @@ func (s *PullTasksStream) startStream() error {
 
 func (s *PullTasksStream) startAckHandler() {
 	for ack := range s.acks {
-		err := s.stream.Send(&proto.PullRequest{
-			Request: &proto.PullRequest_Ack{
-				Ack: ack,
-			},
-		})
-
+		err := s.stream.Send(ack)
 		if err != nil {
 			fmt.Println("ack failed", err)
 		}
