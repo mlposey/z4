@@ -73,7 +73,7 @@ func (sn *SyncedNamespace) load() error {
 	// Default settings for new namespaces go here.
 	sn.N = &proto.Namespace{
 		Id:                         sn.namespace,
-		LastDeliveredQueuedTask:    iden.Min.String(),
+		LastDeliveredQueuedTask:    iden.Max.String(),
 		LastDeliveredScheduledTask: iden.Min.String(),
 		AckDeadlineSeconds:         300, // 5 minutes
 	}
