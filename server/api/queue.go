@@ -4,6 +4,7 @@ import (
 	"context"
 	"github.com/hashicorp/raft"
 	"github.com/mlposey/z4/feeds"
+	"github.com/mlposey/z4/iden"
 	"github.com/mlposey/z4/proto"
 	"github.com/mlposey/z4/server/cluster"
 	"github.com/mlposey/z4/storage"
@@ -23,6 +24,7 @@ type Queue struct {
 	tasks  *storage.TaskStore
 	raft   *raft.Raft
 	handle *cluster.LeaderHandle
+	ids    *storage.IDGenerator
 }
 
 func NewQueue(
@@ -30,12 +32,14 @@ func NewQueue(
 	tasks *storage.TaskStore,
 	raft *raft.Raft,
 	handle *cluster.LeaderHandle,
+	ids *storage.IDGenerator,
 ) proto.QueueServer {
 	return &Queue{
 		fm:     fm,
 		tasks:  tasks,
 		raft:   raft,
 		handle: handle,
+		ids:    ids,
 	}
 }
 
@@ -90,7 +94,10 @@ func (q *Queue) createTask(ctx context.Context, req *proto.PushTaskRequest) (*pr
 		return res, err
 	}
 
-	task := q.makeTask(req)
+	task, err := q.makeTask(req)
+	if err != nil {
+		return nil, status.Errorf(codes.Internal, "task creation failed: %v", err)
+	}
 
 	if req.GetAsync() {
 		cluster.ApplySaveTaskCommand(q.raft, task)
@@ -115,20 +122,27 @@ func (q *Queue) forwardPushRequest(
 	return client.Push(ctx, req)
 }
 
-func (q *Queue) makeTask(req *proto.PushTaskRequest) *proto.Task {
+func (q *Queue) makeTask(req *proto.PushTaskRequest) (*proto.Task, error) {
 	task := &proto.Task{
 		Namespace: req.GetNamespace(),
 		Metadata:  req.GetMetadata(),
 		Payload:   req.GetPayload(),
+		CreatedAt: timestamppb.New(time.Now()),
 	}
+
 	ts := q.getRunTime(req)
+	id, err := q.ids.ID(req.GetNamespace(), ts)
+	if err != nil {
+		return nil, err
+	}
+
 	if ts.IsZero() {
-		task.Id = storage.NewTaskID(time.Now())
+		task.Id = id.String()
 	} else {
-		task.Id = storage.NewTaskID(ts)
+		task.Id = id.String()
 		task.ScheduleTime = timestamppb.New(ts)
 	}
-	return task
+	return task, nil
 }
 
 func (q *Queue) getRunTime(req *proto.PushTaskRequest) time.Time {
@@ -141,7 +155,12 @@ func (q *Queue) getRunTime(req *proto.PushTaskRequest) time.Time {
 }
 
 func (q *Queue) GetTask(ctx context.Context, req *proto.GetTaskRequest) (*proto.Task, error) {
-	task, err := q.tasks.Get(req.GetReference().GetNamespace(), req.GetReference().GetTaskId())
+	id, err := iden.ParseString(req.GetReference().GetTaskId())
+	if err != nil {
+		return nil, status.Errorf(codes.InvalidArgument, "invalid task id")
+	}
+
+	task, err := q.tasks.Get(req.GetReference().GetNamespace(), id)
 	if err != nil {
 		return nil, status.Errorf(codes.NotFound, "task not found: %v", err)
 	}

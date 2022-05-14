@@ -90,8 +90,8 @@ func (r *namespaceTableIterator) Next() (sql.Row, error) {
 func (r *namespaceTableIterator) rowFromNamespace(namespace *proto.Namespace) sql.Row {
 	return sql.NewRow(
 		namespace.GetId(),
-		namespace.GetLastTask(),
-		namespace.GetLastIndex(),
+		namespace.GetLastDeliveredScheduledTask(),
+		namespace.GetLastDeliveredQueuedTask(),
 		namespace.GetAckDeadlineSeconds(),
 	)
 }

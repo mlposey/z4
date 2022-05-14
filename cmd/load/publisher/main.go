@@ -3,8 +3,8 @@ package main
 import (
 	"context"
 	"fmt"
+	"github.com/google/uuid"
 	"github.com/mlposey/z4/proto"
-	"github.com/segmentio/ksuid"
 	"go.uber.org/ratelimit"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials/insecure"
@@ -59,7 +59,7 @@ func loadTestStreaming(rps int) {
 	for i := 0; i < requestsToSend; i++ {
 		rl.Take()
 		err := stream.Send(&proto.PushTaskRequest{
-			RequestId: ksuid.New().String(),
+			RequestId: uuid.New().String(),
 			Namespace: os.Getenv("NAMESPACE"),
 			Async:     true,
 			Payload:   []byte("buy eggs"),

@@ -3,6 +3,7 @@ package sched
 import (
 	"context"
 	"github.com/mlposey/z4/feeds/q"
+	"github.com/mlposey/z4/iden"
 	"github.com/mlposey/z4/proto"
 	"github.com/mlposey/z4/storage"
 	"github.com/mlposey/z4/telemetry"
@@ -73,7 +74,7 @@ func (tr *taskReader) startReadLoop() {
 
 // pullAndPush loads ready tasks from storage and delivers them to consumers.
 func (tr *taskReader) pullAndPush(prefetch int) (int, error) {
-	lastDeliveredTaskID := tr.namespace.LastTask
+	lastID := iden.MustParseString(tr.namespace.LastDeliveredScheduledTask)
 	if time.Since(tr.lastSweep) > time.Second*30 {
 		tr.lastSweep = time.Now()
 		go func(tag uint64) {
@@ -83,14 +84,14 @@ func (tr *taskReader) pullAndPush(prefetch int) (int, error) {
 				return
 			}
 
-			err := tr.processDelivered(lastDeliveredTaskID)
+			err := tr.processDelivered(lastID)
 			if err != nil {
 				telemetry.Logger.Error("failed to process delivered scheduled tasks",
 					zap.Error(err))
 			}
 		}(atomic.LoadUint64(&tr.sweepTag))
 	}
-	return tr.processUndelivered(lastDeliveredTaskID, prefetch)
+	return tr.processUndelivered(lastID, prefetch)
 }
 
 func (tr *taskReader) push(task *proto.Task) error {
@@ -104,7 +105,7 @@ func (tr *taskReader) push(task *proto.Task) error {
 }
 
 // attempts to redeliver unacknowledged tasks
-func (tr *taskReader) processDelivered(lastID string) error {
+func (tr *taskReader) processDelivered(lastID iden.TaskID) error {
 	ackDeadline := time.Second * time.Duration(tr.namespace.GetAckDeadlineSeconds())
 	df := &deliveredTaskFetcher{
 		Tasks:           tr.tasks,
@@ -142,7 +143,7 @@ func (tr *taskReader) processDelivered(lastID string) error {
 }
 
 // attempts to deliver new tasks
-func (tr *taskReader) processUndelivered(lastID string, prefetch int) (int, error) {
+func (tr *taskReader) processUndelivered(lastID iden.TaskID, prefetch int) (int, error) {
 	uf := &undeliveredTaskFetcher{
 		Tasks:     tr.tasks,
 		StartID:   lastID,
@@ -155,7 +156,7 @@ func (tr *taskReader) processUndelivered(lastID string, prefetch int) (int, erro
 		if err := tr.push(task); err != nil {
 			return err
 		}
-		tr.namespace.LastTask = task.GetId()
+		tr.namespace.LastDeliveredScheduledTask = task.GetId()
 		count++
 		return nil
 	})

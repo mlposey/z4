@@ -68,13 +68,6 @@ func (f *stateMachine) splitLogs(logs []*raft.Log) (*splitBatch, error) {
 
 		switch v := cmd.GetCmd().(type) {
 		case *proto.Command_Task:
-			if v.Task.GetScheduleTime() == nil {
-				index, err := f.writer.NextIndex(v.Task.GetNamespace())
-				if err != nil {
-					return nil, err
-				}
-				v.Task.Index = index
-			}
 			sb.Tasks = append(sb.Tasks, v.Task)
 
 		case *proto.Command_Ack:

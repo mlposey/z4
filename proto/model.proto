@@ -28,7 +28,7 @@ message Task {
   google.protobuf.Timestamp schedule_time = 5;
   // Last time the task was sent to the client due to not receiving an ack.
   google.protobuf.Timestamp last_retry = 6;
-  uint64 index = 7;
+  google.protobuf.Timestamp created_at = 7;
 }
 
 // TaskReference is a unique reference to a task.
@@ -36,14 +36,7 @@ message TaskReference {
   // The namespace where the task is located.
   string namespace = 1;
 
-  // The id of the task
-  oneof id {
-    // The task id if the task was scheduled.
-    string task_id = 2;
-
-    // The task index if the task was enqueued.
-    uint64 index = 3;
-  }
+  string task_id = 2;
 }
 
 message Ack {
@@ -55,14 +48,14 @@ message Namespace {
   string id = 1;
 
   // The id of the last scheduled task that was sent to a client.
-  string last_task = 2;
+  string last_delivered_scheduled_task = 2;
+
+  // The id of the last queued task that was sent to a client.
+  string last_delivered_queued_task = 3;
 
   // The length of time after sending a message that it will
   // be redelivered if not acknowledged.
-  int32 ack_deadline_seconds = 3;
-
-  // The index of the last queued task that was sent to the client.
-  uint64 last_index = 4;
+  int32 ack_deadline_seconds = 4;
 }
 
 message PurgeTasksRequest {

@@ -8,10 +8,10 @@ require (
 	github.com/cucumber/godog v0.12.5
 	github.com/dgraph-io/badger/v3 v3.2103.2
 	github.com/dolthub/go-mysql-server v0.11.0
+	github.com/google/uuid v1.2.0
 	github.com/hashicorp/raft v1.3.6
 	github.com/kelseyhightower/envconfig v1.4.0
 	github.com/prometheus/client_golang v1.4.0
-	github.com/segmentio/ksuid v1.0.4
 	github.com/vmihailenco/msgpack/v5 v5.3.5
 	go.uber.org/multierr v1.6.0
 	go.uber.org/ratelimit v0.2.0
@@ -40,7 +40,6 @@ require (
 	github.com/golang/protobuf v1.5.2 // indirect
 	github.com/golang/snappy v0.0.3 // indirect
 	github.com/google/flatbuffers v1.12.1 // indirect
-	github.com/google/uuid v1.2.0 // indirect
 	github.com/hashicorp/go-hclog v0.9.1 // indirect
 	github.com/hashicorp/go-immutable-radix v1.3.0 // indirect
 	github.com/hashicorp/go-memdb v1.3.0 // indirect

@@ -4,14 +4,15 @@ import (
 	"context"
 	"github.com/hashicorp/raft"
 	"github.com/mlposey/z4/feeds"
-	"github.com/mlposey/z4/feeds/q"
 	"github.com/mlposey/z4/proto"
 	"github.com/mlposey/z4/server/cluster"
+	"github.com/mlposey/z4/storage"
 	"github.com/mlposey/z4/telemetry"
 	"go.uber.org/zap"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 	emptypb "google.golang.org/protobuf/types/known/emptypb"
+	"time"
 )
 
 // Admin implements the gRPC Admin service.
@@ -22,7 +23,7 @@ type Admin struct {
 	fm            *feeds.Manager
 	serverID      string
 	advertiseAddr string
-	writer        q.TaskWriter
+	ids           *storage.IDGenerator
 }
 
 func NewAdmin(
@@ -30,7 +31,7 @@ func NewAdmin(
 	cfg cluster.PeerConfig,
 	handle *cluster.LeaderHandle,
 	fm *feeds.Manager,
-	writer q.TaskWriter,
+	ids *storage.IDGenerator,
 ) *Admin {
 	return &Admin{
 		raft:          raft,
@@ -38,7 +39,7 @@ func NewAdmin(
 		advertiseAddr: cfg.AdvertiseAddr,
 		handle:        handle,
 		fm:            fm,
-		writer:        writer,
+		ids:           ids,
 	}
 }
 
@@ -109,11 +110,11 @@ func (a *Admin) PurgeTasks(ctx context.Context, req *proto.PurgeTasksRequest) (*
 	}
 	defer feed.Release()
 
-	skip, err := a.writer.NextIndex(req.GetNamespaceId())
+	id, err := a.ids.ID(req.GetNamespaceId(), time.Time{})
 	if err != nil {
 		return nil, status.Errorf(codes.Internal, "purge failed: %v", err)
 	}
-	feed.Feed().Namespace.N.LastIndex = skip
+	feed.Feed().Namespace.N.LastDeliveredQueuedTask = id.String()
 
 	cluster.ApplyPurgeTasksCommand(a.raft, req)
 	return new(emptypb.Empty), nil

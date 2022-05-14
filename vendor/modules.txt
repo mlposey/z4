@@ -210,9 +210,6 @@ github.com/prometheus/common/model
 github.com/prometheus/procfs
 github.com/prometheus/procfs/internal/fs
 github.com/prometheus/procfs/internal/util
-# github.com/segmentio/ksuid v1.0.4
-## explicit; go 1.12
-github.com/segmentio/ksuid
 # github.com/shopspring/decimal v0.0.0-20191130220710-360f2bc03045
 ## explicit; go 1.13
 github.com/shopspring/decimal

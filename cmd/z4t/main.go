@@ -5,8 +5,8 @@ import (
 	"encoding/json"
 	"flag"
 	"fmt"
+	"github.com/google/uuid"
 	"github.com/mlposey/z4/proto"
-	"github.com/segmentio/ksuid"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials/insecure"
 )
@@ -102,7 +102,7 @@ func consume(client proto.QueueClient, namespace string) {
 	err = stream.Send(&proto.PullRequest{
 		Request: &proto.PullRequest_StartReq{
 			StartReq: &proto.StartStreamRequest{
-				RequestId: ksuid.New().String(),
+				RequestId: uuid.New().String(),
 				Namespace: namespace,
 			},
 		},
@@ -125,27 +125,13 @@ func consume(client proto.QueueClient, namespace string) {
 		}
 		fmt.Println(string(out))
 
-		var ref *proto.TaskReference
-		if task.GetScheduleTime() == nil {
-			ref = &proto.TaskReference{
-				Namespace: task.GetNamespace(),
-				Id: &proto.TaskReference_Index{
-					Index: task.GetIndex(),
-				},
-			}
-		} else {
-			ref = &proto.TaskReference{
-				Namespace: task.GetNamespace(),
-				Id: &proto.TaskReference_TaskId{
-					TaskId: task.GetId(),
-				},
-			}
-		}
-
 		err = stream.Send(&proto.PullRequest{
 			Request: &proto.PullRequest_Ack{
 				Ack: &proto.Ack{
-					Reference: ref,
+					Reference: &proto.TaskReference{
+						Namespace: task.GetNamespace(),
+						TaskId:    task.GetId(),
+					},
 				},
 			},
 		})

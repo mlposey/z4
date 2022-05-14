@@ -62,12 +62,14 @@ func (s *Server) Start() error {
 		return fmt.Errorf("failed to obtain leader handle: %w", err)
 	}
 
+	gen := storage.NewGenerator(storage.NewIndexStore(s.config.PeerConfig.Namespaces))
+
 	s.server = grpc.NewServer(s.config.Opts...)
-	adminServer := api.NewAdmin(s.peer.Raft, s.config.PeerConfig, handle, s.fm,
-		s.config.PeerConfig.Writer)
+	adminServer := api.NewAdmin(s.peer.Raft, s.config.PeerConfig, handle, s.fm, gen)
 	proto.RegisterAdminServer(s.server, adminServer)
 
-	collectionServer := api.NewQueue(s.fm, s.config.PeerConfig.Tasks, s.peer.Raft, handle)
+	collectionServer := api.NewQueue(s.fm, s.config.PeerConfig.Tasks,
+		s.peer.Raft, handle, gen)
 	proto.RegisterQueueServer(s.server, collectionServer)
 
 	go telemetry.StartPromServer(s.config.MetricsPort)

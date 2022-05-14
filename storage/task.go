@@ -5,25 +5,12 @@ import (
 	"encoding/binary"
 	"fmt"
 	"github.com/dgraph-io/badger/v3"
+	"github.com/mlposey/z4/iden"
 	"github.com/mlposey/z4/proto"
 	"github.com/mlposey/z4/telemetry"
-	"github.com/segmentio/ksuid"
 	"go.uber.org/zap"
 	pb "google.golang.org/protobuf/proto"
-	"time"
 )
-
-// NewTaskID creates a task id based on the time it should be delivered.
-//
-// Task IDs are random strings can be lexicographically sorted according
-// to the delivery time of the task.
-func NewTaskID(deliverAt time.Time) string {
-	id, err := ksuid.NewRandomWithTime(deliverAt)
-	if err != nil {
-		telemetry.Logger.Fatal("could not create task id", zap.Error(err))
-	}
-	return id.String()
-}
 
 // TaskStore manages persistent storage for tasks.
 type TaskStore struct {
@@ -55,8 +42,12 @@ func (ts *TaskStore) DeleteAll(acks []*proto.Ack) error {
 	defer batch.Cancel()
 
 	for _, ack := range acks {
-		key := getAckKey(ack)
-		err := batch.Delete(key)
+		key, err := getAckKey(ack)
+		if err != nil {
+			return fmt.Errorf("failed to delete task '%s' in batch: %w", ack.GetReference(), err)
+		}
+
+		err = batch.Delete(key)
 		if err != nil {
 			return fmt.Errorf("failed to delete task '%s' in batch: %w", ack.GetReference(), err)
 		}
@@ -83,7 +74,7 @@ func (ts *TaskStore) SaveAll(tasks []*proto.Task) error {
 	return batch.Flush()
 }
 
-func (ts *TaskStore) Get(namespace, id string) (*proto.Task, error) {
+func (ts *TaskStore) Get(namespace string, id iden.TaskID) (*proto.Task, error) {
 	var task *proto.Task
 	err := ts.Client.DB.View(func(txn *badger.Txn) error {
 		key := getScheduledTaskKey(namespace, id)
@@ -101,45 +92,43 @@ func (ts *TaskStore) Get(namespace, id string) (*proto.Task, error) {
 }
 
 func (ts *TaskStore) IterateRange(query TaskRange) (*TaskIterator, error) {
-	err := query.Validate()
-	if err != nil {
-		return nil, fmt.Errorf("failed to fetch tasks due to invalid query: %w", err)
-	}
 	return NewTaskIterator(ts.Client, query), nil
 }
 
 func getTaskKey(task *proto.Task) []byte {
+	id := iden.MustParseString(task.GetId())
 	if task.GetScheduleTime() == nil {
-		return getFifoTaskKey(task.GetNamespace(), task.GetIndex())
+		return getFifoTaskKey(task.GetNamespace(), id)
 	}
-	return getScheduledTaskKey(task.GetNamespace(), task.GetId())
+	return getScheduledTaskKey(task.GetNamespace(), id)
 }
 
-func getAckKey(ack *proto.Ack) []byte {
-	switch v := ack.GetReference().GetId().(type) {
-	case *proto.TaskReference_TaskId:
-		return getScheduledTaskKey(ack.GetReference().GetNamespace(), v.TaskId)
+func getAckKey(ack *proto.Ack) ([]byte, error) {
+	id, err := iden.ParseString(ack.GetReference().GetTaskId())
+	if err != nil {
+		return nil, err
+	}
 
-	case *proto.TaskReference_Index:
-		return getFifoTaskKey(ack.GetReference().GetNamespace(), v.Index)
-
-	default:
-		telemetry.Logger.Error("found invalid task reference type",
-			zap.String("namespace", ack.GetReference().GetNamespace()))
-		return nil
+	if id.Time().IsZero() {
+		return getFifoTaskKey(ack.GetReference().GetNamespace(), id), nil
+	} else {
+		return getScheduledTaskKey(ack.GetReference().GetNamespace(), id), nil
 	}
 }
 
-func getScheduledTaskKey(namespaceID, taskID string) []byte {
-	return []byte(fmt.Sprintf("task#sched#%s#%s", namespaceID, taskID))
-}
-
-func getFifoTaskKey(namespaceID string, index uint64) []byte {
+func getScheduledTaskKey(namespaceID string, id iden.TaskID) []byte {
 	buf := bytes.NewBuffer(nil)
-	buf.WriteString(fmt.Sprintf("task#fifo#%s#", namespaceID))
+	buf.Write(getSchedPrefix(namespaceID))
+	buf.Write(id[:])
+	return buf.Bytes()
+}
+
+func getFifoTaskKey(namespaceID string, id iden.TaskID) []byte {
+	buf := bytes.NewBuffer(nil)
+	buf.Write(getFifoPrefix(namespaceID))
 
 	indexB := make([]byte, 8)
-	binary.BigEndian.PutUint64(indexB, index)
+	binary.BigEndian.PutUint64(indexB, id.Index())
 	buf.Write(indexB)
 
 	return buf.Bytes()
