@@ -43,7 +43,7 @@ func (tr *taskReader) startReadLoop() {
 	for {
 		select {
 		case <-tr.ctx.Done():
-			telemetry.Logger.Info("fifo task reader stopped",
+			telemetry.Logger.Info("task reader stopped",
 				zap.String("namespace", tr.namespace.GetId()))
 			return
 		default:
