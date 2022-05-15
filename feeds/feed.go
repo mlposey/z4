@@ -10,15 +10,16 @@ import (
 	"github.com/mlposey/z4/telemetry"
 	"go.uber.org/zap"
 	"io"
+	"time"
 )
 
 // Feed provides access to a stream of tasks that are ready to be delivered.
 type Feed struct {
 	Namespace  *storage.SyncedNamespace
 	feed       chan *proto.Task
-	readyTasks q.TaskReader
 	ctx        context.Context
 	ctxCancel  context.CancelFunc
+	operations []q.ReadOperation
 }
 
 func New(
@@ -40,7 +41,7 @@ func New(
 	}
 
 	tasks := storage.NewTaskStore(db)
-	f.readyTasks = q.NewDefaultTaskReader(ctx, tasks, f.Namespace.N)
+	f.operations = q.ReadOperations(tasks, f.Namespace.N)
 
 	go f.startFeed()
 	return f, nil
@@ -51,18 +52,46 @@ func (f *Feed) startFeed() {
 	telemetry.Logger.Info("feed started",
 		zap.String("namespace", f.Namespace.N.GetId()))
 
-	tasks := f.readyTasks.Tasks()
 	for {
 		select {
 		case <-f.ctx.Done():
 			return
+		default:
+		}
 
-		case task := <-tasks:
-			if err := f.push(task); err != nil {
-				return
-			}
+		pushCount, err := f.pullAndPush()
+		if err != nil {
+			telemetry.Logger.Error("feed operation failed", zap.Error(err))
+			time.Sleep(time.Second)
+			continue
+		}
+
+		if pushCount == 0 {
+			time.Sleep(time.Millisecond * 5)
 		}
 	}
+}
+
+// pullAndPush loads ready tasks from storage and delivers them to consumers.
+func (f *Feed) pullAndPush() (int, error) {
+	count := 0
+	for _, op := range f.operations {
+		if !op.Ready() {
+			continue
+		}
+
+		err := op.Run(func(task *proto.Task) error {
+			err := f.push(task)
+			if err == nil {
+				count++
+			}
+			return err
+		})
+		if err != nil {
+			return count, err
+		}
+	}
+	return count, nil
 }
 
 func (f *Feed) push(task *proto.Task) error {

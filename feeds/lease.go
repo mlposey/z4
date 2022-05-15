@@ -52,7 +52,7 @@ func (lh *leaseHolder) Get() *Lease {
 }
 
 func (lh *leaseHolder) remove(l *Lease) {
-	telemetry.Logger.Info("releasing lease",
+	telemetry.Logger.Debug("releasing lease",
 		zap.String("namespace", lh.F.Namespace.N.GetId()))
 	lh.mu.Lock()
 	delete(lh.leases, l)
