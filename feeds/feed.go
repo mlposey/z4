@@ -5,8 +5,6 @@ import (
 	"fmt"
 	"github.com/hashicorp/raft"
 	"github.com/mlposey/z4/feeds/q"
-	"github.com/mlposey/z4/feeds/q/fifo"
-	"github.com/mlposey/z4/feeds/q/sched"
 	"github.com/mlposey/z4/proto"
 	"github.com/mlposey/z4/storage"
 	"github.com/mlposey/z4/telemetry"
@@ -16,12 +14,11 @@ import (
 
 // Feed provides access to a stream of tasks that are ready to be delivered.
 type Feed struct {
-	Namespace      *storage.SyncedNamespace
-	feed           chan *proto.Task
-	scheduledTasks q.TaskReader
-	fifoTasks      q.TaskReader
-	ctx            context.Context
-	ctxCancel      context.CancelFunc
+	Namespace  *storage.SyncedNamespace
+	feed       chan *proto.Task
+	readyTasks q.TaskReader
+	ctx        context.Context
+	ctxCancel  context.CancelFunc
 }
 
 func New(
@@ -43,8 +40,7 @@ func New(
 	}
 
 	tasks := storage.NewTaskStore(db)
-	f.scheduledTasks = sched.NewScheduledTaskReader(ctx, f.Namespace.N, tasks)
-	f.fifoTasks = fifo.NewFifoTaskReader(ctx, f.Namespace.N, tasks)
+	f.readyTasks = q.NewDefaultTaskReader(ctx, tasks, f.Namespace.N)
 
 	go f.startFeed()
 	return f, nil
@@ -55,19 +51,13 @@ func (f *Feed) startFeed() {
 	telemetry.Logger.Info("feed started",
 		zap.String("namespace", f.Namespace.N.GetId()))
 
-	scheduled := f.scheduledTasks.Tasks()
-	queued := f.fifoTasks.Tasks()
+	tasks := f.readyTasks.Tasks()
 	for {
 		select {
 		case <-f.ctx.Done():
 			return
 
-		case task := <-scheduled:
-			if err := f.push(task); err != nil {
-				return
-			}
-
-		case task := <-queued:
+		case task := <-tasks:
 			if err := f.push(task); err != nil {
 				return
 			}
