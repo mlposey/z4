@@ -31,7 +31,7 @@ func (s *schedUndeliveredQueryFactory) Query(namespace *proto.Namespace) storage
 	return &storage.ScheduledRange{
 		Namespace: namespace.GetId(),
 		StartID:   nextID,
-		EndID:     iden.New(time.Now(), 0),
+		EndID:     iden.New(time.Now().UTC(), 0),
 		Prefetch:  s.prefetch,
 	}
 }
