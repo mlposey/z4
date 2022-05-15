@@ -19,7 +19,7 @@ type deliveredReader struct {
 	qf        QueryFactory
 }
 
-var _ ReadOperation = (*deliveredReader)(nil)
+var _ Reader = (*deliveredReader)(nil)
 
 func newDeliveredReader(
 	interval time.Duration,
@@ -41,7 +41,7 @@ func (d *deliveredReader) Ready() bool {
 	return time.Since(d.lastRun) > d.interval && !d.active
 }
 
-func (d *deliveredReader) Run(f func(task *proto.Task) error) error {
+func (d *deliveredReader) Read(f func(task *proto.Task) error) error {
 	d.lastRun = time.Now()
 	d.active = true
 	go func() {

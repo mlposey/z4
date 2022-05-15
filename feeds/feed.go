@@ -15,11 +15,11 @@ import (
 
 // Feed provides access to a stream of tasks that are ready to be delivered.
 type Feed struct {
-	Namespace  *storage.SyncedNamespace
-	feed       chan *proto.Task
-	ctx        context.Context
-	ctxCancel  context.CancelFunc
-	operations []q.ReadOperation
+	Namespace *storage.SyncedNamespace
+	feed      chan *proto.Task
+	ctx       context.Context
+	ctxCancel context.CancelFunc
+	readers   []q.Reader
 }
 
 func New(
@@ -41,7 +41,7 @@ func New(
 	}
 
 	tasks := storage.NewTaskStore(db)
-	f.operations = q.ReadOperations(tasks, f.Namespace.N)
+	f.readers = q.Readers(tasks, f.Namespace.N)
 
 	go f.startFeed()
 	return f, nil
@@ -75,12 +75,12 @@ func (f *Feed) startFeed() {
 // pullAndPush loads ready tasks from storage and delivers them to consumers.
 func (f *Feed) pullAndPush() (int, error) {
 	count := 0
-	for _, op := range f.operations {
-		if !op.Ready() {
+	for _, reader := range f.readers {
+		if !reader.Ready() {
 			continue
 		}
 
-		err := op.Run(func(task *proto.Task) error {
+		err := reader.Read(func(task *proto.Task) error {
 			err := f.push(task)
 			if err == nil {
 				count++

@@ -15,9 +15,9 @@ type TaskWriter interface {
 
 type TaskStream <-chan *proto.Task
 
-type ReadOperation interface {
+type Reader interface {
 	Ready() bool
-	Run(f func(task *proto.Task) error) error
+	Read(f func(task *proto.Task) error) error
 }
 
 type QueryFactory interface {
@@ -33,12 +33,12 @@ type Checkpointer interface {
 	Set(namespace *proto.Namespace, task *proto.Task)
 }
 
-func ReadOperations(
+func Readers(
 	tasks *storage.TaskStore,
 	namespace *proto.Namespace,
-) []ReadOperation {
+) []Reader {
 	redeliveryInterval := time.Second * 30
-	return []ReadOperation{
+	return []Reader{
 		// Handle redelivery for queued tasks.
 		newDeliveredReader(
 			redeliveryInterval,

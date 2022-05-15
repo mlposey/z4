@@ -13,7 +13,7 @@ type undeliveredReader struct {
 	check     Checkpointer
 }
 
-var _ ReadOperation = (*undeliveredReader)(nil)
+var _ Reader = (*undeliveredReader)(nil)
 
 func newUndeliveredReader(
 	tasks *storage.TaskStore,
@@ -33,7 +33,7 @@ func (u *undeliveredReader) Ready() bool {
 	return true
 }
 
-func (u *undeliveredReader) Run(f func(task *proto.Task) error) error {
+func (u *undeliveredReader) Read(f func(task *proto.Task) error) error {
 	var count int
 	err := u.executeQuery(func(task *proto.Task) error {
 		if err := f(task); err != nil {
