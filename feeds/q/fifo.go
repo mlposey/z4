@@ -33,7 +33,8 @@ func (f *fifoUndeliveredFactory) Query(namespace *proto.Namespace) storage.TaskR
 		Namespace:  namespace.GetId(),
 		StartIndex: nextIndex,
 		// TODO: Make read limit configurable.
-		EndIndex: nextIndex + 2_000, // must be greater than 1000 because the sequence buffer is 1000
+		// EndIndex must be greater than SequenceLeaseSize
+		EndIndex: nextIndex + storage.SequenceLeaseSize*2,
 		Prefetch: f.prefetch,
 	}
 }

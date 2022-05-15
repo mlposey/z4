@@ -9,6 +9,17 @@ import (
 	pb "google.golang.org/protobuf/proto"
 )
 
+// SequenceLeaseSize is the number of indexes leased at a time.
+//
+// If the application does not gracefully shut down, this number
+// represents the maximum number of indexes that will be "lost".
+// Lost indexes are just numbers we will not be able to assign
+// to new tasks; they don't represent lost data.
+//
+// A higher number will permit faster index assignment but at the
+// cost of more lost indexes during application crashes.
+const SequenceLeaseSize = 1000
+
 // NamespaceStore manages persistent storage for namespace configurations.
 type NamespaceStore struct {
 	Client *BadgerClient
@@ -24,7 +35,7 @@ func NewNamespaceStore(client *BadgerClient) *NamespaceStore {
 
 func (cs *NamespaceStore) Sequence(namespaceID string) (*badger.Sequence, error) {
 	key := getSeqKey(namespaceID)
-	return cs.Client.DB.GetSequence(key, 1000)
+	return cs.Client.DB.GetSequence(key, SequenceLeaseSize)
 }
 
 func getSeqKey(namespaceID string) []byte {
