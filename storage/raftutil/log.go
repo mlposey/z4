@@ -10,9 +10,8 @@ import (
 )
 
 type BadgerLogStore struct {
-	db              *badger.DB
-	cache           *logCache
-	maxCompactedIdx uint64
+	db    *badger.DB
+	cache *logCache
 }
 
 var _ raft.LogStore = (*BadgerLogStore)(nil)
@@ -42,48 +41,16 @@ func (b *BadgerLogStore) FirstIndex() (uint64, error) {
 			return nil
 		}
 
-		k := it.Item().Key()
+		item := it.Item()
+		k := item.Key()
 		idx := k[len(k)-8:]
 		index = binary.BigEndian.Uint64(idx)
-		return nil
+		return item.Value(func(val []byte) error {
+			return b.cache.Set(index, val)
+		})
 	})
 	if err != nil {
 		return 0, err
-	}
-
-	if index < b.maxCompactedIdx {
-		// TODO: Properly fix FirstIndex compaction bug.
-		// This is technically a fix, but it is more of a workaround.
-
-		// This block handles a weird but reproducible bug that
-		// I don't quite understand.
-		//
-		// When the Raft log becomes large enough, it is compacted.
-		// Compaction involves a few steps
-		// 1. Take a snapshot of the finite state machine (aka the
-		//    task database).
-		// 2. Select the first N logs for deletion.
-		//    Example:
-		//      N = 1000
-		//      First log has index 50
-		//      The following indexes are selected (inclusive): [50, 1050]
-		// 3. Use the DeleteRange method of the LogStore to actually
-		//    perform the log deletions. Once this is complete, the
-		//    first log will change to be the last compacted log plus one.
-		//
-		// It has been observed that, after log compaction, the FirstIndex
-		// method of the LogStore occasionally returns an index that has
-		// recently been compacted. I.e., it used to be the first index
-		// but is now outdated and references a log that does not exist.
-		//
-		// When FirstIndex returns an invalid index, the GetLog method
-		// will be invoked with that index and return an error. Raft will
-		// infinitely retry GetLog if it returns an error.
-		//
-		// So this code is essentially overruling what BadgerDB thinks
-		// is the first index based on what we know about the compaction
-		// process. This helps us avoid infinite loops in the Raft algorithm.
-		index = b.maxCompactedIdx + 1
 	}
 	return index, nil
 }
@@ -163,7 +130,6 @@ func (b *BadgerLogStore) DeleteRange(min, max uint64) error {
 		}
 		b.cache.Remove(i)
 	}
-	b.maxCompactedIdx = max
 	return batch.Flush()
 }
 
