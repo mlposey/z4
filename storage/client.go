@@ -15,7 +15,9 @@ type BadgerClient struct {
 }
 
 func NewBadgerClient(dataDir string) (*BadgerClient, error) {
-	db, err := badger.Open(badger.DefaultOptions(dataDir))
+	opts := badger.DefaultOptions(dataDir).
+		WithMetricsEnabled(false)
+	db, err := badger.Open(opts)
 	if err != nil {
 		return nil, fmt.Errorf("could not open badger database: %w", err)
 	}

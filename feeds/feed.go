@@ -5,23 +5,21 @@ import (
 	"fmt"
 	"github.com/hashicorp/raft"
 	"github.com/mlposey/z4/feeds/q"
-	"github.com/mlposey/z4/feeds/q/fifo"
-	"github.com/mlposey/z4/feeds/q/sched"
 	"github.com/mlposey/z4/proto"
 	"github.com/mlposey/z4/storage"
 	"github.com/mlposey/z4/telemetry"
 	"go.uber.org/zap"
 	"io"
+	"time"
 )
 
 // Feed provides access to a stream of tasks that are ready to be delivered.
 type Feed struct {
-	Namespace      *storage.SyncedNamespace
-	feed           chan *proto.Task
-	scheduledTasks q.TaskReader
-	fifoTasks      q.TaskReader
-	ctx            context.Context
-	ctxCancel      context.CancelFunc
+	Namespace *storage.SyncedNamespace
+	feed      chan *proto.Task
+	ctx       context.Context
+	ctxCancel context.CancelFunc
+	readers   []q.Reader
 }
 
 func New(
@@ -43,8 +41,7 @@ func New(
 	}
 
 	tasks := storage.NewTaskStore(db)
-	f.scheduledTasks = sched.NewScheduledTaskReader(ctx, f.Namespace.N, tasks)
-	f.fifoTasks = fifo.NewFifoTaskReader(ctx, f.Namespace.N, tasks)
+	f.readers = q.Readers(tasks, f.Namespace.N)
 
 	go f.startFeed()
 	return f, nil
@@ -55,24 +52,46 @@ func (f *Feed) startFeed() {
 	telemetry.Logger.Info("feed started",
 		zap.String("namespace", f.Namespace.N.GetId()))
 
-	scheduled := f.scheduledTasks.Tasks()
-	queued := f.fifoTasks.Tasks()
 	for {
 		select {
 		case <-f.ctx.Done():
 			return
+		default:
+		}
 
-		case task := <-scheduled:
-			if err := f.push(task); err != nil {
-				return
-			}
+		pushCount, err := f.pullAndPush()
+		if err != nil {
+			telemetry.Logger.Error("feed operation failed", zap.Error(err))
+			time.Sleep(time.Second)
+			continue
+		}
 
-		case task := <-queued:
-			if err := f.push(task); err != nil {
-				return
-			}
+		if pushCount == 0 {
+			time.Sleep(time.Millisecond * 5)
 		}
 	}
+}
+
+// pullAndPush loads ready tasks from storage and delivers them to consumers.
+func (f *Feed) pullAndPush() (int, error) {
+	count := 0
+	for _, reader := range f.readers {
+		if !reader.Ready() {
+			continue
+		}
+
+		err := reader.Read(func(task *proto.Task) error {
+			err := f.push(task)
+			if err == nil {
+				count++
+			}
+			return err
+		})
+		if err != nil {
+			return count, err
+		}
+	}
+	return count, nil
 }
 
 func (f *Feed) push(task *proto.Task) error {
