@@ -17,10 +17,13 @@ type BadgerLogStore struct {
 var _ raft.LogStore = (*BadgerLogStore)(nil)
 var logStorePrefix = []byte("raft#logstore#")
 
-func NewLogStore(db *badger.DB, prefetch int) (*BadgerLogStore, error) {
+func NewLogStore(db *badger.DB) (*BadgerLogStore, error) {
 	return &BadgerLogStore{
-		db:    db,
-		cache: newLogCache(db, prefetch),
+		db: db,
+		// TODO: Find a good cache size.
+		// This value seems to work well in practice, but it was
+		// really just pulled from a hat.
+		cache: newLogCache(db, 100_000),
 	}, nil
 }
 
@@ -77,7 +80,12 @@ func (b *BadgerLogStore) StoreLog(log *raft.Log) error {
 		if err != nil {
 			return err
 		}
-		return txn.Set(getLogKey(log.Index), payload)
+
+		err = txn.Set(getLogKey(log.Index), payload)
+		if err != nil {
+			return err
+		}
+		return b.cache.Set(log.Index, payload)
 	})
 }
 
@@ -95,6 +103,11 @@ func (b *BadgerLogStore) StoreLogs(logs []*raft.Log) error {
 		if err != nil {
 			return err
 		}
+
+		err = b.cache.Set(log.Index, payload)
+		if err != nil {
+			return err
+		}
 	}
 	return batch.Flush()
 }
@@ -108,6 +121,7 @@ func (b *BadgerLogStore) DeleteRange(min, max uint64) error {
 		if err != nil {
 			return err
 		}
+		b.cache.Remove(i)
 	}
 	return batch.Flush()
 }

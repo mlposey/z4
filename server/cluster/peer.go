@@ -65,7 +65,7 @@ func (p *Peer) initStorage() error {
 		}
 	}
 
-	p.logStore, err = raftutil.NewLogStore(p.config.DB.DB, p.config.LogBatchSize)
+	p.logStore, err = raftutil.NewLogStore(p.config.DB.DB)
 	if err != nil {
 		return fmt.Errorf("failed to load log store: %w", err)
 	}

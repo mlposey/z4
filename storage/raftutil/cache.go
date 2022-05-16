@@ -18,13 +18,17 @@ func newLogCache(db *badger.DB, size int) *logCache {
 	p := &logCache{
 		db: db,
 	}
-	p.logs = gcache.New(size * 2).
-		LFU().
+	p.logs = gcache.New(size).
+		LRU().
 		LoaderFunc(func(i interface{}) (interface{}, error) {
 			return p.load(i.(uint64))
 		}).
 		Build()
 	return p
+}
+
+func (p *logCache) Set(index uint64, log marshaledLog) error {
+	return p.logs.Set(index, log)
 }
 
 func (p *logCache) Get(index uint64, log *raft.Log) error {
@@ -35,7 +39,12 @@ func (p *logCache) Get(index uint64, log *raft.Log) error {
 	return msgpack.Unmarshal(um.(marshaledLog), log)
 }
 
+func (p *logCache) Remove(index uint64) {
+	p.logs.Remove(index)
+}
+
 func (p *logCache) load(index uint64) (marshaledLog, error) {
+	// TODO: Record cache misses using a metric.
 	var log marshaledLog
 	return log, p.db.View(func(txn *badger.Txn) error {
 		item, err := txn.Get(getLogKey(index))
