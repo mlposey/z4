@@ -46,13 +46,16 @@ func (p *logCache) Remove(index uint64) {
 func (p *logCache) load(index uint64) (marshaledLog, error) {
 	// TODO: Record cache misses using a metric.
 	var log marshaledLog
-	return log, p.db.View(func(txn *badger.Txn) error {
+	err := p.db.View(func(txn *badger.Txn) error {
 		item, err := txn.Get(getLogKey(index))
 		if err != nil {
 			return err
 		}
 
-		log, err = item.ValueCopy(nil)
-		return err
+		return item.Value(func(val []byte) error {
+			log = val
+			return nil
+		})
 	})
+	return log, err
 }
