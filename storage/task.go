@@ -5,7 +5,7 @@ import (
 	"encoding/binary"
 	"errors"
 	"fmt"
-	"github.com/dgraph-io/badger/v3"
+	"github.com/cockroachdb/pebble"
 	"github.com/mlposey/z4/iden"
 	"github.com/mlposey/z4/proto"
 	"github.com/mlposey/z4/telemetry"
@@ -39,8 +39,7 @@ func getSchedPrefix(namespace string) []byte {
 
 func (ts *TaskStore) DeleteAll(acks []*proto.Ack) error {
 	telemetry.Logger.Debug("deleting task batch from DB", zap.Int("count", len(acks)))
-	batch := ts.Client.DB.NewWriteBatch()
-	defer batch.Cancel()
+	batch := ts.Client.DB2.NewBatch()
 
 	for _, ack := range acks {
 		key, err := getAckKey(ack)
@@ -51,18 +50,18 @@ func (ts *TaskStore) DeleteAll(acks []*proto.Ack) error {
 			continue
 		}
 
-		err = batch.Delete(key)
+		err = batch.Delete(key, pebble.Sync)
 		if err != nil {
+			_ = batch.Close()
 			return fmt.Errorf("failed to delete task '%s' in batch: %w", ack.GetReference(), err)
 		}
 	}
-	return batch.Flush()
+	return batch.Commit(pebble.Sync)
 }
 
 func (ts *TaskStore) SaveAll(tasks []*proto.Task, saveIndex bool) error {
 	telemetry.Logger.Debug("writing task batch to DB", zap.Int("count", len(tasks)))
-	batch := ts.Client.DB.NewWriteBatch()
-	defer batch.Cancel()
+	batch := ts.Client.DB2.NewBatch()
 
 	maxIndexes := make(map[string]uint64)
 	for _, task := range tasks {
@@ -73,12 +72,14 @@ func (ts *TaskStore) SaveAll(tasks []*proto.Task, saveIndex bool) error {
 
 		payload, err := pb.Marshal(task)
 		if err != nil {
+			_ = batch.Close()
 			return fmt.Errorf("count not encode task '%s': %w", task.GetId(), err)
 		}
 
 		key := getTaskKey(task, id)
-		err = batch.Set(key, payload)
+		err = batch.Set(key, payload, pebble.Sync)
 		if err != nil {
+			_ = batch.Close()
 			return fmt.Errorf("failed to write task '%s' from batch: %w", task.GetId(), err)
 		}
 	}
@@ -89,29 +90,27 @@ func (ts *TaskStore) SaveAll(tasks []*proto.Task, saveIndex bool) error {
 		for ns, index := range maxIndexes {
 			var payload [8]byte
 			binary.BigEndian.PutUint64(payload[:], index)
-			err := batch.Set(getSeqKey(ns), payload[:])
+			err := batch.Set(getSeqKey(ns), payload[:], pebble.Sync)
 			if err != nil {
+				_ = batch.Close()
 				return fmt.Errorf("failed to save index for namespace %s: %w", ns, err)
 			}
 		}
 	}
-	return batch.Flush()
+	return batch.Commit(pebble.Sync)
 }
 
 func (ts *TaskStore) Get(namespace string, id iden.TaskID) (*proto.Task, error) {
 	var task *proto.Task
-	err := ts.Client.DB.View(func(txn *badger.Txn) error {
-		key := getScheduledTaskKey(namespace, id)
-		item, err := txn.Get(key)
-		if err != nil {
-			return err
-		}
+	key := getScheduledTaskKey(namespace, id)
+	item, closer, err := ts.Client.DB2.Get(key)
+	if err != nil {
+		return nil, err
+	}
+	defer closer.Close()
 
-		return item.Value(func(val []byte) error {
-			task = new(proto.Task)
-			return pb.Unmarshal(val, task)
-		})
-	})
+	task = new(proto.Task)
+	err = pb.Unmarshal(item, task)
 	return task, err
 }
 
