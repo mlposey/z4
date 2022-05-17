@@ -52,10 +52,8 @@ func (p *logCache) load(index uint64) (marshaledLog, error) {
 			return err
 		}
 
-		return item.Value(func(val []byte) error {
-			log = val
-			return nil
-		})
+		log, err = item.ValueCopy(nil)
+		return err
 	})
 	return log, err
 }

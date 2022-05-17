@@ -31,7 +31,7 @@ func (b *BadgerLogStore) FirstIndex() (uint64, error) {
 	var index uint64
 	err := b.db.View(func(txn *badger.Txn) error {
 		opts := badger.DefaultIteratorOptions
-		opts.PrefetchValues = false
+		opts.PrefetchSize = 2
 		opts.Prefix = logStorePrefix
 
 		it := txn.NewIterator(opts)
@@ -45,9 +45,12 @@ func (b *BadgerLogStore) FirstIndex() (uint64, error) {
 		k := item.Key()
 		idx := k[len(k)-8:]
 		index = binary.BigEndian.Uint64(idx)
-		return item.Value(func(val []byte) error {
-			return b.cache.Set(index, val)
-		})
+
+		log, err := item.ValueCopy(nil)
+		if err != nil {
+			return err
+		}
+		return b.cache.Set(index, log)
 	})
 	if err != nil {
 		return 0, err
@@ -59,7 +62,7 @@ func (b *BadgerLogStore) LastIndex() (uint64, error) {
 	var index uint64
 	return index, b.db.View(func(txn *badger.Txn) error {
 		opts := badger.DefaultIteratorOptions
-		opts.PrefetchValues = false
+		opts.PrefetchSize = 2
 		opts.Reverse = true
 		opts.Prefix = logStorePrefix
 
