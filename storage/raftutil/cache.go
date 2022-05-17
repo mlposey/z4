@@ -2,19 +2,19 @@ package raftutil
 
 import (
 	"github.com/bluele/gcache"
-	"github.com/dgraph-io/badger/v3"
+	"github.com/cockroachdb/pebble"
 	"github.com/hashicorp/raft"
 	"github.com/vmihailenco/msgpack/v5"
 )
 
 type logCache struct {
-	db   *badger.DB
+	db   *pebble.DB
 	logs gcache.Cache
 }
 
 type marshaledLog []byte
 
-func newLogCache(db *badger.DB, size int) *logCache {
+func newLogCache(db *pebble.DB, size int) *logCache {
 	p := &logCache{
 		db: db,
 	}
@@ -45,15 +45,11 @@ func (p *logCache) Remove(index uint64) {
 
 func (p *logCache) load(index uint64) (marshaledLog, error) {
 	// TODO: Record cache misses using a metric.
-	var log marshaledLog
-	err := p.db.View(func(txn *badger.Txn) error {
-		item, err := txn.Get(getLogKey(index))
-		if err != nil {
-			return err
-		}
-
-		log, err = item.ValueCopy(nil)
-		return err
-	})
-	return log, err
+	val, closer, err := p.db.Get(getLogKey(index))
+	if err != nil {
+		return nil, err
+	}
+	var log marshaledLog = make([]byte, len(val))
+	copy(log, val)
+	return log, closer.Close()
 }

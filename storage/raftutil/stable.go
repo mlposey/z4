@@ -4,18 +4,18 @@ import (
 	"bytes"
 	"encoding/binary"
 	"errors"
-	"github.com/dgraph-io/badger/v3"
+	"github.com/cockroachdb/pebble"
 	"github.com/hashicorp/raft"
 )
 
 type BadgerStableStore struct {
-	db     *badger.DB
+	db     *pebble.DB
 	prefix []byte
 }
 
 var _ raft.StableStore = (*BadgerStableStore)(nil)
 
-func NewStableStore(db *badger.DB) *BadgerStableStore {
+func NewStableStore(db *pebble.DB) *BadgerStableStore {
 	return &BadgerStableStore{
 		db:     db,
 		prefix: []byte("raft#stablestore#"),
@@ -23,22 +23,17 @@ func NewStableStore(db *badger.DB) *BadgerStableStore {
 }
 
 func (b *BadgerStableStore) Set(key []byte, val []byte) error {
-	return b.db.Update(func(txn *badger.Txn) error {
-		return txn.Set(b.getKey(key), val)
-	})
+	return b.db.Set(b.getKey(key), val, pebble.Sync)
 }
 
 func (b *BadgerStableStore) Get(key []byte) ([]byte, error) {
-	var out []byte
-	return out, b.db.View(func(txn *badger.Txn) error {
-		item, err := txn.Get(b.getKey(key))
-		if err != nil {
-			return err
-		}
-
-		out, err = item.ValueCopy(nil)
-		return err
-	})
+	val, closer, err := b.db.Get(b.getKey(key))
+	if err != nil {
+		return nil, err
+	}
+	res := make([]byte, len(val))
+	copy(res, val)
+	return res, closer.Close()
 }
 
 func (b *BadgerStableStore) SetUint64(key []byte, val uint64) error {
@@ -50,7 +45,7 @@ func (b *BadgerStableStore) SetUint64(key []byte, val uint64) error {
 func (b *BadgerStableStore) GetUint64(key []byte) (uint64, error) {
 	val, err := b.Get(b.getKey(key))
 	if err != nil {
-		if errors.Is(err, badger.ErrKeyNotFound) {
+		if errors.Is(err, pebble.ErrNotFound) {
 			return 0, nil
 		}
 		return 0, err

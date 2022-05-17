@@ -3,21 +3,21 @@ package raftutil
 import (
 	"bytes"
 	"encoding/binary"
-	"github.com/dgraph-io/badger/v3"
+	"github.com/cockroachdb/pebble"
 	"github.com/hashicorp/raft"
 	"github.com/vmihailenco/msgpack/v5"
 	"math"
 )
 
 type BadgerLogStore struct {
-	db    *badger.DB
+	db    *pebble.DB
 	cache *logCache
 }
 
 var _ raft.LogStore = (*BadgerLogStore)(nil)
 var logStorePrefix = []byte("raft#logstore#")
 
-func NewLogStore(db *badger.DB) (*BadgerLogStore, error) {
+func NewLogStore(db *pebble.DB) (*BadgerLogStore, error) {
 	return &BadgerLogStore{
 		db: db,
 		// TODO: Find a good cache size.
@@ -28,56 +28,37 @@ func NewLogStore(db *badger.DB) (*BadgerLogStore, error) {
 }
 
 func (b *BadgerLogStore) FirstIndex() (uint64, error) {
-	var index uint64
-	err := b.db.View(func(txn *badger.Txn) error {
-		opts := badger.DefaultIteratorOptions
-		opts.PrefetchSize = 2
-		opts.Prefix = logStorePrefix
-
-		it := txn.NewIterator(opts)
-		defer it.Close()
-		it.Seek(getLogKey(0))
-		if !it.Valid() {
-			return nil
-		}
-
-		item := it.Item()
-		k := item.Key()
-		idx := k[len(k)-8:]
-		index = binary.BigEndian.Uint64(idx)
-
-		log, err := item.ValueCopy(nil)
-		if err != nil {
-			return err
-		}
-		return b.cache.Set(index, log)
-	})
-	if err != nil {
-		return 0, err
+	it := b.db.NewIter(new(pebble.IterOptions))
+	defer it.Close()
+	found := it.SeekGE(getLogKey(0))
+	if !found {
+		return 0, nil
 	}
-	return index, nil
+
+	key := it.Key()
+	idx := key[len(key)-8:]
+	index := binary.BigEndian.Uint64(idx)
+
+	var log marshaledLog = make([]byte, len(it.Value()))
+	copy(log, it.Value())
+	return index, b.cache.Set(index, log)
 }
 
 func (b *BadgerLogStore) LastIndex() (uint64, error) {
-	var index uint64
-	return index, b.db.View(func(txn *badger.Txn) error {
-		opts := badger.DefaultIteratorOptions
-		opts.PrefetchSize = 2
-		opts.Reverse = true
-		opts.Prefix = logStorePrefix
+	it := b.db.NewIter(new(pebble.IterOptions))
+	defer it.Close()
+	found := it.SeekLT(getLogKey(math.MaxUint64))
+	if !found {
+		return 0, nil
+	}
 
-		it := txn.NewIterator(opts)
-		defer it.Close()
-		it.Seek(getLogKey(math.MaxUint64))
-		if !it.Valid() {
-			return nil
-		}
+	key := it.Key()
+	idx := key[len(key)-8:]
+	index := binary.BigEndian.Uint64(idx)
 
-		k := it.Item().Key()
-		idx := k[len(k)-8:]
-		index = binary.BigEndian.Uint64(idx)
-		return nil
-	})
+	var log marshaledLog = make([]byte, len(it.Value()))
+	copy(log, it.Value())
+	return index, b.cache.Set(index, log)
 }
 
 func (b *BadgerLogStore) GetLog(index uint64, log *raft.Log) error {
@@ -85,55 +66,51 @@ func (b *BadgerLogStore) GetLog(index uint64, log *raft.Log) error {
 }
 
 func (b *BadgerLogStore) StoreLog(log *raft.Log) error {
-	return b.db.Update(func(txn *badger.Txn) error {
-		payload, err := msgpack.Marshal(log)
-		if err != nil {
-			return err
-		}
+	payload, err := msgpack.Marshal(log)
+	if err != nil {
+		return err
+	}
 
-		err = txn.Set(getLogKey(log.Index), payload)
-		if err != nil {
-			return err
-		}
-		return b.cache.Set(log.Index, payload)
-	})
+	err = b.db.Set(getLogKey(log.Index), payload, pebble.Sync)
+	if err != nil {
+		return err
+	}
+	return b.cache.Set(log.Index, payload)
 }
 
 func (b *BadgerLogStore) StoreLogs(logs []*raft.Log) error {
-	batch := b.db.NewWriteBatch()
-	defer batch.Cancel()
-
+	batch := b.db.NewBatch()
 	for _, log := range logs {
 		payload, err := msgpack.Marshal(log)
 		if err != nil {
+			_ = batch.Close()
 			return err
 		}
 
-		err = batch.Set(getLogKey(log.Index), payload)
+		err = batch.Set(getLogKey(log.Index), payload, pebble.Sync)
 		if err != nil {
+			_ = batch.Close()
 			return err
 		}
 
 		err = b.cache.Set(log.Index, payload)
 		if err != nil {
+			_ = batch.Close()
 			return err
 		}
 	}
-	return batch.Flush()
+	return batch.Commit(pebble.Sync)
 }
 
 func (b *BadgerLogStore) DeleteRange(min, max uint64) error {
-	batch := b.db.NewWriteBatch()
-	defer batch.Cancel()
-
 	for i := min; i <= max; i++ {
-		err := batch.Delete(getLogKey(i))
-		if err != nil {
-			return err
-		}
 		b.cache.Remove(i)
 	}
-	return batch.Flush()
+	return b.db.DeleteRange(
+		getLogKey(min),
+		getLogKey(max+1),
+		pebble.Sync,
+	)
 }
 
 func getLogKey(index uint64) []byte {

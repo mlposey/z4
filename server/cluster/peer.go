@@ -65,11 +65,11 @@ func (p *Peer) initStorage() error {
 		}
 	}
 
-	p.logStore, err = raftutil.NewLogStore(p.config.DB.DB)
+	p.logStore, err = raftutil.NewLogStore(p.config.DB.DB2)
 	if err != nil {
 		return fmt.Errorf("failed to load log store: %w", err)
 	}
-	p.stableStore = raftutil.NewStableStore(p.config.DB.DB)
+	p.stableStore = raftutil.NewStableStore(p.config.DB.DB2)
 
 	p.snapshots, err = raft.NewFileSnapshotStore(p.config.DataDir, 1, os.Stderr)
 	if err != nil {
@@ -99,7 +99,7 @@ func (p *Peer) joinNetwork() error {
 		return fmt.Errorf("could not create transport for raft peer: %w", err)
 	}
 
-	p.fsm = newFSM(p.config.DB.DB, p.config.Writer, p.config.Namespaces)
+	p.fsm = newFSM(p.config.DB.DB2, p.config.Writer, p.config.Namespaces)
 	p.Raft, err = raft.NewRaft(
 		c,
 		p.fsm,

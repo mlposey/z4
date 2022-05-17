@@ -2,6 +2,7 @@ package storage
 
 import (
 	"fmt"
+	"github.com/cockroachdb/pebble"
 	"github.com/dgraph-io/badger/v3"
 	"github.com/mlposey/z4/telemetry"
 	"go.uber.org/multierr"
@@ -10,8 +11,9 @@ import (
 
 // BadgerClient manages a connection to a BadgerDB file store.
 type BadgerClient struct {
-	DB *badger.DB
-	r  *reporter
+	DB  *badger.DB
+	DB2 *pebble.DB
+	r   *reporter
 }
 
 func NewBadgerClient(dataDir string) (*BadgerClient, error) {
@@ -20,7 +22,16 @@ func NewBadgerClient(dataDir string) (*BadgerClient, error) {
 	if err != nil {
 		return nil, fmt.Errorf("could not open badger database: %w", err)
 	}
-	client := &BadgerClient{DB: db}
+
+	peb, err := pebble.Open(dataDir+"/pebble", &pebble.Options{})
+	if err != nil {
+		return nil, fmt.Errorf("could not open pebble database: %w", err)
+	}
+
+	client := &BadgerClient{
+		DB:  db,
+		DB2: peb,
+	}
 	client.r = newReporter(client)
 	go client.handleGC()
 	go client.r.StartReporter()
@@ -50,6 +61,7 @@ func (bc *BadgerClient) handleGC() {
 // pending writes may be canceled when the application terminates.
 func (bc *BadgerClient) Close() error {
 	return multierr.Combine(
+		bc.DB2.Close(),
 		bc.r.Close(),
 		bc.DB.Close(),
 	)

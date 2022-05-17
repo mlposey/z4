@@ -1,8 +1,9 @@
 package cluster
 
 import (
+	"encoding/binary"
 	"errors"
-	"github.com/dgraph-io/badger/v3"
+	"github.com/cockroachdb/pebble"
 	"github.com/hashicorp/raft"
 	"github.com/mlposey/z4/feeds/q"
 	"github.com/mlposey/z4/proto"
@@ -15,14 +16,14 @@ import (
 
 // stateMachine uses raft logs to modify the task database.
 type stateMachine struct {
-	db     *badger.DB
+	db     *pebble.DB
 	writer q.TaskWriter
 	ns     *storage.NamespaceStore
 	handle *LeaderHandle
 }
 
 func newFSM(
-	db *badger.DB,
+	db *pebble.DB,
 	ts q.TaskWriter,
 	ns *storage.NamespaceStore,
 ) *stateMachine {
@@ -179,31 +180,99 @@ func (f *stateMachine) Apply(log *raft.Log) interface{} {
 
 func (f *stateMachine) Snapshot() (raft.FSMSnapshot, error) {
 	telemetry.Logger.Info("taking fsm snapshot")
-	return &snapshot{db: f.db}, nil
+	return &snapshot{db: f.db.NewSnapshot()}, nil
 }
 
 func (f *stateMachine) Restore(snapshot io.ReadCloser) error {
 	telemetry.Logger.Info("restoring fsm from snapshot")
-	// TODO: Freeze db writes
-	return f.db.Load(snapshot, 100)
-	// TODO: Resume db writes.
+	// TODO: Delete the existing database before restoring.
+
+	batch := f.db.NewBatch()
+	l := make([]byte, 4)
+	for {
+		_, err := snapshot.Read(l)
+		if err != nil {
+			if err == io.EOF {
+				break
+			}
+			_ = batch.Close()
+			return err
+		}
+
+		key := make([]byte, binary.BigEndian.Uint32(l))
+		_, err = snapshot.Read(key)
+		if err != nil {
+			if err == io.EOF {
+				break
+			}
+			_ = batch.Close()
+			return err
+		}
+
+		_, err = snapshot.Read(l)
+		if err != nil {
+			if err == io.EOF {
+				break
+			}
+			_ = batch.Close()
+			return err
+		}
+
+		value := make([]byte, binary.BigEndian.Uint32(l))
+		_, err = snapshot.Read(value)
+		if err != nil {
+			if err == io.EOF {
+				break
+			}
+			_ = batch.Close()
+			return err
+		}
+
+		err = batch.Set(key, value, pebble.Sync)
+		if err != nil {
+			_ = batch.Close()
+			return err
+		}
+	}
+	return batch.Commit(pebble.Sync)
 }
 
 type snapshot struct {
-	db *badger.DB
+	db *pebble.Snapshot
 }
 
 func (s *snapshot) Persist(sink raft.SnapshotSink) error {
 	telemetry.Logger.Info("persisting fsm snapshot")
-	_, err := s.db.Backup(sink, 0)
-	if err != nil {
-		sink.Cancel()
-	} else {
-		telemetry.LastFSMSnapshot.SetToCurrentTime()
-		sink.Close()
+
+	it := s.db.NewIter(&pebble.IterOptions{})
+	l := make([]byte, 4)
+	for it.Valid() {
+		binary.BigEndian.PutUint32(l, uint32(len(it.Key())))
+		_, err := sink.Write(l)
+		if err != nil {
+			return err
+		}
+
+		_, err = sink.Write(it.Key())
+		if err != nil {
+			return err
+		}
+
+		binary.BigEndian.PutUint32(l, uint32(len(it.Value())))
+		_, err = sink.Write(l)
+		if err != nil {
+			return err
+		}
+
+		_, err = sink.Write(it.Value())
+		if err != nil {
+			return err
+		}
 	}
-	return err
+	telemetry.LastFSMSnapshot.SetToCurrentTime()
+	return it.Close()
 }
 
 func (s *snapshot) Release() {
+	_ = s.db.Close()
 }
