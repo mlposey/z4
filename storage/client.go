@@ -24,8 +24,8 @@ func NewBadgerClient(dataDir string) (*BadgerClient, error) {
 	}
 
 	peb, err := pebble.Open(dataDir+"/pebble", &pebble.Options{
-		MemTableSize:  100 << 20,
-		LBaseMaxBytes: 100 << 20,
+		MemTableSize: 100 << 20,
+		//LBaseMaxBytes: 100 << 20,
 	})
 	if err != nil {
 		return nil, fmt.Errorf("could not open pebble database: %w", err)
