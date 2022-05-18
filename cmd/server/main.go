@@ -68,8 +68,8 @@ func initLogger(debugEnabled bool) {
 	}
 }
 
-func initDB(dataDir string, port int) *storage.BadgerClient {
-	db, err := storage.NewBadgerClient(dataDir)
+func initDB(dataDir string, port int) *storage.PebbleClient {
+	db, err := storage.NewPebbleClient(dataDir)
 	if err != nil {
 		log.Fatalf("error initializing database client: %v", err)
 	}
