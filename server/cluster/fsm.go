@@ -164,7 +164,8 @@ func (f *stateMachine) Snapshot() (raft.FSMSnapshot, error) {
 }
 
 func (f *stateMachine) Restore(snapshot io.ReadCloser) error {
-	telemetry.Logger.Info("restoring fsm from snapshot")
+	telemetry.Logger.Info("restoring fsm from snapshot...")
+	defer telemetry.Logger.Info("snapshot restored")
 	// TODO: Delete the existing database before restoring.
 
 	batch := f.db.NewBatch()
@@ -222,7 +223,8 @@ type snapshot struct {
 }
 
 func (s *snapshot) Persist(sink raft.SnapshotSink) error {
-	telemetry.Logger.Info("persisting fsm snapshot")
+	telemetry.Logger.Info("persisting fsm snapshot...")
+	defer telemetry.Logger.Info("snapshot persisted")
 
 	it := s.db.NewIter(&pebble.IterOptions{})
 	l := make([]byte, 4)
