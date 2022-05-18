@@ -54,5 +54,6 @@ func (u *undeliveredReader) Read(f func(task *proto.Task) error) error {
 func (u *undeliveredReader) executeQuery(handle func(task *proto.Task) error) error {
 	query := u.qf.Query(u.namespace)
 	it := storage.NewTaskIterator(u.tasks.Client, query)
+	defer it.Close()
 	return it.ForEach(handle)
 }

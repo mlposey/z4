@@ -90,6 +90,7 @@ func (d *deliveredReader) executeQuery(handle func(task *proto.Task) error) erro
 	watermark := time.Now().Add(-ackDeadline)
 	query := d.qf.Query(d.namespace)
 	it := storage.NewTaskIterator(d.tasks.Client, query)
+	defer it.Close()
 
 	return it.ForEach(func(task *proto.Task) error {
 		if d.retryTask(task, watermark) {
