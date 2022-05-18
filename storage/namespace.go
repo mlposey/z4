@@ -4,7 +4,6 @@ import (
 	"bytes"
 	"fmt"
 	"github.com/cockroachdb/pebble"
-	"github.com/dgraph-io/badger/v3"
 	"github.com/mlposey/z4/proto"
 	"github.com/mlposey/z4/telemetry"
 	"go.uber.org/zap"
@@ -20,7 +19,7 @@ import (
 //
 // A higher number will permit faster index assignment but at the
 // cost of more lost indexes during application crashes.
-const SequenceLeaseSize = 1000
+const SequenceLeaseSize = 10_000
 
 // NamespaceStore manages persistent storage for namespace configurations.
 type NamespaceStore struct {
@@ -35,9 +34,9 @@ func NewNamespaceStore(client *BadgerClient) *NamespaceStore {
 	}
 }
 
-func (cs *NamespaceStore) Sequence(namespaceID string) (*badger.Sequence, error) {
+func (cs *NamespaceStore) Sequence(namespaceID string) (*Sequence, error) {
 	key := getSeqKey(namespaceID)
-	return cs.Client.DB.GetSequence(key, SequenceLeaseSize)
+	return NewSequence(cs.Client.DB2, key, SequenceLeaseSize)
 }
 
 func getSeqKey(namespaceID string) []byte {

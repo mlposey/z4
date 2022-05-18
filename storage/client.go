@@ -4,16 +4,13 @@ import (
 	"fmt"
 	"github.com/cockroachdb/pebble"
 	"github.com/dgraph-io/badger/v3"
-	"github.com/mlposey/z4/telemetry"
 	"go.uber.org/multierr"
-	"time"
 )
 
 // BadgerClient manages a connection to a BadgerDB file store.
 type BadgerClient struct {
 	DB  *badger.DB
 	DB2 *pebble.DB
-	r   *reporter
 }
 
 func NewBadgerClient(dataDir string) (*BadgerClient, error) {
@@ -31,31 +28,10 @@ func NewBadgerClient(dataDir string) (*BadgerClient, error) {
 		return nil, fmt.Errorf("could not open pebble database: %w", err)
 	}
 
-	client := &BadgerClient{
+	return &BadgerClient{
 		DB:  db,
 		DB2: peb,
-	}
-	client.r = newReporter(client)
-	go client.handleGC()
-	go client.r.StartReporter()
-	return client, nil
-}
-
-func (bc *BadgerClient) handleGC() {
-	// TODO: Consider making these values configurable.
-
-	ticker := time.NewTicker(30 * time.Second)
-	defer ticker.Stop()
-	for range ticker.C {
-		telemetry.Logger.Debug("running value log garbage collector")
-
-	again:
-		err := bc.DB.RunValueLogGC(0.2)
-		if err == nil {
-			goto again
-		}
-		telemetry.LastDBGC.SetToCurrentTime()
-	}
+	}, nil
 }
 
 // Close flushes writes to disk.
@@ -65,7 +41,6 @@ func (bc *BadgerClient) handleGC() {
 func (bc *BadgerClient) Close() error {
 	return multierr.Combine(
 		bc.DB2.Close(),
-		bc.r.Close(),
 		bc.DB.Close(),
 	)
 }

@@ -28,6 +28,7 @@ type Server struct {
 	config Config
 	server *grpc.Server
 	peer   *cluster.Peer
+	idx    *storage.IndexStore
 }
 
 func NewServer(config Config) *Server {
@@ -61,7 +62,8 @@ func (s *Server) Start() error {
 	}
 	s.peer.LoadHandle(handle)
 
-	gen := storage.NewGenerator(storage.NewIndexStore(s.config.PeerConfig.Namespaces))
+	s.idx = storage.NewIndexStore(s.config.PeerConfig.Namespaces)
+	gen := storage.NewGenerator(s.idx)
 
 	s.server = grpc.NewServer(s.config.Opts...)
 	adminServer := api.NewAdmin(s.peer.Raft, s.config.PeerConfig, handle, s.fm, gen)
@@ -82,7 +84,8 @@ func (s *Server) Close() error {
 	err := multierr.Combine(
 		s.peer.Close(),
 		s.fm.Close(),
-		s.config.PeerConfig.Writer.Close())
+		s.config.PeerConfig.Writer.Close(),
+		s.idx.Close())
 	telemetry.Logger.Info("server stopped")
 	return err
 }
