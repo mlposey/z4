@@ -9,7 +9,7 @@ import (
 type undeliveredReader struct {
 	namespace *proto.Namespace
 	tasks     *storage.TaskStore
-	qf        PreemptiveQueryFactory
+	qf        QueryFactory
 	check     Checkpointer
 }
 
@@ -18,7 +18,7 @@ var _ Reader = (*undeliveredReader)(nil)
 func newUndeliveredReader(
 	tasks *storage.TaskStore,
 	namespace *proto.Namespace,
-	qf PreemptiveQueryFactory,
+	qf QueryFactory,
 	check Checkpointer,
 ) *undeliveredReader {
 	return &undeliveredReader{
@@ -43,7 +43,6 @@ func (u *undeliveredReader) Read(f func(task *proto.Task) error) error {
 		count++
 		return nil
 	})
-	u.qf.Inform(count)
 
 	if err != nil && err != io.EOF {
 		return err

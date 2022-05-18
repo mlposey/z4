@@ -47,16 +47,6 @@ type QueryFactory interface {
 	Query(namespace *proto.Namespace) storage.TaskRange
 }
 
-// A PreemptiveQueryFactory generates task queries.
-//
-// It is much like a QueryFactory but contains an
-// additional method Inform that can help the factory
-// build queries based on the results of previous queries.
-type PreemptiveQueryFactory interface {
-	QueryFactory
-	Inform(n int)
-}
-
 // A Checkpointer saves a checkpoint based on a task.
 type Checkpointer interface {
 	Set(namespace *proto.Namespace, task *proto.Task)

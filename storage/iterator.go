@@ -97,7 +97,6 @@ type TaskRange interface {
 	GetStart() []byte
 	GetEnd() []byte
 	GetPrefix() []byte
-	GetPrefetch() int
 }
 
 // ScheduledRange is a query for tasks within a time range.
@@ -112,8 +111,6 @@ type ScheduledRange struct {
 	// EndID restricts the search to all task IDs that are equal to it
 	// or occur before it in ascending sorted order.
 	EndID iden.TaskID
-
-	Prefetch int
 }
 
 func (tr *ScheduledRange) GetPrefix() []byte {
@@ -132,10 +129,6 @@ func (tr *ScheduledRange) GetEnd() []byte {
 	return getScheduledTaskKey(tr.Namespace, tr.EndID)
 }
 
-func (tr *ScheduledRange) GetPrefetch() int {
-	return tr.Prefetch
-}
-
 // FifoRange is a query for tasks within an index range
 type FifoRange struct {
 	// Namespace restricts the search to only tasks in a given namespace.
@@ -143,8 +136,6 @@ type FifoRange struct {
 
 	StartIndex uint64
 	EndIndex   uint64
-
-	Prefetch int
 }
 
 func (fr *FifoRange) GetPrefix() []byte {
@@ -163,8 +154,4 @@ func (fr *FifoRange) GetStart() []byte {
 func (fr *FifoRange) GetEnd() []byte {
 	id := iden.New(time.Time{}, fr.EndIndex)
 	return getFifoTaskKey(fr.Namespace, id)
-}
-
-func (fr *FifoRange) GetPrefetch() int {
-	return fr.Prefetch
 }
