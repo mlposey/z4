@@ -1,6 +1,7 @@
 package cluster
 
 import (
+	"bytes"
 	"encoding/binary"
 	"errors"
 	"github.com/cockroachdb/pebble"
@@ -8,6 +9,7 @@ import (
 	"github.com/mlposey/z4/feeds/q"
 	"github.com/mlposey/z4/proto"
 	"github.com/mlposey/z4/storage"
+	"github.com/mlposey/z4/storage/raftutil"
 	"github.com/mlposey/z4/telemetry"
 	pb "google.golang.org/protobuf/proto"
 	"io"
@@ -168,6 +170,45 @@ func (f *stateMachine) Restore(snapshot io.ReadCloser) error {
 	defer telemetry.Logger.Info("snapshot restored")
 	// TODO: Delete the existing database before restoring.
 
+	err := f.discard()
+	if err != nil {
+		return err
+	}
+	return f.restore(snapshot)
+}
+
+func (f *stateMachine) discard() error {
+	snap := f.db.NewSnapshot()
+	batch := f.db.NewBatch()
+	it := snap.NewIter(&pebble.IterOptions{})
+
+	it.First()
+	for ; it.Valid(); it.Next() {
+		if isRaftKey(it.Key()) {
+			// Don't delete Raft data; only task data
+			continue
+		}
+
+		err := batch.Delete(it.Key(), pebble.NoSync)
+		if err != nil {
+			_ = it.Close()
+			_ = snap.Close()
+			_ = batch.Close()
+			return err
+		}
+	}
+
+	_ = it.Close()
+	_ = snap.Close()
+	return batch.Commit(pebble.NoSync)
+}
+
+func isRaftKey(k []byte) bool {
+	return bytes.HasPrefix(k, raftutil.LogStorePrefix) ||
+		bytes.HasPrefix(k, raftutil.StableStorePrefix)
+}
+
+func (f *stateMachine) restore(snapshot io.ReadCloser) error {
 	batch := f.db.NewBatch()
 	l := make([]byte, 4)
 	for {
@@ -209,13 +250,13 @@ func (f *stateMachine) Restore(snapshot io.ReadCloser) error {
 			return err
 		}
 
-		err = batch.Set(key, value, pebble.Sync)
+		err = batch.Set(key, value, pebble.NoSync)
 		if err != nil {
 			_ = batch.Close()
 			return err
 		}
 	}
-	return batch.Commit(pebble.Sync)
+	return batch.Commit(pebble.NoSync)
 }
 
 type snapshot struct {
@@ -227,8 +268,14 @@ func (s *snapshot) Persist(sink raft.SnapshotSink) error {
 	defer telemetry.Logger.Info("snapshot persisted")
 
 	it := s.db.NewIter(&pebble.IterOptions{})
+	it.First()
 	l := make([]byte, 4)
-	for it.Valid() {
+	for ; it.Valid(); it.Next() {
+		if isRaftKey(it.Key()) {
+			// Don't snapshot the Raft data; only tasks
+			continue
+		}
+
 		binary.BigEndian.PutUint32(l, uint32(len(it.Key())))
 		_, err := sink.Write(l)
 		if err != nil {

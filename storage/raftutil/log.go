@@ -15,7 +15,7 @@ type PebbleLogStore struct {
 }
 
 var _ raft.LogStore = (*PebbleLogStore)(nil)
-var logStorePrefix = []byte("raft#logstore#")
+var LogStorePrefix = []byte("raft#logstore#")
 
 func NewLogStore(db *pebble.DB) (*PebbleLogStore, error) {
 	return &PebbleLogStore{
@@ -115,7 +115,7 @@ func (b *PebbleLogStore) DeleteRange(min, max uint64) error {
 
 func getLogKey(index uint64) []byte {
 	k := bytes.NewBuffer(nil)
-	k.Write(logStorePrefix)
+	k.Write(LogStorePrefix)
 	_ = binary.Write(k, binary.BigEndian, index)
 	return k.Bytes()
 }

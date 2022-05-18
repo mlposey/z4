@@ -9,17 +9,14 @@ import (
 )
 
 type PebbleStableStore struct {
-	db     *pebble.DB
-	prefix []byte
+	db *pebble.DB
 }
 
 var _ raft.StableStore = (*PebbleStableStore)(nil)
+var StableStorePrefix = []byte("raft#stablestore#")
 
 func NewStableStore(db *pebble.DB) *PebbleStableStore {
-	return &PebbleStableStore{
-		db:     db,
-		prefix: []byte("raft#stablestore#"),
-	}
+	return &PebbleStableStore{db: db}
 }
 
 func (b *PebbleStableStore) Set(key []byte, val []byte) error {
@@ -55,7 +52,7 @@ func (b *PebbleStableStore) GetUint64(key []byte) (uint64, error) {
 
 func (b *PebbleStableStore) getKey(key []byte) []byte {
 	k := bytes.NewBuffer(nil)
-	k.Write(b.prefix)
+	k.Write(StableStorePrefix)
 	k.Write(key)
 	return k.Bytes()
 }
