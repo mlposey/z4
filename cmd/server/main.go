@@ -25,7 +25,7 @@ func main() {
 	config := configFromEnv()
 
 	initLogger(config.DebugLoggingEnabled)
-	db := initDB(config.DBDataDir, config.SQLPort)
+	db := initDB(config.DBDataDir+"/state", config.SQLPort)
 
 	srv := server.NewServer(server.Config{
 		DB:          db,
@@ -35,7 +35,7 @@ func main() {
 			ID:               config.PeerID,
 			Port:             config.PeerPort,
 			AdvertiseAddr:    config.PeerAdvertiseAddr,
-			DataDir:          config.PeerDataDir,
+			SnapshotDir:      config.DBDataDir,
 			LogBatchSize:     1000,
 			BootstrapCluster: config.BootstrapCluster,
 		},
@@ -68,8 +68,8 @@ func initLogger(debugEnabled bool) {
 	}
 }
 
-func initDB(dataDir string, port int) *storage.BadgerClient {
-	db, err := storage.NewBadgerClient(dataDir)
+func initDB(dataDir string, port int) *storage.PebbleClient {
+	db, err := storage.NewPebbleClient(dataDir)
 	if err != nil {
 		log.Fatalf("error initializing database client: %v", err)
 	}

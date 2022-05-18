@@ -40,7 +40,6 @@ compose_down:
 
 clean_db:
 	rm -rf z4data && mkdir z4data
-	rm -rf z4peer && mkdir z4peer
 
 build_and_run_m1: build_m1
 	Z4_DEBUG_LOGGING_ENABLED=true \

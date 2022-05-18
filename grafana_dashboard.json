@@ -618,93 +618,6 @@
       "type": "row"
     },
     {
-      "description": "The amount of space used by each namespace to store tasks",
-      "fieldConfig": {
-        "defaults": {
-          "color": {
-            "mode": "palette-classic"
-          },
-          "custom": {
-            "axisLabel": "",
-            "axisPlacement": "auto",
-            "barAlignment": 0,
-            "drawStyle": "line",
-            "fillOpacity": 0,
-            "gradientMode": "none",
-            "hideFrom": {
-              "legend": false,
-              "tooltip": false,
-              "viz": false
-            },
-            "lineInterpolation": "linear",
-            "lineWidth": 1,
-            "pointSize": 5,
-            "scaleDistribution": {
-              "type": "linear"
-            },
-            "showPoints": "auto",
-            "spanNulls": false,
-            "stacking": {
-              "group": "A",
-              "mode": "none"
-            },
-            "thresholdsStyle": {
-              "mode": "off"
-            }
-          },
-          "mappings": [],
-          "thresholds": {
-            "mode": "absolute",
-            "steps": [
-              {
-                "color": "green",
-                "value": null
-              },
-              {
-                "color": "red",
-                "value": 80
-              }
-            ]
-          },
-          "unit": "decbytes"
-        },
-        "overrides": []
-      },
-      "gridPos": {
-        "h": 8,
-        "w": 10,
-        "x": 0,
-        "y": 35
-      },
-      "id": 26,
-      "options": {
-        "legend": {
-          "calcs": [],
-          "displayMode": "list",
-          "placement": "bottom"
-        },
-        "tooltip": {
-          "mode": "single",
-          "sort": "none"
-        }
-      },
-      "targets": [
-        {
-          "datasource": {
-            "type": "prometheus",
-            "uid": "prometheus"
-          },
-          "exemplar": true,
-          "expr": "max(z4_namespace_size_bytes) by (task_namespace)",
-          "interval": "",
-          "legendFormat": "{{task_namespace}}",
-          "refId": "A"
-        }
-      ],
-      "title": "Namespace Disk Usage",
-      "type": "timeseries"
-    },
-    {
       "description": "The last time a snapshot of the database was taken.",
       "fieldConfig": {
         "defaults": {
@@ -731,8 +644,8 @@
       },
       "gridPos": {
         "h": 8,
-        "w": 7,
-        "x": 10,
+        "w": 12,
+        "x": 0,
         "y": 35
       },
       "id": 16,
@@ -795,8 +708,8 @@
       },
       "gridPos": {
         "h": 8,
-        "w": 7,
-        "x": 17,
+        "w": 12,
+        "x": 12,
         "y": 35
       },
       "id": 12,
@@ -842,13 +755,13 @@
     "list": []
   },
   "time": {
-    "from": "now-1h",
+    "from": "now-3h",
     "to": "now"
   },
   "timepicker": {},
   "timezone": "",
   "title": "z4",
   "uid": "TGc1G_w7z",
-  "version": 16,
+  "version": 17,
   "weekStart": ""
 }

@@ -8,7 +8,6 @@ services:
       Z4_PEER_ID: peer1
       Z4_PEER_ADVERTISE_ADDR: peer1:6356
       Z4_DB_DATA_DIR: /var/lib/z4/db
-      Z4_PEER_DATA_DIR: /var/lib/z4/cluster
       # This command is essentially ignored when restarting this container
       # after bootstrapping it the first time, so we do not need to modify
       # it when testing failure scenarios.
@@ -24,7 +23,6 @@ services:
       Z4_PEER_ID: peer2
       Z4_PEER_ADVERTISE_ADDR: peer2:6356
       Z4_DB_DATA_DIR: /var/lib/z4/db
-      Z4_PEER_DATA_DIR: /var/lib/z4/cluster
     ports:
       - 6455:6355
       - 3307:3306
@@ -36,7 +34,6 @@ services:
       Z4_PEER_ID: peer3
       Z4_PEER_ADVERTISE_ADDR: peer3:6356
       Z4_DB_DATA_DIR: /var/lib/z4/db
-      Z4_PEER_DATA_DIR: /var/lib/z4/cluster
     ports:
       - 6555:6355
       - 3308:3306

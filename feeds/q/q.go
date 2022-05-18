@@ -19,9 +19,6 @@ type TaskWriter interface {
 	// to the collection.
 	Acknowledge(acks []*proto.Ack) error
 
-	// PurgeTasks should delete all tasks in the collection.
-	PurgeTasks(namespace string) error
-
 	// Close should release all resources needed to
 	// safely destroy the TaskWriter object.
 	Close() error
@@ -45,16 +42,6 @@ type Reader interface {
 // A QueryFactory generates task queries.
 type QueryFactory interface {
 	Query(namespace *proto.Namespace) storage.TaskRange
-}
-
-// A PreemptiveQueryFactory generates task queries.
-//
-// It is much like a QueryFactory but contains an
-// additional method Inform that can help the factory
-// build queries based on the results of previous queries.
-type PreemptiveQueryFactory interface {
-	QueryFactory
-	Inform(n int)
 }
 
 // A Checkpointer saves a checkpoint based on a task.

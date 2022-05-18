@@ -14,19 +14,17 @@ import (
 
 // LocalServer manages a local instance of a z4 server.
 type LocalServer struct {
-	dbDataDir   string
-	peerDataDir string
-	server      *os.Process
-	serverPort  int
-	appOutput   io.ReadCloser
-	appHandle   *exec.Cmd
+	dbDataDir  string
+	server     *os.Process
+	serverPort int
+	appOutput  io.ReadCloser
+	appHandle  *exec.Cmd
 }
 
 func NewLocalServer(port int) *LocalServer {
 	return &LocalServer{
-		dbDataDir:   "/tmp/" + uuid.New().String(),
-		peerDataDir: "/tmp/" + uuid.New().String(),
-		serverPort:  port,
+		dbDataDir:  "/tmp/" + uuid.New().String(),
+		serverPort: port,
 	}
 }
 
@@ -45,7 +43,6 @@ func (ls *LocalServer) startApp() error {
 	_ = os.Setenv("Z4_DEBUG_LOGGING_ENABLED", "true")
 	_ = os.Setenv("Z4_PEER_ID", "godog")
 	_ = os.Setenv("Z4_BOOTSTRAP_CLUSTER", "true")
-	_ = os.Setenv("Z4_PEER_DATA_DIR", ls.peerDataDir)
 
 	ls.appHandle = exec.Command("bash", "-c", "go run ../cmd/server/*.go")
 

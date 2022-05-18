@@ -20,7 +20,7 @@ type leaseHolder struct {
 
 func newLeaseHolder(
 	namespace string,
-	db *storage.BadgerClient,
+	db *storage.PebbleClient,
 	onRemove func(),
 	raft *raft.Raft,
 ) (*leaseHolder, error) {

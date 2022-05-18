@@ -17,12 +17,10 @@ func (s *schedDeliveredQueryFactory) Query(namespace *proto.Namespace) storage.T
 		Namespace: namespace.GetId(),
 		StartID:   iden.Min,
 		EndID:     iden.New(watermark, 0),
-		Prefetch:  1_000,
 	}
 }
 
 type schedUndeliveredQueryFactory struct {
-	prefetch int
 }
 
 func (s *schedUndeliveredQueryFactory) Query(namespace *proto.Namespace) storage.TaskRange {
@@ -32,15 +30,6 @@ func (s *schedUndeliveredQueryFactory) Query(namespace *proto.Namespace) storage
 		Namespace: namespace.GetId(),
 		StartID:   nextID,
 		EndID:     iden.New(time.Now().UTC(), 0),
-		Prefetch:  s.prefetch,
-	}
-}
-
-func (s *schedUndeliveredQueryFactory) Inform(n int) {
-	if n > 0 {
-		s.prefetch = 1000
-	} else {
-		s.prefetch = 0
 	}
 }
 

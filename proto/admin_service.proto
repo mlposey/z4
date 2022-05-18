@@ -16,9 +16,6 @@ service Admin {
   // UpdateNamespace updates the settings of a task namespace.
   rpc UpdateNamespace(UpdateNamespaceRequest) returns (Namespace) {};
 
-  // PurgeTasks deletes all tasks in a namespace.
-  rpc PurgeTasks(PurgeTasksRequest) returns (google.protobuf.Empty) {};
-
   // GetClusterInfo returns information about the structure of the Raft cluster.
   rpc GetClusterInfo(GetClusterInfoRequest) returns (ClusterInfo) {};
 

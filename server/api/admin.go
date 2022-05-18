@@ -12,7 +12,6 @@ import (
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 	emptypb "google.golang.org/protobuf/types/known/emptypb"
-	"time"
 )
 
 // Admin implements the gRPC Admin service.
@@ -93,31 +92,6 @@ func (a *Admin) UpdateNamespace(ctx context.Context, req *proto.UpdateNamespaceR
 		ns.AckDeadlineSeconds = req.GetNamespace().GetAckDeadlineSeconds()
 	}
 	return ns, nil
-}
-
-func (a *Admin) PurgeTasks(ctx context.Context, req *proto.PurgeTasksRequest) (*emptypb.Empty, error) {
-	if !a.handle.IsLeader() {
-		client, err := a.handle.AdminClient()
-		if err != nil {
-			return nil, status.Errorf(codes.Internal, "could not forward request: %v", err)
-		}
-		return client.PurgeTasks(ctx, req)
-	}
-
-	feed, err := a.fm.Lease(req.GetNamespaceId())
-	if err != nil {
-		return nil, status.Errorf(codes.Internal, "could not get lease for update: %v", err)
-	}
-	defer feed.Release()
-
-	id, err := a.ids.ID(req.GetNamespaceId(), time.Time{})
-	if err != nil {
-		return nil, status.Errorf(codes.Internal, "purge failed: %v", err)
-	}
-	feed.Feed().Namespace.N.LastDeliveredQueuedTask = id.String()
-
-	cluster.ApplyPurgeTasksCommand(a.raft, req)
-	return new(emptypb.Empty), nil
 }
 
 func (a *Admin) GetClusterInfo(

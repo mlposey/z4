@@ -3,7 +3,7 @@ package storage
 import (
 	"errors"
 	"fmt"
-	"github.com/dgraph-io/badger/v3"
+	"github.com/cockroachdb/pebble"
 	"github.com/hashicorp/raft"
 	"github.com/mlposey/z4/iden"
 	"github.com/mlposey/z4/proto"
@@ -66,7 +66,7 @@ func (sn *SyncedNamespace) load() error {
 		return nil
 	}
 
-	if !errors.Is(err, badger.ErrKeyNotFound) {
+	if !errors.Is(err, pebble.ErrNotFound) {
 		return fmt.Errorf("failed to load namespace from database: %w", err)
 	}
 

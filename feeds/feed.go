@@ -24,7 +24,7 @@ type Feed struct {
 
 func New(
 	namespaceID string,
-	db *storage.BadgerClient,
+	db *storage.PebbleClient,
 	raft *raft.Raft,
 ) (*Feed, error) {
 	ctx, cancel := context.WithCancel(context.Background())

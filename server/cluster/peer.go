@@ -19,10 +19,10 @@ type PeerConfig struct {
 	ID               string
 	Port             int
 	AdvertiseAddr    string
-	DataDir          string
+	SnapshotDir      string
 	LogBatchSize     int
 	BootstrapCluster bool
-	DB               *storage.BadgerClient
+	DB               *storage.PebbleClient
 	Tasks            *storage.TaskStore
 	Namespaces       *storage.NamespaceStore
 	Writer           q.TaskWriter
@@ -57,9 +57,9 @@ func NewPeer(config PeerConfig) (*Peer, error) {
 }
 
 func (p *Peer) initStorage() error {
-	_, err := os.Stat(p.config.DataDir)
+	_, err := os.Stat(p.config.SnapshotDir)
 	if errors.Is(err, os.ErrNotExist) {
-		err := os.Mkdir(p.config.DataDir, os.ModePerm)
+		err := os.Mkdir(p.config.SnapshotDir, os.ModePerm)
 		if err != nil {
 			return fmt.Errorf("failed to create peer storage folder: %w", err)
 		}
@@ -71,9 +71,9 @@ func (p *Peer) initStorage() error {
 	}
 	p.stableStore = raftutil.NewStableStore(p.config.DB.DB)
 
-	p.snapshots, err = raft.NewFileSnapshotStore(p.config.DataDir, 1, os.Stderr)
+	p.snapshots, err = raft.NewFileSnapshotStore(p.config.SnapshotDir, 1, os.Stderr)
 	if err != nil {
-		return fmt.Errorf(`raft.NewFileSnapshotStore(%q, ...): %v`, p.config.DataDir, err)
+		return fmt.Errorf(`raft.NewFileSnapshotStore(%q, ...): %v`, p.config.SnapshotDir, err)
 	}
 	return nil
 }

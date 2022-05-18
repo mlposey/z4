@@ -3,7 +3,7 @@ package storage
 import (
 	"bytes"
 	"errors"
-	"github.com/dgraph-io/badger/v3"
+	"github.com/cockroachdb/pebble"
 	"github.com/mlposey/z4/iden"
 	"github.com/mlposey/z4/proto"
 	pb "google.golang.org/protobuf/proto"
@@ -13,32 +13,23 @@ import (
 
 // TaskIterator iterates over a range of tasks in the database.
 type TaskIterator struct {
-	txn *badger.Txn
-	it  *badger.Iterator
-	end []byte
-	buf []byte
+	it     *pebble.Iterator
+	end    []byte
+	prefix []byte
 }
 
-func NewTaskIterator(client *BadgerClient, query TaskRange) *TaskIterator {
-	// TODO: Consider creating another type to pass in instead of BadgerClient.
-	// We should try to avoid usage of BadgerClient in other packages as much as possible.
+func NewTaskIterator(client *PebbleClient, query TaskRange) *TaskIterator {
+	// TODO: Consider creating another type to pass in instead of PebbleClient.
+	// We should try to avoid usage of PebbleClient in other packages as much as possible.
 
-	txn := client.DB.NewTransaction(false)
-	opts := badger.DefaultIteratorOptions
-	opts.Prefix = query.GetPrefix()
-	if query.GetPrefetch() != 0 {
-		opts.PrefetchSize = query.GetPrefetch()
-	} else {
-		opts.PrefetchValues = false
-	}
-	it := txn.NewIterator(opts)
+	it := client.DB.NewIter(&pebble.IterOptions{})
 	start := query.GetStart()
-	it.Seek(start)
+	it.SeekGE(start)
 
 	return &TaskIterator{
-		txn: txn,
-		it:  it,
-		end: query.GetEnd(),
+		it:     it,
+		end:    query.GetEnd(),
+		prefix: query.GetPrefix(),
 	}
 }
 
@@ -61,7 +52,7 @@ func (ti *TaskIterator) ForEach(handle func(task *proto.Task) error) error {
 }
 
 func (ti *TaskIterator) Next() (*proto.Task, error) {
-	if !ti.it.Valid() {
+	if !(ti.it.Valid() && bytes.HasPrefix(ti.it.Key(), ti.prefix)) {
 		return nil, io.EOF
 	}
 
@@ -77,23 +68,16 @@ func (ti *TaskIterator) Peek() (*proto.Task, error) {
 }
 
 func (ti *TaskIterator) peek(skipCheck bool) (*proto.Task, error) {
-	if !skipCheck && !ti.it.Valid() {
+	if !skipCheck && !(ti.it.Valid() && bytes.HasPrefix(ti.it.Key(), ti.prefix)) {
 		return nil, io.EOF
 	}
 
-	item := ti.it.Item()
-	if bytes.Compare(item.Key(), ti.end) > 0 {
+	if bytes.Compare(ti.it.Key(), ti.end) > 0 {
 		return nil, io.EOF
-	}
-
-	var err error
-	ti.buf, err = item.ValueCopy(ti.buf)
-	if err != nil {
-		return nil, err
 	}
 
 	task := new(proto.Task)
-	err = pb.Unmarshal(ti.buf, task)
+	err := pb.Unmarshal(ti.it.Value(), task)
 	if err != nil {
 		return nil, err
 	}
@@ -105,9 +89,7 @@ func (ti *TaskIterator) peek(skipCheck bool) (*proto.Task, error) {
 }
 
 func (ti *TaskIterator) Close() error {
-	ti.it.Close()
-	ti.txn.Discard()
-	return nil
+	return ti.it.Close()
 }
 
 type TaskRange interface {
@@ -115,7 +97,6 @@ type TaskRange interface {
 	GetStart() []byte
 	GetEnd() []byte
 	GetPrefix() []byte
-	GetPrefetch() int
 }
 
 // ScheduledRange is a query for tasks within a time range.
@@ -130,8 +111,6 @@ type ScheduledRange struct {
 	// EndID restricts the search to all task IDs that are equal to it
 	// or occur before it in ascending sorted order.
 	EndID iden.TaskID
-
-	Prefetch int
 }
 
 func (tr *ScheduledRange) GetPrefix() []byte {
@@ -150,10 +129,6 @@ func (tr *ScheduledRange) GetEnd() []byte {
 	return getScheduledTaskKey(tr.Namespace, tr.EndID)
 }
 
-func (tr *ScheduledRange) GetPrefetch() int {
-	return tr.Prefetch
-}
-
 // FifoRange is a query for tasks within an index range
 type FifoRange struct {
 	// Namespace restricts the search to only tasks in a given namespace.
@@ -161,8 +136,6 @@ type FifoRange struct {
 
 	StartIndex uint64
 	EndIndex   uint64
-
-	Prefetch int
 }
 
 func (fr *FifoRange) GetPrefix() []byte {
@@ -181,8 +154,4 @@ func (fr *FifoRange) GetStart() []byte {
 func (fr *FifoRange) GetEnd() []byte {
 	id := iden.New(time.Time{}, fr.EndIndex)
 	return getFifoTaskKey(fr.Namespace, id)
-}
-
-func (fr *FifoRange) GetPrefetch() int {
-	return fr.Prefetch
 }

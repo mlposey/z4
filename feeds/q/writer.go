@@ -27,10 +27,6 @@ func NewTaskWriter(tasks *storage.TaskStore) TaskWriter {
 	return w
 }
 
-func (s *taskWriter) PurgeTasks(namespace string) error {
-	return s.tasks.PurgeTasks(namespace)
-}
-
 func (s *taskWriter) Push(tasks []*proto.Task, isFollower bool) error {
 	return s.tasks.SaveAll(tasks, isFollower)
 }
