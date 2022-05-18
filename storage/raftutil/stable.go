@@ -8,25 +8,25 @@ import (
 	"github.com/hashicorp/raft"
 )
 
-type BadgerStableStore struct {
+type PebbleStableStore struct {
 	db     *pebble.DB
 	prefix []byte
 }
 
-var _ raft.StableStore = (*BadgerStableStore)(nil)
+var _ raft.StableStore = (*PebbleStableStore)(nil)
 
-func NewStableStore(db *pebble.DB) *BadgerStableStore {
-	return &BadgerStableStore{
+func NewStableStore(db *pebble.DB) *PebbleStableStore {
+	return &PebbleStableStore{
 		db:     db,
 		prefix: []byte("raft#stablestore#"),
 	}
 }
 
-func (b *BadgerStableStore) Set(key []byte, val []byte) error {
+func (b *PebbleStableStore) Set(key []byte, val []byte) error {
 	return b.db.Set(b.getKey(key), val, pebble.NoSync)
 }
 
-func (b *BadgerStableStore) Get(key []byte) ([]byte, error) {
+func (b *PebbleStableStore) Get(key []byte) ([]byte, error) {
 	val, closer, err := b.db.Get(b.getKey(key))
 	if err != nil {
 		return nil, err
@@ -36,13 +36,13 @@ func (b *BadgerStableStore) Get(key []byte) ([]byte, error) {
 	return res, closer.Close()
 }
 
-func (b *BadgerStableStore) SetUint64(key []byte, val uint64) error {
+func (b *PebbleStableStore) SetUint64(key []byte, val uint64) error {
 	encoded := make([]byte, 8)
 	binary.BigEndian.PutUint64(encoded, val)
 	return b.Set(b.getKey(key), encoded)
 }
 
-func (b *BadgerStableStore) GetUint64(key []byte) (uint64, error) {
+func (b *PebbleStableStore) GetUint64(key []byte) (uint64, error) {
 	val, err := b.Get(b.getKey(key))
 	if err != nil {
 		if errors.Is(err, pebble.ErrNotFound) {
@@ -53,7 +53,7 @@ func (b *BadgerStableStore) GetUint64(key []byte) (uint64, error) {
 	return binary.BigEndian.Uint64(val), nil
 }
 
-func (b *BadgerStableStore) getKey(key []byte) []byte {
+func (b *PebbleStableStore) getKey(key []byte) []byte {
 	k := bytes.NewBuffer(nil)
 	k.Write(b.prefix)
 	k.Write(key)

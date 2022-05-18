@@ -16,7 +16,7 @@ import (
 )
 
 type Config struct {
-	DB          *storage.BadgerClient
+	DB          *storage.PebbleClient
 	GRPCPort    int
 	MetricsPort int
 	PeerConfig  cluster.PeerConfig

@@ -14,12 +14,12 @@ import (
 // Manager ensures that only one feed is active per requested namespace.
 type Manager struct {
 	leases map[string]*leaseHolder
-	db     *storage.BadgerClient
+	db     *storage.PebbleClient
 	mu     sync.Mutex
 	raft   *raft.Raft
 }
 
-func NewManager(db *storage.BadgerClient, raft *raft.Raft) *Manager {
+func NewManager(db *storage.PebbleClient, raft *raft.Raft) *Manager {
 	return &Manager{
 		leases: make(map[string]*leaseHolder),
 		db:     db,

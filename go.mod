@@ -7,7 +7,6 @@ require (
 	github.com/bluele/gcache v0.0.2
 	github.com/cockroachdb/pebble v0.0.0-20220517003944-e567fec84c6e
 	github.com/cucumber/godog v0.12.5
-	github.com/dgraph-io/badger/v3 v3.2103.2
 	github.com/dolthub/go-mysql-server v0.11.0
 	github.com/google/uuid v1.2.0
 	github.com/hashicorp/raft v1.3.6
@@ -36,17 +35,13 @@ require (
 	github.com/cucumber/gherkin-go/v19 v19.0.3 // indirect
 	github.com/cucumber/messages-go/v16 v16.0.1 // indirect
 	github.com/davecgh/go-spew v1.1.1 // indirect
-	github.com/dgraph-io/ristretto v0.1.0 // indirect
 	github.com/dolthub/vitess v0.0.0-20211013185428-a8845fb919c1 // indirect
-	github.com/dustin/go-humanize v1.0.0 // indirect
 	github.com/go-kit/kit v0.9.0 // indirect
 	github.com/gofrs/uuid v4.0.0+incompatible // indirect
 	github.com/gogo/protobuf v1.3.2 // indirect
 	github.com/golang/glog v0.0.0-20160126235308-23def4e6c14b // indirect
-	github.com/golang/groupcache v0.0.0-20190702054246-869f871628b6 // indirect
 	github.com/golang/protobuf v1.5.2 // indirect
 	github.com/golang/snappy v0.0.3 // indirect
-	github.com/google/flatbuffers v1.12.1 // indirect
 	github.com/hashicorp/go-hclog v0.9.1 // indirect
 	github.com/hashicorp/go-immutable-radix v1.3.0 // indirect
 	github.com/hashicorp/go-memdb v1.3.0 // indirect
@@ -68,11 +63,11 @@ require (
 	github.com/prometheus/procfs v0.0.8 // indirect
 	github.com/shopspring/decimal v0.0.0-20191130220710-360f2bc03045 // indirect
 	github.com/sirupsen/logrus v1.4.2 // indirect
+	github.com/spaolacci/murmur3 v1.1.0 // indirect
 	github.com/spf13/pflag v1.0.5 // indirect
 	github.com/src-d/go-oniguruma v1.1.0 // indirect
 	github.com/stretchr/testify v1.7.0 // indirect
 	github.com/vmihailenco/tagparser/v2 v2.0.0 // indirect
-	go.opencensus.io v0.22.5 // indirect
 	go.uber.org/atomic v1.7.0 // indirect
 	golang.org/x/exp v0.0.0-20200513190911-00229845015e // indirect
 	golang.org/x/net v0.0.0-20210405180319-a5a99cb37ef4 // indirect

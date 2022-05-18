@@ -9,16 +9,16 @@ import (
 	"math"
 )
 
-type BadgerLogStore struct {
+type PebbleLogStore struct {
 	db    *pebble.DB
 	cache *logCache
 }
 
-var _ raft.LogStore = (*BadgerLogStore)(nil)
+var _ raft.LogStore = (*PebbleLogStore)(nil)
 var logStorePrefix = []byte("raft#logstore#")
 
-func NewLogStore(db *pebble.DB) (*BadgerLogStore, error) {
-	return &BadgerLogStore{
+func NewLogStore(db *pebble.DB) (*PebbleLogStore, error) {
+	return &PebbleLogStore{
 		db: db,
 		// TODO: Find a good cache size.
 		// This value seems to work well in practice, but it was
@@ -27,7 +27,7 @@ func NewLogStore(db *pebble.DB) (*BadgerLogStore, error) {
 	}, nil
 }
 
-func (b *BadgerLogStore) FirstIndex() (uint64, error) {
+func (b *PebbleLogStore) FirstIndex() (uint64, error) {
 	it := b.db.NewIter(new(pebble.IterOptions))
 	defer it.Close()
 	found := it.SeekGE(getLogKey(0))
@@ -44,7 +44,7 @@ func (b *BadgerLogStore) FirstIndex() (uint64, error) {
 	return index, b.cache.Set(index, log)
 }
 
-func (b *BadgerLogStore) LastIndex() (uint64, error) {
+func (b *PebbleLogStore) LastIndex() (uint64, error) {
 	it := b.db.NewIter(new(pebble.IterOptions))
 	defer it.Close()
 	found := it.SeekLT(getLogKey(math.MaxUint64))
@@ -61,11 +61,11 @@ func (b *BadgerLogStore) LastIndex() (uint64, error) {
 	return index, b.cache.Set(index, log)
 }
 
-func (b *BadgerLogStore) GetLog(index uint64, log *raft.Log) error {
+func (b *PebbleLogStore) GetLog(index uint64, log *raft.Log) error {
 	return b.cache.Get(index, log)
 }
 
-func (b *BadgerLogStore) StoreLog(log *raft.Log) error {
+func (b *PebbleLogStore) StoreLog(log *raft.Log) error {
 	payload, err := msgpack.Marshal(log)
 	if err != nil {
 		return err
@@ -78,7 +78,7 @@ func (b *BadgerLogStore) StoreLog(log *raft.Log) error {
 	return b.cache.Set(log.Index, payload)
 }
 
-func (b *BadgerLogStore) StoreLogs(logs []*raft.Log) error {
+func (b *PebbleLogStore) StoreLogs(logs []*raft.Log) error {
 	batch := b.db.NewBatch()
 	for _, log := range logs {
 		payload, err := msgpack.Marshal(log)
@@ -102,7 +102,7 @@ func (b *BadgerLogStore) StoreLogs(logs []*raft.Log) error {
 	return batch.Commit(pebble.NoSync)
 }
 
-func (b *BadgerLogStore) DeleteRange(min, max uint64) error {
+func (b *PebbleLogStore) DeleteRange(min, max uint64) error {
 	for i := min; i <= max; i++ {
 		b.cache.Remove(i)
 	}

@@ -15,10 +15,10 @@ import (
 
 // TaskStore manages persistent storage for tasks.
 type TaskStore struct {
-	Client *BadgerClient
+	Client *PebbleClient
 }
 
-func NewTaskStore(db *BadgerClient) *TaskStore {
+func NewTaskStore(db *PebbleClient) *TaskStore {
 	store := &TaskStore{Client: db}
 	return store
 }
@@ -33,7 +33,7 @@ func getSchedPrefix(namespace string) []byte {
 
 func (ts *TaskStore) DeleteAll(acks []*proto.Ack) error {
 	telemetry.Logger.Debug("deleting task batch from DB", zap.Int("count", len(acks)))
-	batch := ts.Client.DB2.NewBatch()
+	batch := ts.Client.DB.NewBatch()
 
 	for _, ack := range acks {
 		key, err := getAckKey(ack)
@@ -55,7 +55,7 @@ func (ts *TaskStore) DeleteAll(acks []*proto.Ack) error {
 
 func (ts *TaskStore) SaveAll(tasks []*proto.Task, saveIndex bool) error {
 	telemetry.Logger.Debug("writing task batch to DB", zap.Int("count", len(tasks)))
-	batch := ts.Client.DB2.NewBatch()
+	batch := ts.Client.DB.NewBatch()
 
 	maxIndexes := make(map[string]uint64)
 	for _, task := range tasks {
@@ -97,7 +97,7 @@ func (ts *TaskStore) SaveAll(tasks []*proto.Task, saveIndex bool) error {
 func (ts *TaskStore) Get(namespace string, id iden.TaskID) (*proto.Task, error) {
 	var task *proto.Task
 	key := getScheduledTaskKey(namespace, id)
-	item, closer, err := ts.Client.DB2.Get(key)
+	item, closer, err := ts.Client.DB.Get(key)
 	if err != nil {
 		return nil, err
 	}

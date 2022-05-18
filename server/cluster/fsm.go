@@ -27,7 +27,7 @@ func newFSM(
 	ts q.TaskWriter,
 	ns *storage.NamespaceStore,
 ) *stateMachine {
-	// TODO: Do not pass a *badger.DB directly. Create a new type.
+	// TODO: Do not pass a *pebble.DB directly. Create a new type.
 	return &stateMachine{
 		db:     db,
 		writer: ts,

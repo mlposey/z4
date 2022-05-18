@@ -18,11 +18,11 @@ type TaskIterator struct {
 	prefix []byte
 }
 
-func NewTaskIterator(client *BadgerClient, query TaskRange) *TaskIterator {
-	// TODO: Consider creating another type to pass in instead of BadgerClient.
-	// We should try to avoid usage of BadgerClient in other packages as much as possible.
+func NewTaskIterator(client *PebbleClient, query TaskRange) *TaskIterator {
+	// TODO: Consider creating another type to pass in instead of PebbleClient.
+	// We should try to avoid usage of PebbleClient in other packages as much as possible.
 
-	it := client.DB2.NewIter(&pebble.IterOptions{})
+	it := client.DB.NewIter(&pebble.IterOptions{})
 	start := query.GetStart()
 	it.SeekGE(start)
 

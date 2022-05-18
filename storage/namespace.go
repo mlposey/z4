@@ -23,11 +23,11 @@ const SequenceLeaseSize = 10_000
 
 // NamespaceStore manages persistent storage for namespace configurations.
 type NamespaceStore struct {
-	Client *BadgerClient
+	Client *PebbleClient
 	prefix []byte
 }
 
-func NewNamespaceStore(client *BadgerClient) *NamespaceStore {
+func NewNamespaceStore(client *PebbleClient) *NamespaceStore {
 	return &NamespaceStore{
 		Client: client,
 		prefix: []byte("namespace#config#"),
@@ -36,7 +36,7 @@ func NewNamespaceStore(client *BadgerClient) *NamespaceStore {
 
 func (cs *NamespaceStore) Sequence(namespaceID string) (*Sequence, error) {
 	key := getSeqKey(namespaceID)
-	return NewSequence(cs.Client.DB2, key, SequenceLeaseSize)
+	return NewSequence(cs.Client.DB, key, SequenceLeaseSize)
 }
 
 func getSeqKey(namespaceID string) []byte {
@@ -49,13 +49,13 @@ func (cs *NamespaceStore) Save(namespace *proto.Namespace) error {
 		return fmt.Errorf("could not encode namespace: %w", err)
 	}
 	key := cs.getConfigKey(namespace.GetId())
-	return cs.Client.DB2.Set(key, payload, pebble.NoSync)
+	return cs.Client.DB.Set(key, payload, pebble.NoSync)
 }
 
 func (cs *NamespaceStore) GetAll() ([]*proto.Namespace, error) {
 	telemetry.Logger.Debug("getting all namespace namespaces from DB")
 
-	it := cs.Client.DB2.NewIter(&pebble.IterOptions{})
+	it := cs.Client.DB.NewIter(&pebble.IterOptions{})
 	defer it.Close()
 	it.SeekGE(cs.prefix)
 
@@ -77,7 +77,7 @@ func (cs *NamespaceStore) GetAll() ([]*proto.Namespace, error) {
 func (cs *NamespaceStore) Get(id string) (*proto.Namespace, error) {
 	telemetry.Logger.Debug("getting namespace config from DB")
 	key := cs.getConfigKey(id)
-	item, closer, err := cs.Client.DB2.Get(key)
+	item, closer, err := cs.Client.DB.Get(key)
 	if err != nil {
 		return nil, err
 	}
