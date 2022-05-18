@@ -50,13 +50,13 @@ func (ts *TaskStore) DeleteAll(acks []*proto.Ack) error {
 			continue
 		}
 
-		err = batch.Delete(key, pebble.Sync)
+		err = batch.Delete(key, pebble.NoSync)
 		if err != nil {
 			_ = batch.Close()
 			return fmt.Errorf("failed to delete task '%s' in batch: %w", ack.GetReference(), err)
 		}
 	}
-	return batch.Commit(pebble.Sync)
+	return batch.Commit(pebble.NoSync)
 }
 
 func (ts *TaskStore) SaveAll(tasks []*proto.Task, saveIndex bool) error {
@@ -77,7 +77,7 @@ func (ts *TaskStore) SaveAll(tasks []*proto.Task, saveIndex bool) error {
 		}
 
 		key := getTaskKey(task, id)
-		err = batch.Set(key, payload, pebble.Sync)
+		err = batch.Set(key, payload, pebble.NoSync)
 		if err != nil {
 			_ = batch.Close()
 			return fmt.Errorf("failed to write task '%s' from batch: %w", task.GetId(), err)
@@ -90,14 +90,14 @@ func (ts *TaskStore) SaveAll(tasks []*proto.Task, saveIndex bool) error {
 		for ns, index := range maxIndexes {
 			var payload [8]byte
 			binary.BigEndian.PutUint64(payload[:], index)
-			err := batch.Set(getSeqKey(ns), payload[:], pebble.Sync)
+			err := batch.Set(getSeqKey(ns), payload[:], pebble.NoSync)
 			if err != nil {
 				_ = batch.Close()
 				return fmt.Errorf("failed to save index for namespace %s: %w", ns, err)
 			}
 		}
 	}
-	return batch.Commit(pebble.Sync)
+	return batch.Commit(pebble.NoSync)
 }
 
 func (ts *TaskStore) Get(namespace string, id iden.TaskID) (*proto.Task, error) {

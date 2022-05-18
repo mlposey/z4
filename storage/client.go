@@ -23,7 +23,10 @@ func NewBadgerClient(dataDir string) (*BadgerClient, error) {
 		return nil, fmt.Errorf("could not open badger database: %w", err)
 	}
 
-	peb, err := pebble.Open(dataDir+"/pebble", &pebble.Options{})
+	peb, err := pebble.Open(dataDir+"/pebble", &pebble.Options{
+		MemTableSize:  100 << 20,
+		LBaseMaxBytes: 100 << 20,
+	})
 	if err != nil {
 		return nil, fmt.Errorf("could not open pebble database: %w", err)
 	}

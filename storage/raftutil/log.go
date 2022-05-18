@@ -71,7 +71,7 @@ func (b *BadgerLogStore) StoreLog(log *raft.Log) error {
 		return err
 	}
 
-	err = b.db.Set(getLogKey(log.Index), payload, pebble.Sync)
+	err = b.db.Set(getLogKey(log.Index), payload, pebble.NoSync)
 	if err != nil {
 		return err
 	}
@@ -87,7 +87,7 @@ func (b *BadgerLogStore) StoreLogs(logs []*raft.Log) error {
 			return err
 		}
 
-		err = batch.Set(getLogKey(log.Index), payload, pebble.Sync)
+		err = batch.Set(getLogKey(log.Index), payload, pebble.NoSync)
 		if err != nil {
 			_ = batch.Close()
 			return err
@@ -99,7 +99,7 @@ func (b *BadgerLogStore) StoreLogs(logs []*raft.Log) error {
 			return err
 		}
 	}
-	return batch.Commit(pebble.Sync)
+	return batch.Commit(pebble.NoSync)
 }
 
 func (b *BadgerLogStore) DeleteRange(min, max uint64) error {
@@ -109,7 +109,7 @@ func (b *BadgerLogStore) DeleteRange(min, max uint64) error {
 	return b.db.DeleteRange(
 		getLogKey(min),
 		getLogKey(max+1),
-		pebble.Sync,
+		pebble.NoSync,
 	)
 }
 

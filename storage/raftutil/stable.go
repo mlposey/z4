@@ -23,7 +23,7 @@ func NewStableStore(db *pebble.DB) *BadgerStableStore {
 }
 
 func (b *BadgerStableStore) Set(key []byte, val []byte) error {
-	return b.db.Set(b.getKey(key), val, pebble.Sync)
+	return b.db.Set(b.getKey(key), val, pebble.NoSync)
 }
 
 func (b *BadgerStableStore) Get(key []byte) ([]byte, error) {

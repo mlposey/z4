@@ -50,7 +50,7 @@ func (cs *NamespaceStore) Save(namespace *proto.Namespace) error {
 		return fmt.Errorf("could not encode namespace: %w", err)
 	}
 	key := cs.getConfigKey(namespace.GetId())
-	return cs.Client.DB2.Set(key, payload, pebble.Sync)
+	return cs.Client.DB2.Set(key, payload, pebble.NoSync)
 }
 
 func (cs *NamespaceStore) GetAll() ([]*proto.Namespace, error) {
