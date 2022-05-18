@@ -29,8 +29,6 @@ type AdminClient interface {
 	GetNamespace(ctx context.Context, in *GetNamespaceRequest, opts ...grpc.CallOption) (*Namespace, error)
 	// UpdateNamespace updates the settings of a task namespace.
 	UpdateNamespace(ctx context.Context, in *UpdateNamespaceRequest, opts ...grpc.CallOption) (*Namespace, error)
-	// PurgeTasks deletes all tasks in a namespace.
-	PurgeTasks(ctx context.Context, in *PurgeTasksRequest, opts ...grpc.CallOption) (*emptypb.Empty, error)
 	// GetClusterInfo returns information about the structure of the Raft cluster.
 	GetClusterInfo(ctx context.Context, in *GetClusterInfoRequest, opts ...grpc.CallOption) (*ClusterInfo, error)
 	// AddClusterMember adds a peer to the Raft cluster.
@@ -75,15 +73,6 @@ func (c *adminClient) GetNamespace(ctx context.Context, in *GetNamespaceRequest,
 func (c *adminClient) UpdateNamespace(ctx context.Context, in *UpdateNamespaceRequest, opts ...grpc.CallOption) (*Namespace, error) {
 	out := new(Namespace)
 	err := c.cc.Invoke(ctx, "/z4.Admin/UpdateNamespace", in, out, opts...)
-	if err != nil {
-		return nil, err
-	}
-	return out, nil
-}
-
-func (c *adminClient) PurgeTasks(ctx context.Context, in *PurgeTasksRequest, opts ...grpc.CallOption) (*emptypb.Empty, error) {
-	out := new(emptypb.Empty)
-	err := c.cc.Invoke(ctx, "/z4.Admin/PurgeTasks", in, out, opts...)
 	if err != nil {
 		return nil, err
 	}
@@ -136,8 +125,6 @@ type AdminServer interface {
 	GetNamespace(context.Context, *GetNamespaceRequest) (*Namespace, error)
 	// UpdateNamespace updates the settings of a task namespace.
 	UpdateNamespace(context.Context, *UpdateNamespaceRequest) (*Namespace, error)
-	// PurgeTasks deletes all tasks in a namespace.
-	PurgeTasks(context.Context, *PurgeTasksRequest) (*emptypb.Empty, error)
 	// GetClusterInfo returns information about the structure of the Raft cluster.
 	GetClusterInfo(context.Context, *GetClusterInfoRequest) (*ClusterInfo, error)
 	// AddClusterMember adds a peer to the Raft cluster.
@@ -166,9 +153,6 @@ func (UnimplementedAdminServer) GetNamespace(context.Context, *GetNamespaceReque
 }
 func (UnimplementedAdminServer) UpdateNamespace(context.Context, *UpdateNamespaceRequest) (*Namespace, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method UpdateNamespace not implemented")
-}
-func (UnimplementedAdminServer) PurgeTasks(context.Context, *PurgeTasksRequest) (*emptypb.Empty, error) {
-	return nil, status.Errorf(codes.Unimplemented, "method PurgeTasks not implemented")
 }
 func (UnimplementedAdminServer) GetClusterInfo(context.Context, *GetClusterInfoRequest) (*ClusterInfo, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method GetClusterInfo not implemented")
@@ -245,24 +229,6 @@ func _Admin_UpdateNamespace_Handler(srv interface{}, ctx context.Context, dec fu
 	}
 	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
 		return srv.(AdminServer).UpdateNamespace(ctx, req.(*UpdateNamespaceRequest))
-	}
-	return interceptor(ctx, in, info, handler)
-}
-
-func _Admin_PurgeTasks_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
-	in := new(PurgeTasksRequest)
-	if err := dec(in); err != nil {
-		return nil, err
-	}
-	if interceptor == nil {
-		return srv.(AdminServer).PurgeTasks(ctx, in)
-	}
-	info := &grpc.UnaryServerInfo{
-		Server:     srv,
-		FullMethod: "/z4.Admin/PurgeTasks",
-	}
-	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
-		return srv.(AdminServer).PurgeTasks(ctx, req.(*PurgeTasksRequest))
 	}
 	return interceptor(ctx, in, info, handler)
 }
@@ -357,10 +323,6 @@ var Admin_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "UpdateNamespace",
 			Handler:    _Admin_UpdateNamespace_Handler,
-		},
-		{
-			MethodName: "PurgeTasks",
-			Handler:    _Admin_PurgeTasks_Handler,
 		},
 		{
 			MethodName: "GetClusterInfo",

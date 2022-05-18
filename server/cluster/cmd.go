@@ -25,13 +25,3 @@ func ApplyAckCommand(raft *raft.Raft, ack *proto.Ack) raft.ApplyFuture {
 	})
 	return raft.Apply(cmd, 0)
 }
-
-// ApplyPurgeTasksCommand applies a command to purge namespace tasks to the Raft log.
-func ApplyPurgeTasksCommand(raft *raft.Raft, req *proto.PurgeTasksRequest) raft.ApplyFuture {
-	cmd, _ := pb.Marshal(&proto.Command{
-		Cmd: &proto.Command_Purge{
-			Purge: req,
-		},
-	})
-	return raft.Apply(cmd, 0)
-}

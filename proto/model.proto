@@ -15,8 +15,6 @@ message Command {
 
     // A request to save a namespace.
     Namespace namespace = 3;
-
-    PurgeTasksRequest purge = 4;
   }
 }
 
@@ -56,9 +54,4 @@ message Namespace {
   // The length of time after sending a message that it will
   // be redelivered if not acknowledged.
   int32 ack_deadline_seconds = 4;
-}
-
-message PurgeTasksRequest {
-  string request_id = 1;
-  string namespace_id = 2;
 }

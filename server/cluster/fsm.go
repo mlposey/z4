@@ -49,12 +49,11 @@ func (f *stateMachine) ApplyBatch(logs []*raft.Log) []interface{} {
 	}
 
 	var wg sync.WaitGroup
-	var errs [4]error
+	var errs [3]error
 
 	f.applyNamespaces(batch.Namespaces, &wg, &errs[0])
 	f.applyTasks(batch.Tasks, &wg, &errs[1])
 	f.applyAcks(batch.Acks, &wg, &errs[2])
-	f.applyPurges(batch.Purges, &wg, &errs[3])
 
 	wg.Wait()
 	for _, err := range errs {
@@ -86,9 +85,6 @@ func (f *stateMachine) splitLogs(logs []*raft.Log) (*splitBatch, error) {
 		case *proto.Command_Namespace:
 			sb.Namespaces = append(sb.Namespaces, v.Namespace)
 
-		case *proto.Command_Purge:
-			sb.Purges = append(sb.Purges, v.Purge)
-
 		default:
 			return nil, errors.New("unknown command type: expected ack or task")
 		}
@@ -99,12 +95,11 @@ func (f *stateMachine) splitLogs(logs []*raft.Log) (*splitBatch, error) {
 type splitBatch struct {
 	Acks       []*proto.Ack
 	Tasks      []*proto.Task
-	Purges     []*proto.PurgeTasksRequest
 	Namespaces []*proto.Namespace
 }
 
 func (s *splitBatch) Size() int {
-	return len(s.Acks) + len(s.Tasks) + len(s.Purges) + len(s.Namespaces)
+	return len(s.Acks) + len(s.Tasks) + len(s.Namespaces)
 }
 
 func (f *stateMachine) applyNamespaces(namespaces []*proto.Namespace, wg *sync.WaitGroup, err *error) {
@@ -146,21 +141,6 @@ func (f *stateMachine) applyAcks(acks []*proto.Ack, wg *sync.WaitGroup, err *err
 		go func() {
 			defer wg.Done()
 			*err = f.writer.Acknowledge(acks)
-		}()
-	}
-}
-
-func (f *stateMachine) applyPurges(purges []*proto.PurgeTasksRequest, wg *sync.WaitGroup, err *error) {
-	if len(purges) > 0 {
-		wg.Add(1)
-		go func() {
-			defer wg.Done()
-			for _, req := range purges {
-				*err = f.writer.PurgeTasks(req.GetNamespaceId())
-				if *err != nil {
-					return
-				}
-			}
 		}()
 	}
 }

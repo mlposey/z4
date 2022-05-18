@@ -19,9 +19,6 @@ type TaskWriter interface {
 	// to the collection.
 	Acknowledge(acks []*proto.Ack) error
 
-	// PurgeTasks should delete all tasks in the collection.
-	PurgeTasks(namespace string) error
-
 	// Close should release all resources needed to
 	// safely destroy the TaskWriter object.
 	Close() error
