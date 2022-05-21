@@ -70,6 +70,10 @@ func (f *stateMachine) ApplyBatch(logs []*raft.Log) []interface{} {
 func (f *stateMachine) splitLogs(logs []*raft.Log) (*splitBatch, error) {
 	sb := new(splitBatch)
 	for _, log := range logs {
+		if log.Type != raft.LogCommand {
+			continue
+		}
+
 		cmd := new(proto.Command)
 		err := pb.Unmarshal(log.Data, cmd)
 		if err != nil {
