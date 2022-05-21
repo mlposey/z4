@@ -12,6 +12,7 @@ import (
 	"go.uber.org/zap"
 	"net"
 	"os"
+	"time"
 )
 
 // PeerConfig defines how a node will take part in the raft cluster.
@@ -92,6 +93,7 @@ func (p *Peer) joinNetwork() error {
 	c.BatchApplyCh = true
 	c.MaxAppendEntries = p.config.LogBatchSize
 	c.NoSnapshotRestoreOnStart = true
+	c.SnapshotInterval = 10 * time.Second
 	err := raft.ValidateConfig(c)
 	if err != nil {
 		return fmt.Errorf("invalid raft config: %w", err)
