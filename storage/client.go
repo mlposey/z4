@@ -17,7 +17,7 @@ func NewPebbleClient(dataDir string) (*PebbleClient, error) {
 		L0StopWritesThreshold:       1000,
 		LBaseMaxBytes:               64 << 20,
 		MaxConcurrentCompactions:    3,
-		MemTableSize:                512 << 20,
+		MemTableSize:                64 << 20,
 		MemTableStopWritesThreshold: 4,
 	}).EnsureDefaults()
 	for i := range opt.Levels {
