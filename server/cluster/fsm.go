@@ -9,7 +9,6 @@ import (
 	"github.com/mlposey/z4/feeds/q"
 	"github.com/mlposey/z4/proto"
 	"github.com/mlposey/z4/storage"
-	"github.com/mlposey/z4/storage/raftutil"
 	"github.com/mlposey/z4/telemetry"
 	pb "google.golang.org/protobuf/proto"
 	"io"
@@ -168,7 +167,6 @@ func (f *stateMachine) Snapshot() (raft.FSMSnapshot, error) {
 func (f *stateMachine) Restore(snapshot io.ReadCloser) error {
 	telemetry.Logger.Info("restoring fsm from snapshot...")
 	defer telemetry.Logger.Info("snapshot restored")
-	// TODO: Delete the existing database before restoring.
 
 	err := f.discard()
 	if err != nil {
@@ -178,85 +176,60 @@ func (f *stateMachine) Restore(snapshot io.ReadCloser) error {
 }
 
 func (f *stateMachine) discard() error {
-	snap := f.db.NewSnapshot()
-	batch := f.db.NewBatch()
-	it := snap.NewIter(&pebble.IterOptions{})
-
-	it.First()
-	for ; it.Valid(); it.Next() {
-		if isRaftKey(it.Key()) {
-			// Don't delete Raft data; only task data
-			continue
-		}
-
-		err := batch.Delete(it.Key(), pebble.NoSync)
-		if err != nil {
-			_ = it.Close()
-			_ = snap.Close()
-			_ = batch.Close()
-			return err
-		}
+	err := f.db.DeleteRange([]byte("task# "), []byte("task#z"), pebble.NoSync)
+	if err != nil {
+		return err
 	}
-
-	_ = it.Close()
-	_ = snap.Close()
-	return batch.Commit(pebble.NoSync)
-}
-
-func isRaftKey(k []byte) bool {
-	return bytes.HasPrefix(k, raftutil.LogStorePrefix) ||
-		bytes.HasPrefix(k, raftutil.StableStorePrefix)
+	return f.db.DeleteRange([]byte("namespace# "), []byte("namespace#z"), pebble.NoSync)
 }
 
 func (f *stateMachine) restore(snapshot io.ReadCloser) error {
-	batch := f.db.NewBatch()
 	l := make([]byte, 4)
+	key := bytes.NewBuffer(nil)
+	value := bytes.NewBuffer(nil)
 	for {
 		_, err := snapshot.Read(l)
 		if err != nil {
 			if err == io.EOF {
 				break
 			}
-			_ = batch.Close()
 			return err
 		}
 
-		key := make([]byte, binary.BigEndian.Uint32(l))
-		_, err = snapshot.Read(key)
+		klen := int(binary.BigEndian.Uint32(l))
+		if key.Cap() < klen {
+			key.Grow(klen - key.Cap())
+		}
+		k := key.Next(klen)
+		_, err = snapshot.Read(k)
 		if err != nil {
-			if err == io.EOF {
-				break
-			}
-			_ = batch.Close()
 			return err
 		}
 
 		_, err = snapshot.Read(l)
 		if err != nil {
-			if err == io.EOF {
-				break
-			}
-			_ = batch.Close()
 			return err
 		}
 
-		value := make([]byte, binary.BigEndian.Uint32(l))
-		_, err = snapshot.Read(value)
+		vlen := int(binary.BigEndian.Uint32(l))
+		if value.Cap() < vlen {
+			value.Grow(vlen - value.Cap())
+		}
+		v := key.Next(vlen)
+		_, err = snapshot.Read(v)
 		if err != nil {
-			if err == io.EOF {
-				break
-			}
-			_ = batch.Close()
 			return err
 		}
 
-		err = batch.Set(key, value, pebble.NoSync)
+		err = f.db.Set(k, v, pebble.NoSync)
 		if err != nil {
-			_ = batch.Close()
 			return err
 		}
+
+		key.Reset()
+		value.Reset()
 	}
-	return batch.Commit(pebble.NoSync)
+	return nil
 }
 
 type snapshot struct {
@@ -271,11 +244,6 @@ func (s *snapshot) Persist(sink raft.SnapshotSink) error {
 	it.First()
 	l := make([]byte, 4)
 	for ; it.Valid(); it.Next() {
-		if isRaftKey(it.Key()) {
-			// Don't snapshot the Raft data; only tasks
-			continue
-		}
-
 		binary.BigEndian.PutUint32(l, uint32(len(it.Key())))
 		_, err := sink.Write(l)
 		if err != nil {

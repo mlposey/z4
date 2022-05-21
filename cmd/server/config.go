@@ -6,7 +6,8 @@ import (
 )
 
 type Config struct {
-	DBDataDir           string `envconfig:"DB_DATA_DIR" default:"./z4data"`
+	DBDataDir           string `envconfig:"DB_DATA_DIR" default:"./z4data/tasks"`
+	RaftDataDir         string `envconfig:"RAFT_DATA_DIR" default:"./z4data/cluster"`
 	SQLPort             int    `envconfig:"SQL_PORT" default:"3306"`
 	BootstrapCluster    bool   `envconfig:"BOOTSTRAP_CLUSTER" default:"false"`
 	DebugLoggingEnabled bool   `envconfig:"DEBUG_LOGGING_ENABLED" default:"false"`

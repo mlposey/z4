@@ -12,9 +12,19 @@ type PebbleClient struct {
 }
 
 func NewPebbleClient(dataDir string) (*PebbleClient, error) {
-	peb, err := pebble.Open(dataDir, &pebble.Options{
-		MemTableSize: 100 << 20,
-	})
+	opt := (&pebble.Options{
+		L0CompactionThreshold:       2,
+		L0StopWritesThreshold:       1000,
+		LBaseMaxBytes:               64 << 20,
+		MaxConcurrentCompactions:    3,
+		MemTableSize:                64 << 20,
+		MemTableStopWritesThreshold: 4,
+	}).EnsureDefaults()
+	for i := range opt.Levels {
+		opt.Levels[i].Compression = pebble.ZstdCompression
+	}
+
+	peb, err := pebble.Open(dataDir, opt)
 	if err != nil {
 		return nil, fmt.Errorf("could not open pebble database: %w", err)
 	}

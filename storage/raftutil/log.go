@@ -10,59 +10,53 @@ import (
 )
 
 type PebbleLogStore struct {
-	db    *pebble.DB
-	cache *logCache
+	db *pebble.DB
 }
 
 var _ raft.LogStore = (*PebbleLogStore)(nil)
 var LogStorePrefix = []byte("raft#logstore#")
 
 func NewLogStore(db *pebble.DB) (*PebbleLogStore, error) {
-	return &PebbleLogStore{
-		db: db,
-		// TODO: Find a good cache size.
-		// This value seems to work well in practice, but it was
-		// really just pulled from a hat.
-		cache: newLogCache(db, 100_000),
-	}, nil
+	return &PebbleLogStore{db: db}, nil
 }
 
 func (b *PebbleLogStore) FirstIndex() (uint64, error) {
-	it := b.db.NewIter(new(pebble.IterOptions))
+	it := b.db.NewIter(&pebble.IterOptions{})
 	defer it.Close()
 	found := it.SeekGE(getLogKey(0))
-	if !found {
+	if !found || !bytes.HasPrefix(it.Key(), LogStorePrefix) {
 		return 0, nil
 	}
 
 	key := it.Key()
 	idx := key[len(key)-8:]
-	index := binary.BigEndian.Uint64(idx)
-
-	var log marshaledLog = make([]byte, len(it.Value()))
-	copy(log, it.Value())
-	return index, b.cache.Set(index, log)
+	return binary.BigEndian.Uint64(idx), nil
 }
 
 func (b *PebbleLogStore) LastIndex() (uint64, error) {
-	it := b.db.NewIter(new(pebble.IterOptions))
+	it := b.db.NewIter(&pebble.IterOptions{})
 	defer it.Close()
-	found := it.SeekLT(getLogKey(math.MaxUint64))
-	if !found {
+	found := it.SeekLT(getLogKey(math.MaxInt64))
+	if !found || !bytes.HasPrefix(it.Key(), LogStorePrefix) {
 		return 0, nil
 	}
 
 	key := it.Key()
 	idx := key[len(key)-8:]
-	index := binary.BigEndian.Uint64(idx)
-
-	var log marshaledLog = make([]byte, len(it.Value()))
-	copy(log, it.Value())
-	return index, b.cache.Set(index, log)
+	return binary.BigEndian.Uint64(idx), nil
 }
 
 func (b *PebbleLogStore) GetLog(index uint64, log *raft.Log) error {
-	return b.cache.Get(index, log)
+	val, closer, err := b.db.Get(getLogKey(index))
+	if err != nil {
+		return err
+	}
+
+	err = msgpack.Unmarshal(val, log)
+	if err != nil {
+		return err
+	}
+	return closer.Close()
 }
 
 func (b *PebbleLogStore) StoreLog(log *raft.Log) error {
@@ -71,11 +65,7 @@ func (b *PebbleLogStore) StoreLog(log *raft.Log) error {
 		return err
 	}
 
-	err = b.db.Set(getLogKey(log.Index), payload, pebble.NoSync)
-	if err != nil {
-		return err
-	}
-	return b.cache.Set(log.Index, payload)
+	return b.db.Set(getLogKey(log.Index), payload, pebble.NoSync)
 }
 
 func (b *PebbleLogStore) StoreLogs(logs []*raft.Log) error {
@@ -92,20 +82,11 @@ func (b *PebbleLogStore) StoreLogs(logs []*raft.Log) error {
 			_ = batch.Close()
 			return err
 		}
-
-		err = b.cache.Set(log.Index, payload)
-		if err != nil {
-			_ = batch.Close()
-			return err
-		}
 	}
 	return batch.Commit(pebble.NoSync)
 }
 
 func (b *PebbleLogStore) DeleteRange(min, max uint64) error {
-	for i := min; i <= max; i++ {
-		b.cache.Remove(i)
-	}
 	return b.db.DeleteRange(
 		getLogKey(min),
 		getLogKey(max+1),

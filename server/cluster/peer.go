@@ -12,6 +12,7 @@ import (
 	"go.uber.org/zap"
 	"net"
 	"os"
+	"time"
 )
 
 // PeerConfig defines how a node will take part in the raft cluster.
@@ -19,7 +20,7 @@ type PeerConfig struct {
 	ID               string
 	Port             int
 	AdvertiseAddr    string
-	SnapshotDir      string
+	DataDir          string
 	LogBatchSize     int
 	BootstrapCluster bool
 	DB               *storage.PebbleClient
@@ -37,6 +38,7 @@ type Peer struct {
 	snapshots   *raft.FileSnapshotStore
 	transport   *raft.NetworkTransport
 	fsm         *stateMachine
+	db          *storage.PebbleClient
 }
 
 func NewPeer(config PeerConfig) (*Peer, error) {
@@ -57,23 +59,30 @@ func NewPeer(config PeerConfig) (*Peer, error) {
 }
 
 func (p *Peer) initStorage() error {
-	_, err := os.Stat(p.config.SnapshotDir)
+	_, err := os.Stat(p.config.DataDir)
 	if errors.Is(err, os.ErrNotExist) {
-		err := os.Mkdir(p.config.SnapshotDir, os.ModePerm)
+		err := os.Mkdir(p.config.DataDir, os.ModePerm)
 		if err != nil {
 			return fmt.Errorf("failed to create peer storage folder: %w", err)
 		}
 	}
 
-	p.logStore, err = raftutil.NewLogStore(p.config.DB.DB)
+	p.db, err = storage.NewPebbleClient(p.config.DataDir)
+	if err != nil {
+		return fmt.Errorf("failed to init raft db: %w", err)
+	}
+
+	p.logStore, err = raftutil.NewLogStore(p.db.DB)
 	if err != nil {
 		return fmt.Errorf("failed to load log store: %w", err)
 	}
-	p.stableStore = raftutil.NewStableStore(p.config.DB.DB)
+	p.logStore, _ = raft.NewLogCache(100_000, p.logStore)
 
-	p.snapshots, err = raft.NewFileSnapshotStore(p.config.SnapshotDir, 1, os.Stderr)
+	p.stableStore = raftutil.NewStableStore(p.db.DB)
+
+	p.snapshots, err = raft.NewFileSnapshotStore(p.config.DataDir, 1, os.Stderr)
 	if err != nil {
-		return fmt.Errorf(`raft.NewFileSnapshotStore(%q, ...): %v`, p.config.SnapshotDir, err)
+		return fmt.Errorf(`raft.NewFileSnapshotStore(%q, ...): %v`, p.config.DataDir, err)
 	}
 	return nil
 }
@@ -83,6 +92,7 @@ func (p *Peer) joinNetwork() error {
 	c.LocalID = raft.ServerID(p.config.ID)
 	c.BatchApplyCh = true
 	c.MaxAppendEntries = p.config.LogBatchSize
+	c.SnapshotInterval = 10 * time.Second
 	err := raft.ValidateConfig(c)
 	if err != nil {
 		return fmt.Errorf("invalid raft config: %w", err)
@@ -145,5 +155,6 @@ func (p *Peer) LoadHandle(handle *LeaderHandle) {
 func (p *Peer) Close() error {
 	return multierr.Combine(
 		p.Raft.Shutdown().Error(),
-		p.transport.Close())
+		p.transport.Close(),
+		p.db.Close())
 }

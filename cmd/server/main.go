@@ -25,7 +25,7 @@ func main() {
 	config := configFromEnv()
 
 	initLogger(config.DebugLoggingEnabled)
-	db := initDB(config.DBDataDir+"/state", config.SQLPort)
+	db := initDB(config.DBDataDir, config.SQLPort)
 
 	srv := server.NewServer(server.Config{
 		DB:          db,
@@ -35,7 +35,7 @@ func main() {
 			ID:               config.PeerID,
 			Port:             config.PeerPort,
 			AdvertiseAddr:    config.PeerAdvertiseAddr,
-			SnapshotDir:      config.DBDataDir,
+			DataDir:          config.RaftDataDir,
 			LogBatchSize:     1000,
 			BootstrapCluster: config.BootstrapCluster,
 		},
