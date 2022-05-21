@@ -46,10 +46,8 @@ spec:
           resources:
             {{- toYaml .Values.resources | nindent 12 }}
           env:
-            - name: Z4_DB_DATA_DIR
-              value: /var/lib/z4/db
-            - name: Z4_PEER_DATA_DIR
-              value: /var/lib/z4/cluster
+            - name: Z4_DATA_DIR
+              value: /var/lib/z4/data
             - name: Z4_PEER_ID
               valueFrom:
                 fieldRef:

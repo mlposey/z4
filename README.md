@@ -215,7 +215,7 @@ There are few things to note
 |Variable|Description|Default|
 |--------|-----------|-------|
 |Z4_DEBUG_LOGGING_ENABLED|Enables or disables debug-level logging|false|
-|Z4_DB_DATA_DIR|The directory where task data is stored|z4data|
+|Z4_DATA_DIR|The directory where task data is stored|z4data|
 |Z4_SERVICE_PORT|The port containing the gRPC services|6355|
 |Z4_PEER_PORT|The port containing the internal cluster membership service|6356|
 |Z4_METRICS_PORT|The port containing the Prometheus metrics service|2112|
