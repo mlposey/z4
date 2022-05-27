@@ -1,14 +1,12 @@
 package main
 
 import (
-	"context"
-	"encoding/json"
 	"fmt"
-	"github.com/mlposey/z4/proto"
+	"github.com/mlposey/z4/pkg/z4"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials/insecure"
-	"google.golang.org/grpc/metadata"
 	"os"
+	"time"
 )
 
 func main() {
@@ -17,40 +15,32 @@ func main() {
 	if err != nil {
 		panic(err)
 	}
-	client := proto.NewQueueClient(conn)
-	consume(client, os.Getenv("NAMESPACE"))
-}
 
-func consume(client proto.QueueClient, namespace string) {
-	md := metadata.New(map[string]string{"namespace": namespace})
-	ctx := metadata.NewOutgoingContext(context.Background(), md)
-	stream, err := client.Pull(ctx)
+	consumer, err := z4.NewConsumer(z4.ConsumerOptions{
+		Conn:      conn,
+		Namespace: os.Getenv("NAMESPACE"),
+	})
 	if err != nil {
 		panic(err)
 	}
 
-	for {
-		task, err := stream.Recv()
-		if err != nil {
-			fmt.Println(err)
-			return
+	count := 0
+	go func() {
+		t := time.Tick(time.Second)
+		var last int
+		for range t {
+			if last != count {
+				fmt.Println("consumed", count, "tasks")
+				last = count
+			}
 		}
+	}()
 
-		out, err := json.MarshalIndent(task, "", "  ")
-		if err != nil {
-			fmt.Println(err)
-			continue
-		}
-		fmt.Println(string(out))
-
-		err = stream.Send(&proto.Ack{
-			Reference: &proto.TaskReference{
-				Namespace: task.GetNamespace(),
-				TaskId:    task.GetId(),
-			},
-		})
-		if err != nil {
-			fmt.Println(err)
-		}
+	err = consumer.Consume(func(m z4.Message) error {
+		count++
+		return m.Ack()
+	})
+	if err != nil {
+		panic(err)
 	}
 }

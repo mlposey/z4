@@ -1,9 +1,9 @@
 package main
 
 import (
-	"context"
 	"fmt"
 	"github.com/google/uuid"
+	"github.com/mlposey/z4/pkg/z4"
 	"github.com/mlposey/z4/proto"
 	"go.uber.org/ratelimit"
 	"google.golang.org/grpc"
@@ -27,45 +27,36 @@ func loadTestStreaming(rps int) {
 	if err != nil {
 		panic(err)
 	}
-	client := proto.NewQueueClient(conn)
-	stream, err := client.PushStream(context.Background())
-	if err != nil {
-		panic(err)
-	}
 
-	const (
-		requestsToSend = 10_000_000
-	)
-
+	const requestsToSend = 100_000_000
 	done := make(chan bool)
-	go func() {
-		count := 0
-		for {
-			_, err := stream.Recv()
-			if err != nil {
-				fmt.Println(err)
-				return
-			}
+	count := 0
 
+	producer, err := z4.NewStreamingProducer(z4.StreamingProducerOptions{
+		ProducerOptions: z4.ProducerOptions{
+			Conn: conn,
+		},
+		Callback: func(res z4.StreamResponse) {
 			count++
 			if count == requestsToSend {
 				done <- true
 			}
-		}
-	}()
+		},
+	})
+
+	if err != nil {
+		panic(err)
+	}
 
 	rl := ratelimit.New(rps)
 	start := time.Now()
 	for i := 0; i < requestsToSend; i++ {
 		rl.Take()
-		err := stream.Send(&proto.PushTaskRequest{
+		err := producer.CreateTask(&proto.PushTaskRequest{
 			RequestId: uuid.New().String(),
 			Namespace: os.Getenv("NAMESPACE"),
 			Async:     true,
 			Payload:   []byte("buy eggs"),
-			/*Schedule: &proto.PushTaskRequest_TtsSeconds{
-				TtsSeconds: int64(rand.Intn(60)), // 1 hour
-			},*/
 		})
 		if err != nil {
 			fmt.Println(err)
