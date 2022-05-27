@@ -38,7 +38,8 @@ func main() {
 
 	err = consumer.Consume(func(m z4.Message) error {
 		count++
-		return m.Ack()
+		m.Ack()
+		return nil
 	})
 	if err != nil {
 		panic(err)

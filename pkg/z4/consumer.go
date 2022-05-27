@@ -3,17 +3,23 @@ package z4
 import (
 	"context"
 	"errors"
+	"fmt"
 	"github.com/mlposey/z4/proto"
 	"go.uber.org/multierr"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/metadata"
 	"io"
+	"sync/atomic"
 )
 
 type Consumer struct {
-	client    proto.QueueClient
-	namespace string
-	ctx       context.Context
+	client          proto.QueueClient
+	stream          proto.Queue_PullClient
+	ctx             context.Context
+	namespace       string
+	acks            chan *proto.Ack
+	unackedMsgCount *int64
+	closed          bool
 }
 
 func NewConsumer(opt ConsumerOptions) (*Consumer, error) {
@@ -23,9 +29,11 @@ func NewConsumer(opt ConsumerOptions) (*Consumer, error) {
 	}
 
 	return &Consumer{
-		client:    proto.NewQueueClient(opt.Conn),
-		namespace: opt.Namespace,
-		ctx:       ctx,
+		client:          proto.NewQueueClient(opt.Conn),
+		namespace:       opt.Namespace,
+		ctx:             ctx,
+		acks:            make(chan *proto.Ack),
+		unackedMsgCount: new(int64),
 	}, nil
 }
 
@@ -43,11 +51,14 @@ func (c *Consumer) Consume(f func(m Message) error) error {
 	if err != nil {
 		return err
 	}
+	c.stream = stream
+
+	go c.startAckHandler()
 
 	for {
 		select {
 		case <-c.ctx.Done():
-			return multierr.Combine(c.ctx.Err(), stream.CloseSend())
+			return multierr.Combine(c.ctx.Err(), c.close())
 		default:
 		}
 
@@ -59,30 +70,58 @@ func (c *Consumer) Consume(f func(m Message) error) error {
 			return err
 		}
 
+		atomic.AddInt64(c.unackedMsgCount, 1)
 		err = f(Message{
-			task:   task,
-			stream: stream,
+			task: task,
+			acks: c.acks,
 		})
 		if err != nil {
-			return multierr.Combine(err, stream.CloseSend())
+			return multierr.Combine(err, c.close())
+		}
+	}
+}
+
+func (c *Consumer) close() error {
+	c.closed = true
+	return c.stream.CloseSend()
+}
+
+func (c *Consumer) startAckHandler() {
+	for ack := range c.acks {
+		atomic.AddInt64(c.unackedMsgCount, -1)
+
+		if c.closed {
+			if atomic.LoadInt64(c.unackedMsgCount) == 0 {
+				close(c.acks)
+				break
+			} else {
+				// Can't send ack, but can't close chan until all acks come in
+				continue
+			}
+		}
+
+		err := c.stream.Send(ack)
+		if err != nil {
+			// TODO: Notify client that ack failed. Use a callback?
+			fmt.Println("ack failed", err)
 		}
 	}
 }
 
 type Message struct {
-	task   *proto.Task
-	stream proto.Queue_PullClient
+	task *proto.Task
+	acks chan<- *proto.Ack
 }
 
 func (m Message) Task() *proto.Task {
 	return m.task
 }
 
-func (m Message) Ack() error {
-	return m.stream.Send(&proto.Ack{
+func (m Message) Ack() {
+	m.acks <- &proto.Ack{
 		Reference: &proto.TaskReference{
 			Namespace: m.task.GetNamespace(),
 			TaskId:    m.task.GetId(),
 		},
-	})
+	}
 }
