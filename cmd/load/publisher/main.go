@@ -54,7 +54,7 @@ func loadTestStreaming(rps int) {
 		rl.Take()
 		err := producer.CreateTask(&proto.PushTaskRequest{
 			RequestId: uuid.New().String(),
-			Namespace: os.Getenv("NAMESPACE"),
+			Queue:     os.Getenv("QUEUE"),
 			Async:     true,
 			Payload:   []byte("buy eggs"),
 		})

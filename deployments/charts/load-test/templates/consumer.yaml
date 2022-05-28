@@ -16,8 +16,8 @@ spec:
           env:
             - name: TARGET
               value: {{ .Values.env.target }}
-            - name: NAMESPACE
-              value: {{ .Values.env.namespace }}
+            - name: QUEUE
+              value: {{ .Values.env.queue }}
       {{- with .Values.nodeSelector }}
       nodeSelector:
         {{- toYaml . | nindent 8 }}

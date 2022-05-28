@@ -41,18 +41,18 @@ type Reader interface {
 
 // A QueryFactory generates task queries.
 type QueryFactory interface {
-	Query(namespace *proto.Namespace) storage.TaskRange
+	Query(settings *proto.QueueConfig) storage.TaskRange
 }
 
 // A Checkpointer saves a checkpoint based on a task.
 type Checkpointer interface {
-	Set(namespace *proto.Namespace, task *proto.Task)
+	Set(settings *proto.QueueConfig, task *proto.Task)
 }
 
 // Readers instantiates a list of all possible readers.
 func Readers(
 	tasks *storage.TaskStore,
-	namespace *proto.Namespace,
+	settings *proto.QueueConfig,
 ) []Reader {
 	redeliveryInterval := time.Second * 30
 	return []Reader{
@@ -60,27 +60,27 @@ func Readers(
 		newDeliveredReader(
 			redeliveryInterval,
 			tasks,
-			namespace,
+			settings,
 			new(fifoDeliveredFactory),
 		),
 		// Handle redelivery for scheduled tasks.
 		newDeliveredReader(
 			redeliveryInterval,
 			tasks,
-			namespace,
+			settings,
 			new(schedDeliveredQueryFactory),
 		),
 		// Handle delivery for queued tasks.
 		newUndeliveredReader(
 			tasks,
-			namespace,
+			settings,
 			new(fifoUndeliveredFactory),
 			new(fifoCheckpointer),
 		),
 		// Handle delivery for scheduled tasks.
 		newUndeliveredReader(
 			tasks,
-			namespace,
+			settings,
 			new(schedUndeliveredQueryFactory),
 			new(schedCheckpointer),
 		),

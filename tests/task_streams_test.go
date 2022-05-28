@@ -32,8 +32,8 @@ func TestTaskStreaming(t *testing.T) {
 		sc.Step(`^after (\d+) seconds I should receive the same task$`, ts.afterSecondsIShouldReceiveTheSameTask)
 		sc.Step(`^after (\d+) seconds I should receive (\d+) tasks$`, ts.afterSecondsIShouldReceiveTasks)
 		sc.Step(`^I have created the task:$`, ts.iHaveCreatedTheTask)
-		sc.Step(`^I subscribe to tasks in the "([^"]*)" namespace$`, ts.iSubscribeToTasksInTheNamespace)
-		sc.Step(`^I subscribe to tasks in the "([^"]*)" namespace after a (\d+) second delay$`, ts.iSubscribeToTasksInTheNamespaceAfterASecondDelay)
+		sc.Step(`^I subscribe to tasks in the "([^"]*)" queue`, ts.iSubscribeToTasksInTheQueue)
+		sc.Step(`^I subscribe to tasks in the "([^"]*)" queue after a (\d+) second delay$`, ts.iSubscribeToTasksInTheQueueAfterASecondDelay)
 	})
 
 }
@@ -113,11 +113,11 @@ func (ts *taskStreams) iBeginStreamingAfterASecondDelay(arg1 int) error {
 	return ts.consumeTaskStream("")
 }
 
-func (ts *taskStreams) consumeTaskStream(namespace string) error {
+func (ts *taskStreams) consumeTaskStream(queue string) error {
 	var err error
 	ts.consumer, err = z4.NewConsumer(z4.ConsumerOptions{
-		Conn:      ts.conn,
-		Namespace: namespace,
+		Conn:  ts.conn,
+		Queue: queue,
 	})
 	if err != nil {
 		return err
@@ -146,7 +146,7 @@ func (ts *taskStreams) iHaveCreatedTheTask(arg1 *godog.DocString) error {
 
 	ts.taskRequest = &proto.PushTaskRequest{
 		RequestId: uuid.New().String(),
-		Namespace: taskDef["namespace"].(string),
+		Queue:     taskDef["queue"].(string),
 		Schedule: &proto.PushTaskRequest_TtsSeconds{
 			TtsSeconds: int64(taskDef["tts_seconds"].(float64)),
 		},
@@ -156,11 +156,11 @@ func (ts *taskStreams) iHaveCreatedTheTask(arg1 *godog.DocString) error {
 	return err
 }
 
-func (ts *taskStreams) iSubscribeToTasksInTheNamespace(arg1 string) error {
+func (ts *taskStreams) iSubscribeToTasksInTheQueue(arg1 string) error {
 	return ts.consumeTaskStream(arg1)
 }
 
-func (ts *taskStreams) iSubscribeToTasksInTheNamespaceAfterASecondDelay(arg1 string, arg2 int) error {
+func (ts *taskStreams) iSubscribeToTasksInTheQueueAfterASecondDelay(arg1 string, arg2 int) error {
 	time.Sleep(time.Duration(arg2) * time.Second)
 	return ts.consumeTaskStream(arg1)
 }

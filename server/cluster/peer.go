@@ -25,7 +25,7 @@ type PeerConfig struct {
 	BootstrapCluster bool
 	DB               *storage.PebbleClient
 	Tasks            *storage.TaskStore
-	Namespaces       *storage.NamespaceStore
+	Settings         *storage.SettingStore
 	Writer           q.TaskWriter
 }
 
@@ -110,7 +110,7 @@ func (p *Peer) joinNetwork() error {
 		return fmt.Errorf("could not create transport for raft peer: %w", err)
 	}
 
-	p.fsm = newFSM(p.config.DB.DB, p.config.Writer, p.config.Namespaces)
+	p.fsm = newFSM(p.config.DB.DB, p.config.Writer, p.config.Settings)
 	p.Raft, err = raft.NewRaft(
 		c,
 		p.fsm,

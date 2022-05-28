@@ -7,25 +7,25 @@ import (
 )
 
 type undeliveredReader struct {
-	namespace *proto.Namespace
-	tasks     *storage.TaskStore
-	qf        QueryFactory
-	check     Checkpointer
+	settings *proto.QueueConfig
+	tasks    *storage.TaskStore
+	qf       QueryFactory
+	check    Checkpointer
 }
 
 var _ Reader = (*undeliveredReader)(nil)
 
 func newUndeliveredReader(
 	tasks *storage.TaskStore,
-	namespace *proto.Namespace,
+	settings *proto.QueueConfig,
 	qf QueryFactory,
 	check Checkpointer,
 ) *undeliveredReader {
 	return &undeliveredReader{
-		namespace: namespace,
-		tasks:     tasks,
-		qf:        qf,
-		check:     check,
+		settings: settings,
+		tasks:    tasks,
+		qf:       qf,
+		check:    check,
 	}
 }
 
@@ -39,7 +39,7 @@ func (u *undeliveredReader) Read(f func(task *proto.Task) error) error {
 		if err := f(task); err != nil {
 			return err
 		}
-		u.check.Set(u.namespace, task)
+		u.check.Set(u.settings, task)
 		count++
 		return nil
 	})
@@ -51,7 +51,7 @@ func (u *undeliveredReader) Read(f func(task *proto.Task) error) error {
 }
 
 func (u *undeliveredReader) executeQuery(handle func(task *proto.Task) error) error {
-	query := u.qf.Query(u.namespace)
+	query := u.qf.Query(u.settings)
 	it := storage.NewTaskIterator(u.tasks.Client, query)
 	defer it.Close()
 	return it.ForEach(handle)

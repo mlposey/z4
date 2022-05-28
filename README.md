@@ -181,18 +181,18 @@ as task management.
 * [Queue service proto](proto/queue_service.proto)
 
 #### MySQL
-A MySQL interface is exposed on the default port 3306. It provides read-only access to namespaces and tasks.
+A MySQL interface is exposed on the default port 3306. It provides read-only access to queues and tasks.
 
 There are few things to note
 * There is currently no support for username and password authorization. When connecting, disable authentication.
 * All tables are stored in the database `z4`.
 * This interface is not optimized for transactional workloads. It is primarily meant as a tool for troubleshooting issues.
-* When querying tasks, queries **require** expressions that filter the namespace and date range.  
+* When querying tasks, queries **require** expressions that filter the queue and date range.  
   This is okay:
   ```sql
   SELECT *
   FROM   tasks
-  WHERE  namespace = 'welcome_emails'
+  WHERE  queue = 'welcome_emails'
     AND  deliver_at BETWEEN '2022-04-16' AND '2022-04-17'
     AND  JSON_EXTRACT(metadata, '$.user_id') = 'newuser@example.com';
   ```
@@ -200,7 +200,7 @@ There are few things to note
   ```sql
   SELECT *
   FROM   tasks
-  WHERE  namespace = 'welcome_emails'
+  WHERE  queue = 'welcome_emails'
     AND  JSON_EXTRACT(metadata, '$.user_id') = 'newuser@example.com';
   ```
   And neither is this:

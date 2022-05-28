@@ -19,7 +19,7 @@ type stateMachine struct {
 func newFSM(
 	db *pebble.DB,
 	tw q.TaskWriter,
-	ns *storage.NamespaceStore,
+	ns *storage.SettingStore,
 ) *stateMachine {
 	// TODO: Do not pass a *pebble.db directly. Create a new type.
 	return &stateMachine{

@@ -23,8 +23,8 @@ service Queue {
   // Pull opens a bi-directional stream for consuming ready tasks.
   //
   // Metadata must be passed to the server to indicate which
-  // namespace to consume from. The metadata key must be "namespace"
-  // and its value a single string that identifies the namespace.
+  // queue to consume from. The metadata key must be "queue"
+  // and its value a single string that identifies the queue.
   //
   // This rpc must be called on the leader.
   rpc Pull(stream Ack) returns (stream Task) {};
@@ -48,8 +48,8 @@ message PushTaskRequest {
   // The unique id of this request
   string request_id = 1;
 
-  // The namespace where the task should be added.
-  string namespace = 2;
+  // The queue where the task should be added.
+  string queue = 2;
 
   // Whether to asynchronously push the task.
   //

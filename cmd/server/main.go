@@ -74,9 +74,9 @@ func initDB(dataDir string, port int) *storage.PebbleClient {
 		log.Fatalf("error initializing database client: %v", err)
 	}
 	go sqli.StartWireListener(sqli.WireConfig{
-		Port:       port,
-		Tasks:      storage.NewTaskStore(db),
-		Namespaces: storage.NewNamespaceStore(db),
+		Port:     port,
+		Tasks:    storage.NewTaskStore(db),
+		Settings: storage.NewSettingStore(db),
 	})
 	return db
 }

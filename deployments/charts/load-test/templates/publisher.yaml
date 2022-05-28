@@ -16,8 +16,8 @@ spec:
           env:
             - name: TARGET
               value: {{ .Values.env.target }}
-            - name: NAMESPACE
-              value: {{ .Values.env.namespace }}
+            - name: QUEUE
+              value: {{ .Values.env.queue }}
             - name: RPS
               value: "{{ .Values.env.rps }}"
       {{- with .Values.nodeSelector }}

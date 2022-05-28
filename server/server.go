@@ -45,7 +45,7 @@ func (s *Server) Start() error {
 		zap.Int("port", s.config.GRPCPort))
 
 	s.config.PeerConfig.Tasks = storage.NewTaskStore(s.config.DB)
-	s.config.PeerConfig.Namespaces = storage.NewNamespaceStore(s.config.DB)
+	s.config.PeerConfig.Settings = storage.NewSettingStore(s.config.DB)
 	s.config.PeerConfig.Writer = q.NewTaskWriter(s.config.PeerConfig.Tasks)
 
 	s.config.PeerConfig.DB = s.config.DB
@@ -62,7 +62,7 @@ func (s *Server) Start() error {
 	}
 	s.peer.LoadHandle(handle)
 
-	s.idx = storage.NewIndexStore(s.config.PeerConfig.Namespaces)
+	s.idx = storage.NewIndexStore(s.config.PeerConfig.Settings)
 	gen := storage.NewGenerator(s.idx)
 
 	s.server = grpc.NewServer(s.config.Opts...)

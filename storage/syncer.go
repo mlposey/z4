@@ -13,98 +13,98 @@ import (
 	"time"
 )
 
-// SyncedNamespace is a Namespace that syncs to disk.
-type SyncedNamespace struct {
-	// N is the namespace that will be synced to disk.
+// SyncedSettings are queue settings that are synchronized to disk.
+type SyncedSettings struct {
+	// S is the queue settings that will be synced to disk.
 	// It is safe to make changes directly to this field.
-	N *proto.Namespace
+	S *proto.QueueConfig
 
-	namespaces *NamespaceStore
-	lastSaved  *proto.Namespace
-	namespace  string
-	closeReq   chan interface{}
-	closeRes   chan interface{}
-	raft       *raft.Raft
+	store     *SettingStore
+	lastSaved *proto.QueueConfig
+	queue     string
+	closeReq  chan interface{}
+	closeRes  chan interface{}
+	raft      *raft.Raft
 }
 
-func NewSyncedNamespace(
-	namespaces *NamespaceStore,
-	namespace string,
+func NewSyncedSettings(
+	store *SettingStore,
+	queue string,
 	raft *raft.Raft,
-) *SyncedNamespace {
-	return &SyncedNamespace{
-		namespaces: namespaces,
-		namespace:  namespace,
-		closeReq:   make(chan interface{}),
-		closeRes:   make(chan interface{}),
-		raft:       raft,
+) *SyncedSettings {
+	return &SyncedSettings{
+		store:    store,
+		queue:    queue,
+		closeReq: make(chan interface{}),
+		closeRes: make(chan interface{}),
+		raft:     raft,
 	}
 }
 
-func (sn *SyncedNamespace) StartSync() error {
-	if err := sn.load(); err != nil {
+func (s *SyncedSettings) StartSync() error {
+	if err := s.load(); err != nil {
 		return err
 	}
 
-	go sn.startSync()
+	go s.startSync()
 	return nil
 }
 
 // Close flushes config changes to disk and stops the sync thread.
 // The object should not be used after a call to Close.
-func (sn *SyncedNamespace) Close() error {
-	sn.closeReq <- nil
-	<-sn.closeRes
+func (s *SyncedSettings) Close() error {
+	s.closeReq <- nil
+	<-s.closeRes
 	return nil
 }
 
-// load pulls the namespace from the database.
-func (sn *SyncedNamespace) load() error {
-	namespace, err := sn.namespaces.Get(sn.namespace)
+// load pulls the settings from the database.
+func (s *SyncedSettings) load() error {
+	settings, err := s.store.Get(s.queue)
 	if err == nil {
-		sn.N = namespace
+		s.S = settings
 		return nil
 	}
 
 	if !errors.Is(err, pebble.ErrNotFound) {
-		return fmt.Errorf("failed to load namespace from database: %w", err)
+		return fmt.Errorf("failed to load queue settings from database: %w", err)
 	}
 
-	// Default settings for new namespaces go here.
-	sn.N = &proto.Namespace{
-		Id:                         sn.namespace,
+	// Default settings for new store go here.
+	s.S = &proto.QueueConfig{
+		Id:                         s.queue,
 		LastDeliveredQueuedTask:    iden.Max.String(),
 		LastDeliveredScheduledTask: iden.Min.String(),
 		AckDeadlineSeconds:         300, // 5 minutes
 	}
 
-	err = sn.trySave()
+	err = s.trySave()
 	if err != nil {
-		return fmt.Errorf("failed to save namespace to database: %w", err)
+		return fmt.Errorf("failed to save queue settings to database: %w", err)
 	}
 	return nil
 }
 
 // startSync starts a loop that flushes changes to disk on an interval.
-func (sn *SyncedNamespace) startSync() {
+func (s *SyncedSettings) startSync() {
 	ticker := time.NewTicker(time.Second * 1)
 	for {
 		select {
-		case <-sn.closeReq:
-			err := sn.trySave()
+		case <-s.closeReq:
+			err := s.trySave()
 			if err != nil {
-				telemetry.Logger.Error("failed to save namespace to database",
+				telemetry.Logger.Error("failed to save queue settings to database",
 					zap.Error(err))
 			}
-			sn.closeRes <- nil
+			s.closeRes <- nil
 			return
 
 		// TODO: Consider syncing after X number of changes if before tick.
 
 		case <-ticker.C:
-			err := sn.trySave()
+			err := s.trySave()
 			if err != nil {
-				telemetry.Logger.Error("failed to save namespace to database",
+				telemetry.Logger.Error("failed to save queue settings to database",
 					zap.Error(err))
 			}
 		}
@@ -112,21 +112,21 @@ func (sn *SyncedNamespace) startSync() {
 }
 
 // trySave saves the config if it has changed since the last write.
-func (sn *SyncedNamespace) trySave() error {
-	if pb.Equal(sn.N, sn.lastSaved) {
+func (s *SyncedSettings) trySave() error {
+	if pb.Equal(s.S, s.lastSaved) {
 		return nil
 	}
 
-	snapshot := pb.Clone(sn.N).(*proto.Namespace)
+	snapshot := pb.Clone(s.S).(*proto.QueueConfig)
 	cmd, _ := pb.Marshal(&proto.Command{
-		Cmd: &proto.Command_Namespace{
-			Namespace: snapshot,
+		Cmd: &proto.Command_Queue{
+			Queue: snapshot,
 		},
 	})
 
-	err := sn.raft.Apply(cmd, 0).Error()
+	err := s.raft.Apply(cmd, 0).Error()
 	if err == nil {
-		sn.lastSaved = snapshot
+		s.lastSaved = snapshot
 	}
 	return err
 }

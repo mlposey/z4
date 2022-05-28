@@ -18,7 +18,7 @@ consumerImage:
 
 env:
   target: "z4-2.z4.z4.svc.cluster.local:6355"
-  namespace: "load_test"
+  queue: "load_test"
   rps: "5000"
 
 nodeSelector:

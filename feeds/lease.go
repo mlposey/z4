@@ -19,12 +19,12 @@ type leaseHolder struct {
 }
 
 func newLeaseHolder(
-	namespace string,
+	queue string,
 	db *storage.PebbleClient,
 	onRemove func(),
 	raft *raft.Raft,
 ) (*leaseHolder, error) {
-	feed, err := New(namespace, db, raft)
+	feed, err := New(queue, db, raft)
 	if err != nil {
 		return nil, fmt.Errorf("lease creation failed: %w", err)
 	}
@@ -53,7 +53,7 @@ func (lh *leaseHolder) Get() *Lease {
 
 func (lh *leaseHolder) remove(l *Lease) {
 	telemetry.Logger.Debug("releasing lease",
-		zap.String("namespace", lh.F.Namespace.N.GetId()))
+		zap.String("queue", lh.F.Settings.S.GetId()))
 	lh.mu.Lock()
 	delete(lh.leases, l)
 	lh.mu.Unlock()

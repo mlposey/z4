@@ -11,7 +11,7 @@ import (
 	"sync"
 )
 
-// Manager ensures that only one feed is active per requested namespace.
+// Manager ensures that only one feed is active per requested queue.
 type Manager struct {
 	leases map[string]*leaseHolder
 	db     *storage.PebbleClient
@@ -27,11 +27,11 @@ func NewManager(db *storage.PebbleClient, raft *raft.Raft) *Manager {
 	}
 }
 
-// Tasks provides access to ready tasks from a namespace.
+// Tasks provides access to ready tasks from a queue.
 //
 // This method automatically manages a lease on the feed.
-func (qm *Manager) Tasks(namespace string, handle func(tasks q.TaskStream) error) error {
-	lease, err := qm.Lease(namespace)
+func (qm *Manager) Tasks(queue string, handle func(tasks q.TaskStream) error) error {
+	lease, err := qm.Lease(queue)
 	if err != nil {
 		return err
 	}
@@ -41,33 +41,33 @@ func (qm *Manager) Tasks(namespace string, handle func(tasks q.TaskStream) error
 	return handle(tasks)
 }
 
-// Lease grants access to the feed for the requested namespace.
+// Lease grants access to the feed for the requested queue.
 //
 // The Tasks method should be preferred in most cases.
-func (qm *Manager) Lease(namespace string) (*Lease, error) {
+func (qm *Manager) Lease(queue string) (*Lease, error) {
 	qm.mu.Lock()
 	defer qm.mu.Unlock()
 
-	lease, exists := qm.leases[namespace]
+	lease, exists := qm.leases[queue]
 	if !exists {
 		var err error
-		lease, err = newLeaseHolder(namespace, qm.db, func() {
-			qm.cleanUpLeases(namespace)
+		lease, err = newLeaseHolder(queue, qm.db, func() {
+			qm.cleanUpLeases(queue)
 		}, qm.raft)
 		if err != nil {
-			return nil, fmt.Errorf("failed to acquire lease for namespace %s: %w", namespace, err)
+			return nil, fmt.Errorf("failed to acquire lease for queue %s: %w", queue, err)
 		}
 
-		qm.leases[namespace] = lease
+		qm.leases[queue] = lease
 	}
 	return lease.Get(), nil
 }
 
-func (qm *Manager) cleanUpLeases(namespace string) {
+func (qm *Manager) cleanUpLeases(queue string) {
 	qm.mu.Lock()
 	defer qm.mu.Unlock()
 
-	feed, exists := qm.leases[namespace]
+	feed, exists := qm.leases[queue]
 	if !exists {
 		return
 	}
@@ -79,10 +79,10 @@ func (qm *Manager) cleanUpLeases(namespace string) {
 	if err != nil {
 		telemetry.Logger.Error("failed to stop feed",
 			zap.Error(err),
-			zap.String("namespace", namespace))
+			zap.String("queue", queue))
 		return
 	}
-	delete(qm.leases, namespace)
+	delete(qm.leases, queue)
 }
 
 // Close releases all resources for managed feeds.

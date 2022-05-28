@@ -10,11 +10,11 @@ import (
 type fifoDeliveredFactory struct {
 }
 
-func (f *fifoDeliveredFactory) Query(namespace *proto.Namespace) storage.TaskRange {
-	lastID := namespace.LastDeliveredQueuedTask
+func (f *fifoDeliveredFactory) Query(settings *proto.QueueConfig) storage.TaskRange {
+	lastID := settings.LastDeliveredQueuedTask
 	lastIndex := iden.MustParseString(lastID).Index()
 	return &storage.FifoRange{
-		Namespace:  namespace.GetId(),
+		Queue:      settings.GetId(),
 		StartIndex: 0,
 		EndIndex:   lastIndex,
 	}
@@ -23,13 +23,13 @@ func (f *fifoDeliveredFactory) Query(namespace *proto.Namespace) storage.TaskRan
 type fifoUndeliveredFactory struct {
 }
 
-func (f *fifoUndeliveredFactory) Query(namespace *proto.Namespace) storage.TaskRange {
-	lastID := namespace.LastDeliveredQueuedTask
+func (f *fifoUndeliveredFactory) Query(settings *proto.QueueConfig) storage.TaskRange {
+	lastID := settings.LastDeliveredQueuedTask
 	lastIndex := iden.MustParseString(lastID).Index()
 	nextIndex := lastIndex + 1
 
 	return &storage.FifoRange{
-		Namespace:  namespace.GetId(),
+		Queue:      settings.GetId(),
 		StartIndex: nextIndex,
 		EndIndex:   math.MaxUint64,
 	}
@@ -38,6 +38,6 @@ func (f *fifoUndeliveredFactory) Query(namespace *proto.Namespace) storage.TaskR
 type fifoCheckpointer struct {
 }
 
-func (f *fifoCheckpointer) Set(namespace *proto.Namespace, task *proto.Task) {
-	namespace.LastDeliveredQueuedTask = task.GetId()
+func (f *fifoCheckpointer) Set(settings *proto.QueueConfig, task *proto.Task) {
+	settings.LastDeliveredQueuedTask = task.GetId()
 }

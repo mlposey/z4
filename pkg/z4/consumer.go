@@ -16,7 +16,7 @@ type Consumer struct {
 	client          proto.QueueClient
 	stream          proto.Queue_PullClient
 	ctx             context.Context
-	namespace       string
+	queue           string
 	acks            chan *proto.Ack
 	unackedMsgCount *int64
 	closed          bool
@@ -30,7 +30,7 @@ func NewConsumer(opt ConsumerOptions) (*Consumer, error) {
 
 	return &Consumer{
 		client:          proto.NewQueueClient(opt.Conn),
-		namespace:       opt.Namespace,
+		queue:           opt.Queue,
 		ctx:             ctx,
 		acks:            make(chan *proto.Ack),
 		unackedMsgCount: new(int64),
@@ -39,13 +39,13 @@ func NewConsumer(opt ConsumerOptions) (*Consumer, error) {
 
 type ConsumerOptions struct {
 	Conn *grpc.ClientConn
-	// TODO: Support multiple namespaces.
-	Namespace string
-	Ctx       context.Context
+	// TODO: Support reading multiple queues at once.
+	Queue string
+	Ctx   context.Context
 }
 
 func (c *Consumer) Consume(f func(m Message) error) error {
-	md := metadata.New(map[string]string{"namespace": c.namespace})
+	md := metadata.New(map[string]string{"queue": c.queue})
 	ctx := metadata.NewOutgoingContext(c.ctx, md)
 	stream, err := c.client.Pull(ctx)
 	if err != nil {
@@ -120,8 +120,8 @@ func (m Message) Task() *proto.Task {
 func (m Message) Ack() {
 	m.acks <- &proto.Ack{
 		Reference: &proto.TaskReference{
-			Namespace: m.task.GetNamespace(),
-			TaskId:    m.task.GetId(),
+			Queue:  m.task.GetQueue(),
+			TaskId: m.task.GetId(),
 		},
 	}
 }

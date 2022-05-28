@@ -45,7 +45,7 @@ func NewQueue(
 
 func (q *Queue) Push(ctx context.Context, req *proto.PushTaskRequest) (*proto.PushTaskResponse, error) {
 	telemetry.PushedTasks.
-		WithLabelValues("Push", req.GetNamespace()).
+		WithLabelValues("Push", req.GetQueue()).
 		Inc()
 	return q.createTask(ctx, req)
 }
@@ -60,7 +60,7 @@ func (q *Queue) PushStream(stream proto.Queue_PushStreamServer) error {
 			return status.Errorf(codes.Internal, "failed to get tasks from client: %v", err)
 		}
 		telemetry.PushedTasks.
-			WithLabelValues("PushStream", req.GetNamespace()).
+			WithLabelValues("PushStream", req.GetQueue()).
 			Inc()
 
 		task, err := q.createTask(stream.Context(), req)
@@ -124,14 +124,14 @@ func (q *Queue) forwardPushRequest(
 
 func (q *Queue) makeTask(req *proto.PushTaskRequest) (*proto.Task, error) {
 	task := &proto.Task{
-		Namespace: req.GetNamespace(),
+		Queue:     req.GetQueue(),
 		Metadata:  req.GetMetadata(),
 		Payload:   req.GetPayload(),
 		CreatedAt: timestamppb.New(time.Now()),
 	}
 
 	ts := q.getRunTime(req)
-	id, err := q.ids.ID(req.GetNamespace(), ts)
+	id, err := q.ids.ID(req.GetQueue(), ts)
 	if err != nil {
 		return nil, err
 	}
@@ -158,13 +158,13 @@ func (q *Queue) GetTask(ctx context.Context, req *proto.GetTaskRequest) (*proto.
 		return nil, status.Errorf(codes.InvalidArgument, "invalid task id")
 	}
 
-	task, err := q.tasks.Get(req.GetReference().GetNamespace(), id)
+	task, err := q.tasks.Get(req.GetReference().GetQueue(), id)
 	if err != nil {
 		return nil, status.Errorf(codes.NotFound, "task not found: %v", err)
 	}
 
 	telemetry.PulledTasks.
-		WithLabelValues("GetTask", req.GetReference().GetNamespace()).
+		WithLabelValues("GetTask", req.GetReference().GetQueue()).
 		Inc()
 	return task, nil
 }
@@ -181,7 +181,7 @@ func (q *Queue) Pull(stream proto.Queue_PullServer) error {
 
 func (q *Queue) Delete(ctx context.Context, req *proto.DeleteTaskRequest) (*proto.DeleteTaskResponse, error) {
 	telemetry.RemovedTasks.
-		WithLabelValues("Delete", req.GetReference().GetNamespace()).
+		WithLabelValues("Delete", req.GetReference().GetQueue()).
 		Inc()
 
 	if !q.handle.IsLeader() {

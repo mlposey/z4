@@ -15,7 +15,7 @@ func main() {
 	host := flag.String("t", "", "host:port of the peer to send requests to")
 	peerAddress := flag.String("p", "", "host:port of the peer")
 	peerID := flag.String("id", "", "id of the peer")
-	namespace := flag.String("ns", "", "namespace")
+	queue := flag.String("q", "", "queue")
 	flag.Parse()
 
 	if flag.NArg() != 1 {
@@ -39,7 +39,7 @@ func main() {
 		info(admin)
 
 	case "consume":
-		consume(conn, *namespace)
+		consume(conn, *queue)
 
 	default:
 		printHelp()
@@ -93,10 +93,10 @@ func info(client proto.AdminClient) {
 	fmt.Println(string(out))
 }
 
-func consume(conn *grpc.ClientConn, namespace string) {
+func consume(conn *grpc.ClientConn, queue string) {
 	consumer, err := z4.NewConsumer(z4.ConsumerOptions{
-		Conn:      conn,
-		Namespace: namespace,
+		Conn:  conn,
+		Queue: queue,
 	})
 	if err != nil {
 		panic(err)

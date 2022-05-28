@@ -10,32 +10,32 @@ import (
 type schedDeliveredQueryFactory struct {
 }
 
-func (s *schedDeliveredQueryFactory) Query(namespace *proto.Namespace) storage.TaskRange {
-	ackDeadline := time.Second * time.Duration(namespace.GetAckDeadlineSeconds())
+func (s *schedDeliveredQueryFactory) Query(settings *proto.QueueConfig) storage.TaskRange {
+	ackDeadline := time.Second * time.Duration(settings.GetAckDeadlineSeconds())
 	watermark := time.Now().Add(-ackDeadline)
 	return &storage.ScheduledRange{
-		Namespace: namespace.GetId(),
-		StartID:   iden.Min,
-		EndID:     iden.New(watermark, 0),
+		Queue:   settings.GetId(),
+		StartID: iden.Min,
+		EndID:   iden.New(watermark, 0),
 	}
 }
 
 type schedUndeliveredQueryFactory struct {
 }
 
-func (s *schedUndeliveredQueryFactory) Query(namespace *proto.Namespace) storage.TaskRange {
-	lastID := iden.MustParseString(namespace.LastDeliveredScheduledTask)
+func (s *schedUndeliveredQueryFactory) Query(settings *proto.QueueConfig) storage.TaskRange {
+	lastID := iden.MustParseString(settings.LastDeliveredScheduledTask)
 	nextID := iden.New(lastID.MustTime(), lastID.Index()+1)
 	return &storage.ScheduledRange{
-		Namespace: namespace.GetId(),
-		StartID:   nextID,
-		EndID:     iden.New(time.Now().UTC(), 0),
+		Queue:   settings.GetId(),
+		StartID: nextID,
+		EndID:   iden.New(time.Now().UTC(), 0),
 	}
 }
 
 type schedCheckpointer struct {
 }
 
-func (s *schedCheckpointer) Set(namespace *proto.Namespace, task *proto.Task) {
-	namespace.LastDeliveredScheduledTask = task.GetId()
+func (s *schedCheckpointer) Set(settings *proto.QueueConfig, task *proto.Task) {
+	settings.LastDeliveredScheduledTask = task.GetId()
 }

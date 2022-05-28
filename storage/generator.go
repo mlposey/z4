@@ -16,8 +16,8 @@ func NewGenerator(indexes *IndexStore) *IDGenerator {
 	}
 }
 
-func (g *IDGenerator) ID(namespace string, ts time.Time) (iden.TaskID, error) {
-	idx, err := g.indexes.Next(namespace)
+func (g *IDGenerator) ID(queue string, ts time.Time) (iden.TaskID, error) {
+	idx, err := g.indexes.Next(queue)
 	if err != nil {
 		return iden.TaskID{}, fmt.Errorf("failed to get next index: %w", err)
 	}

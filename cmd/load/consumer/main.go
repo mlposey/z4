@@ -17,8 +17,8 @@ func main() {
 	}
 
 	consumer, err := z4.NewConsumer(z4.ConsumerOptions{
-		Conn:      conn,
-		Namespace: os.Getenv("NAMESPACE"),
+		Conn:  conn,
+		Queue: os.Getenv("QUEUE"),
 	})
 	if err != nil {
 		panic(err)

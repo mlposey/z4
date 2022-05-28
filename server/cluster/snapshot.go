@@ -90,7 +90,7 @@ func (s *snapshotRestorer) clearDatabase() error {
 	if err != nil {
 		return err
 	}
-	return s.db.DeleteRange([]byte("namespace# "), []byte("namespace#z"), pebble.NoSync)
+	return s.db.DeleteRange([]byte("queue# "), []byte("queue#z"), pebble.NoSync)
 }
 
 func (s *snapshotRestorer) loadData(snapshot io.ReadCloser) error {

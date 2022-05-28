@@ -18,7 +18,7 @@ const (
 	taskTableID         = "task"
 	taskColumnDeliverAt = "deliver_at"
 	taskColumnLastRetry = "last_retry"
-	taskColumnNamespace = "namespace"
+	taskColumnQueue     = "queue"
 	taskColumnID        = "id"
 	taskColumnMetadata  = "metadata"
 	taskColumnPayload   = "payload"
@@ -38,7 +38,7 @@ func newTaskTable(tasks *storage.TaskStore) *taskTable {
 	return &taskTable{
 		name: taskTableID,
 		schema: sql.Schema{
-			{Name: taskColumnNamespace, Type: sql.Text, Nullable: false, Source: taskTableID},
+			{Name: taskColumnQueue, Type: sql.Text, Nullable: false, Source: taskTableID},
 			{Name: taskColumnID, Type: sql.Text, Nullable: false, Source: taskTableID},
 			{Name: taskColumnDeliverAt, Type: sql.Timestamp, Nullable: false, Source: taskTableID},
 			{Name: taskColumnLastRetry, Type: sql.Timestamp, Nullable: true, Source: taskTableID},
@@ -89,13 +89,13 @@ func (t *taskTable) WithFilters(ctx *sql.Context, filters []sql.Expression) sql.
 }
 
 type taskTableIterator struct {
-	filters        []sql.Expression
-	store          *storage.TaskStore
-	rangeStart     time.Time
-	rangeEnd       time.Time
-	namespace      string
-	namespaceFound bool
-	it             *storage.TaskIterator
+	filters    []sql.Expression
+	store      *storage.TaskStore
+	rangeStart time.Time
+	rangeEnd   time.Time
+	queue      string
+	queueFound bool
+	it         *storage.TaskIterator
 }
 
 func newTaskTableIterator(filters []sql.Expression, store *storage.TaskStore) (*taskTableIterator, error) {
@@ -116,7 +116,7 @@ func (r *taskTableIterator) initBounds() error {
 			if r.detectTimeBounds(expr) {
 				return false
 			}
-			return !r.detectNamespace(expr)
+			return !r.detectQueue(expr)
 		})
 	}
 
@@ -124,14 +124,14 @@ func (r *taskTableIterator) initBounds() error {
 		return fmt.Errorf("invalid or missing range query for field: %s", taskColumnDeliverAt)
 	}
 
-	if !r.namespaceFound {
-		return fmt.Errorf("missing required namespace in query")
+	if !r.queueFound {
+		return fmt.Errorf("missing required queue in query")
 	}
 
 	r.it = storage.NewTaskIterator(r.store.Client, &storage.ScheduledRange{
-		Namespace: r.namespace,
-		StartID:   iden.New(r.rangeStart, 0),
-		EndID:     iden.New(r.rangeEnd, 0),
+		Queue:   r.queue,
+		StartID: iden.New(r.rangeStart, 0),
+		EndID:   iden.New(r.rangeEnd, 0),
 	})
 	return nil
 }
@@ -201,11 +201,11 @@ func (r *taskTableIterator) isFieldExpression(f sql.Expression, field string) bo
 	return found
 }
 
-func (r *taskTableIterator) getNamespace(f sql.Expression) string {
-	var namespace string
+func (r *taskTableIterator) getQueue(f sql.Expression) string {
+	var queue string
 
 	sql.Inspect(f, func(expr sql.Expression) bool {
-		if namespace != "" {
+		if queue != "" {
 			return false
 		}
 		lit, ok := expr.(*expression.Literal)
@@ -217,10 +217,10 @@ func (r *taskTableIterator) getNamespace(f sql.Expression) string {
 		if !ok {
 			return true
 		}
-		namespace = lit.Value().(string)
+		queue = lit.Value().(string)
 		return false
 	})
-	return namespace
+	return queue
 }
 
 func (r *taskTableIterator) getTime(f sql.Expression) time.Time {
@@ -251,16 +251,16 @@ func (r *taskTableIterator) getTime(f sql.Expression) time.Time {
 	return ts
 }
 
-func (r *taskTableIterator) detectNamespace(f sql.Expression) bool {
+func (r *taskTableIterator) detectQueue(f sql.Expression) bool {
 	equal, ok := f.(*expression.Equals)
 	if !ok {
 		return false
 	}
 
 	be := equal.BinaryExpression
-	if r.isFieldExpression(be.Left, "namespace") {
-		r.namespace = r.getNamespace(be.Right)
-		r.namespaceFound = true
+	if r.isFieldExpression(be.Left, "queue") {
+		r.queue = r.getQueue(be.Right)
+		r.queueFound = true
 		return true
 	}
 	return false
@@ -298,7 +298,7 @@ func (r *taskTableIterator) rowFromTask(task *proto.Task) sql.Row {
 	}
 
 	return sql.NewRow(
-		task.GetNamespace(),
+		task.GetQueue(),
 		task.GetId(),
 		task.GetScheduleTime().AsTime(),
 		lastRetry,

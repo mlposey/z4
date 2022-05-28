@@ -15,7 +15,7 @@ import (
 
 // Feed provides access to a stream of tasks that are ready to be delivered.
 type Feed struct {
-	Namespace *storage.SyncedNamespace
+	Settings  *storage.SyncedSettings
 	feed      chan *proto.Task
 	ctx       context.Context
 	ctxCancel context.CancelFunc
@@ -23,25 +23,25 @@ type Feed struct {
 }
 
 func New(
-	namespaceID string,
+	queue string,
 	db *storage.PebbleClient,
 	raft *raft.Raft,
 ) (*Feed, error) {
 	ctx, cancel := context.WithCancel(context.Background())
 
 	f := &Feed{
-		Namespace: storage.NewSyncedNamespace(storage.NewNamespaceStore(db), namespaceID, raft),
+		Settings:  storage.NewSyncedSettings(storage.NewSettingStore(db), queue, raft),
 		feed:      make(chan *proto.Task, 100_000),
 		ctx:       ctx,
 		ctxCancel: cancel,
 	}
 
-	if err := f.Namespace.StartSync(); err != nil {
-		return nil, fmt.Errorf("feed creation failed due to namespace error: %w", err)
+	if err := f.Settings.StartSync(); err != nil {
+		return nil, fmt.Errorf("feed creation failed due to queue error: %w", err)
 	}
 
 	tasks := storage.NewTaskStore(db)
-	f.readers = q.Readers(tasks, f.Namespace.N)
+	f.readers = q.Readers(tasks, f.Settings.S)
 
 	go f.startFeed()
 	return f, nil
@@ -50,7 +50,7 @@ func New(
 func (f *Feed) startFeed() {
 	defer close(f.feed)
 	telemetry.Logger.Info("feed started",
-		zap.String("namespace", f.Namespace.N.GetId()))
+		zap.String("queue", f.Settings.S.GetId()))
 
 	for {
 		select {
@@ -114,12 +114,12 @@ func (f *Feed) Tasks() q.TaskStream {
 // needed.
 func (f *Feed) Close() error {
 	f.ctxCancel()
-	err := f.Namespace.Close()
+	err := f.Settings.Close()
 	if err != nil {
-		return fmt.Errorf("failed to close feed for namespace '%s': %w", f.Namespace.N.GetId(), err)
+		return fmt.Errorf("failed to close feed for queue '%s': %w", f.Settings.S.GetId(), err)
 	}
 
 	telemetry.Logger.Info("feed stopped",
-		zap.String("namespace", f.Namespace.N.GetId()))
+		zap.String("queue", f.Settings.S.GetId()))
 	return nil
 }

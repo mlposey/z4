@@ -23,12 +23,12 @@ func NewTaskStore(db *PebbleClient) *TaskStore {
 	return store
 }
 
-func getFifoPrefix(namespace string) []byte {
-	return []byte(fmt.Sprintf("task#fifo#%s#", namespace))
+func getFifoPrefix(queue string) []byte {
+	return []byte(fmt.Sprintf("task#fifo#%s#", queue))
 }
 
-func getSchedPrefix(namespace string) []byte {
-	return []byte(fmt.Sprintf("task#sched#%s#", namespace))
+func getSchedPrefix(queue string) []byte {
+	return []byte(fmt.Sprintf("task#sched#%s#", queue))
 }
 
 func (ts *TaskStore) DeleteAll(acks []*proto.Ack) error {
@@ -39,7 +39,7 @@ func (ts *TaskStore) DeleteAll(acks []*proto.Ack) error {
 		key, err := getAckKey(ack)
 		if err != nil {
 			telemetry.Logger.Error("invalid ack key",
-				zap.Error(err), zap.String("namespace", ack.GetReference().GetNamespace()),
+				zap.Error(err), zap.String("queue", ack.GetReference().GetQueue()),
 				zap.String("task_id", ack.GetReference().GetTaskId()))
 			continue
 		}
@@ -60,8 +60,8 @@ func (ts *TaskStore) SaveAll(tasks []*proto.Task, saveIndex bool) error {
 	maxIndexes := make(map[string]uint64)
 	for _, task := range tasks {
 		id := iden.MustParseString(task.GetId())
-		if saveIndex && id.Index() > maxIndexes[task.GetNamespace()] {
-			maxIndexes[task.GetNamespace()] = id.Index()
+		if saveIndex && id.Index() > maxIndexes[task.GetQueue()] {
+			maxIndexes[task.GetQueue()] = id.Index()
 		}
 
 		payload, err := pb.Marshal(task)
@@ -87,16 +87,16 @@ func (ts *TaskStore) SaveAll(tasks []*proto.Task, saveIndex bool) error {
 			err := batch.Set(getSeqKey(ns), payload[:], pebble.NoSync)
 			if err != nil {
 				_ = batch.Close()
-				return fmt.Errorf("failed to save index for namespace %s: %w", ns, err)
+				return fmt.Errorf("failed to save index for queue %s: %w", ns, err)
 			}
 		}
 	}
 	return batch.Commit(pebble.NoSync)
 }
 
-func (ts *TaskStore) Get(namespace string, id iden.TaskID) (*proto.Task, error) {
+func (ts *TaskStore) Get(queue string, id iden.TaskID) (*proto.Task, error) {
 	var task *proto.Task
-	key := getScheduledTaskKey(namespace, id)
+	key := getScheduledTaskKey(queue, id)
 	item, closer, err := ts.Client.DB.Get(key)
 	if err != nil {
 		return nil, err
@@ -114,9 +114,9 @@ func (ts *TaskStore) IterateRange(query TaskRange) (*TaskIterator, error) {
 
 func getTaskKey(task *proto.Task, parsedID iden.TaskID) []byte {
 	if task.GetScheduleTime() == nil {
-		return getFifoTaskKey(task.GetNamespace(), parsedID)
+		return getFifoTaskKey(task.GetQueue(), parsedID)
 	}
-	return getScheduledTaskKey(task.GetNamespace(), parsedID)
+	return getScheduledTaskKey(task.GetQueue(), parsedID)
 }
 
 func getAckKey(ack *proto.Ack) ([]byte, error) {
@@ -127,22 +127,22 @@ func getAckKey(ack *proto.Ack) ([]byte, error) {
 
 	_, err = id.Time()
 	if errors.Is(err, iden.ErrNoTime) {
-		return getFifoTaskKey(ack.GetReference().GetNamespace(), id), nil
+		return getFifoTaskKey(ack.GetReference().GetQueue(), id), nil
 	} else {
-		return getScheduledTaskKey(ack.GetReference().GetNamespace(), id), nil
+		return getScheduledTaskKey(ack.GetReference().GetQueue(), id), nil
 	}
 }
 
-func getScheduledTaskKey(namespaceID string, id iden.TaskID) []byte {
+func getScheduledTaskKey(queue string, id iden.TaskID) []byte {
 	buf := bytes.NewBuffer(nil)
-	buf.Write(getSchedPrefix(namespaceID))
+	buf.Write(getSchedPrefix(queue))
 	buf.Write(id[:])
 	return buf.Bytes()
 }
 
-func getFifoTaskKey(namespaceID string, id iden.TaskID) []byte {
+func getFifoTaskKey(queue string, id iden.TaskID) []byte {
 	buf := bytes.NewBuffer(nil)
-	buf.Write(getFifoPrefix(namespaceID))
+	buf.Write(getFifoPrefix(queue))
 
 	indexB := make([]byte, 8)
 	binary.BigEndian.PutUint64(indexB, id.Index())

@@ -25,10 +25,10 @@ const _ = grpc.SupportPackageIsVersion7
 type AdminClient interface {
 	// CheckHealth determines whether the service is in a healthy state.
 	CheckHealth(ctx context.Context, in *CheckHealthRequest, opts ...grpc.CallOption) (*Status, error)
-	// GetNamespace gets settings for a task namespace.
-	GetNamespace(ctx context.Context, in *GetNamespaceRequest, opts ...grpc.CallOption) (*Namespace, error)
-	// UpdateNamespace updates the settings of a task namespace.
-	UpdateNamespace(ctx context.Context, in *UpdateNamespaceRequest, opts ...grpc.CallOption) (*Namespace, error)
+	// GetQueue gets settings for a task queue.
+	GetQueue(ctx context.Context, in *GetQueueRequest, opts ...grpc.CallOption) (*QueueConfig, error)
+	// UpdateQueue updates the settings of a task queue.
+	UpdateQueue(ctx context.Context, in *UpdateQueueRequest, opts ...grpc.CallOption) (*QueueConfig, error)
 	// GetClusterInfo returns information about the structure of the Raft cluster.
 	GetClusterInfo(ctx context.Context, in *GetClusterInfoRequest, opts ...grpc.CallOption) (*ClusterInfo, error)
 	// AddClusterMember adds a peer to the Raft cluster.
@@ -61,18 +61,18 @@ func (c *adminClient) CheckHealth(ctx context.Context, in *CheckHealthRequest, o
 	return out, nil
 }
 
-func (c *adminClient) GetNamespace(ctx context.Context, in *GetNamespaceRequest, opts ...grpc.CallOption) (*Namespace, error) {
-	out := new(Namespace)
-	err := c.cc.Invoke(ctx, "/z4.Admin/GetNamespace", in, out, opts...)
+func (c *adminClient) GetQueue(ctx context.Context, in *GetQueueRequest, opts ...grpc.CallOption) (*QueueConfig, error) {
+	out := new(QueueConfig)
+	err := c.cc.Invoke(ctx, "/z4.Admin/GetQueue", in, out, opts...)
 	if err != nil {
 		return nil, err
 	}
 	return out, nil
 }
 
-func (c *adminClient) UpdateNamespace(ctx context.Context, in *UpdateNamespaceRequest, opts ...grpc.CallOption) (*Namespace, error) {
-	out := new(Namespace)
-	err := c.cc.Invoke(ctx, "/z4.Admin/UpdateNamespace", in, out, opts...)
+func (c *adminClient) UpdateQueue(ctx context.Context, in *UpdateQueueRequest, opts ...grpc.CallOption) (*QueueConfig, error) {
+	out := new(QueueConfig)
+	err := c.cc.Invoke(ctx, "/z4.Admin/UpdateQueue", in, out, opts...)
 	if err != nil {
 		return nil, err
 	}
@@ -121,10 +121,10 @@ func (c *adminClient) BootstrapCluster(ctx context.Context, in *emptypb.Empty, o
 type AdminServer interface {
 	// CheckHealth determines whether the service is in a healthy state.
 	CheckHealth(context.Context, *CheckHealthRequest) (*Status, error)
-	// GetNamespace gets settings for a task namespace.
-	GetNamespace(context.Context, *GetNamespaceRequest) (*Namespace, error)
-	// UpdateNamespace updates the settings of a task namespace.
-	UpdateNamespace(context.Context, *UpdateNamespaceRequest) (*Namespace, error)
+	// GetQueue gets settings for a task queue.
+	GetQueue(context.Context, *GetQueueRequest) (*QueueConfig, error)
+	// UpdateQueue updates the settings of a task queue.
+	UpdateQueue(context.Context, *UpdateQueueRequest) (*QueueConfig, error)
 	// GetClusterInfo returns information about the structure of the Raft cluster.
 	GetClusterInfo(context.Context, *GetClusterInfoRequest) (*ClusterInfo, error)
 	// AddClusterMember adds a peer to the Raft cluster.
@@ -148,11 +148,11 @@ type UnimplementedAdminServer struct {
 func (UnimplementedAdminServer) CheckHealth(context.Context, *CheckHealthRequest) (*Status, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method CheckHealth not implemented")
 }
-func (UnimplementedAdminServer) GetNamespace(context.Context, *GetNamespaceRequest) (*Namespace, error) {
-	return nil, status.Errorf(codes.Unimplemented, "method GetNamespace not implemented")
+func (UnimplementedAdminServer) GetQueue(context.Context, *GetQueueRequest) (*QueueConfig, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method GetQueue not implemented")
 }
-func (UnimplementedAdminServer) UpdateNamespace(context.Context, *UpdateNamespaceRequest) (*Namespace, error) {
-	return nil, status.Errorf(codes.Unimplemented, "method UpdateNamespace not implemented")
+func (UnimplementedAdminServer) UpdateQueue(context.Context, *UpdateQueueRequest) (*QueueConfig, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method UpdateQueue not implemented")
 }
 func (UnimplementedAdminServer) GetClusterInfo(context.Context, *GetClusterInfoRequest) (*ClusterInfo, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method GetClusterInfo not implemented")
@@ -197,38 +197,38 @@ func _Admin_CheckHealth_Handler(srv interface{}, ctx context.Context, dec func(i
 	return interceptor(ctx, in, info, handler)
 }
 
-func _Admin_GetNamespace_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
-	in := new(GetNamespaceRequest)
+func _Admin_GetQueue_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(GetQueueRequest)
 	if err := dec(in); err != nil {
 		return nil, err
 	}
 	if interceptor == nil {
-		return srv.(AdminServer).GetNamespace(ctx, in)
+		return srv.(AdminServer).GetQueue(ctx, in)
 	}
 	info := &grpc.UnaryServerInfo{
 		Server:     srv,
-		FullMethod: "/z4.Admin/GetNamespace",
+		FullMethod: "/z4.Admin/GetQueue",
 	}
 	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
-		return srv.(AdminServer).GetNamespace(ctx, req.(*GetNamespaceRequest))
+		return srv.(AdminServer).GetQueue(ctx, req.(*GetQueueRequest))
 	}
 	return interceptor(ctx, in, info, handler)
 }
 
-func _Admin_UpdateNamespace_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
-	in := new(UpdateNamespaceRequest)
+func _Admin_UpdateQueue_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(UpdateQueueRequest)
 	if err := dec(in); err != nil {
 		return nil, err
 	}
 	if interceptor == nil {
-		return srv.(AdminServer).UpdateNamespace(ctx, in)
+		return srv.(AdminServer).UpdateQueue(ctx, in)
 	}
 	info := &grpc.UnaryServerInfo{
 		Server:     srv,
-		FullMethod: "/z4.Admin/UpdateNamespace",
+		FullMethod: "/z4.Admin/UpdateQueue",
 	}
 	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
-		return srv.(AdminServer).UpdateNamespace(ctx, req.(*UpdateNamespaceRequest))
+		return srv.(AdminServer).UpdateQueue(ctx, req.(*UpdateQueueRequest))
 	}
 	return interceptor(ctx, in, info, handler)
 }
@@ -317,12 +317,12 @@ var Admin_ServiceDesc = grpc.ServiceDesc{
 			Handler:    _Admin_CheckHealth_Handler,
 		},
 		{
-			MethodName: "GetNamespace",
-			Handler:    _Admin_GetNamespace_Handler,
+			MethodName: "GetQueue",
+			Handler:    _Admin_GetQueue_Handler,
 		},
 		{
-			MethodName: "UpdateNamespace",
-			Handler:    _Admin_UpdateNamespace_Handler,
+			MethodName: "UpdateQueue",
+			Handler:    _Admin_UpdateQueue_Handler,
 		},
 		{
 			MethodName: "GetClusterInfo",

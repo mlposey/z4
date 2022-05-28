@@ -36,8 +36,8 @@ type QueueClient interface {
 	// Pull opens a bi-directional stream for consuming ready tasks.
 	//
 	// Metadata must be passed to the server to indicate which
-	// namespace to consume from. The metadata key must be "namespace"
-	// and its value a single string that identifies the namespace.
+	// queue to consume from. The metadata key must be "queue"
+	// and its value a single string that identifies the queue.
 	//
 	// This rpc must be called on the leader.
 	Pull(ctx context.Context, opts ...grpc.CallOption) (Queue_PullClient, error)
@@ -169,8 +169,8 @@ type QueueServer interface {
 	// Pull opens a bi-directional stream for consuming ready tasks.
 	//
 	// Metadata must be passed to the server to indicate which
-	// namespace to consume from. The metadata key must be "namespace"
-	// and its value a single string that identifies the namespace.
+	// queue to consume from. The metadata key must be "queue"
+	// and its value a single string that identifies the queue.
 	//
 	// This rpc must be called on the leader.
 	Pull(Queue_PullServer) error

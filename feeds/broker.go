@@ -13,11 +13,11 @@ import (
 
 // TaskBroker manages the read and ack streams of a task feed.
 type TaskBroker struct {
-	fm        *Manager
-	stream    proto.Queue_PullServer
-	raft      *raft.Raft
-	namespace string
-	lease     *Lease
+	fm     *Manager
+	stream proto.Queue_PullServer
+	raft   *raft.Raft
+	queue  string
+	lease  *Lease
 }
 
 func NewTaskBroker(
@@ -37,13 +37,13 @@ func (tb *TaskBroker) Start() error {
 	if !ok {
 		return status.Errorf(codes.InvalidArgument, "missing metadata")
 	}
-	ns := md.Get("namespace")
+	ns := md.Get("queue")
 	if len(ns) != 1 {
-		return status.Errorf(codes.InvalidArgument, "expected one namespace in metadata")
+		return status.Errorf(codes.InvalidArgument, "expected one queue in metadata")
 	}
-	tb.namespace = ns[0]
+	tb.queue = ns[0]
 
-	l, err := tb.fm.Lease(tb.namespace)
+	l, err := tb.fm.Lease(tb.queue)
 	if err != nil {
 		return status.Errorf(codes.Internal, "could not start task feed: %v", err)
 	}
@@ -66,12 +66,12 @@ func (tb *TaskBroker) startAckListener() {
 		if err != nil {
 			telemetry.Logger.Debug("closing ack stream",
 				zap.Error(err),
-				zap.String("namespace", tb.namespace))
+				zap.String("queue", tb.queue))
 			return
 		}
 
 		telemetry.RemovedTasks.
-			WithLabelValues("Ack", ack.GetReference().GetNamespace()).
+			WithLabelValues("Ack", ack.GetReference().GetQueue()).
 			Inc()
 
 		// This is intentionally async.
@@ -92,7 +92,7 @@ func (tb *TaskBroker) startTaskSender() error {
 			}
 
 			telemetry.PulledTasks.
-				WithLabelValues("Pull", tb.namespace).
+				WithLabelValues("Pull", tb.queue).
 				Inc()
 		}
 	}

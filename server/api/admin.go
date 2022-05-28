@@ -52,44 +52,44 @@ func (a *Admin) CheckHealth(
 	return new(proto.Status), nil
 }
 
-func (a *Admin) GetNamespace(ctx context.Context, req *proto.GetNamespaceRequest) (*proto.Namespace, error) {
+func (a *Admin) GetQueue(ctx context.Context, req *proto.GetQueueRequest) (*proto.QueueConfig, error) {
 	if !a.handle.IsLeader() {
 		client, err := a.handle.AdminClient()
 		if err != nil {
 			return nil, status.Errorf(codes.Internal, "could not forward request: %v", err)
 		}
-		return client.GetNamespace(ctx, req)
+		return client.GetQueue(ctx, req)
 	}
 
-	feed, err := a.fm.Lease(req.GetNamespaceId())
+	feed, err := a.fm.Lease(req.GetQueue())
 	if err != nil {
 		return nil, status.Errorf(codes.Internal, "could not get lease for update: %v", err)
 	}
 	defer feed.Release()
 
-	return feed.Feed().Namespace.N, nil
+	return feed.Feed().Settings.S, nil
 }
 
-func (a *Admin) UpdateNamespace(ctx context.Context, req *proto.UpdateNamespaceRequest) (*proto.Namespace, error) {
+func (a *Admin) UpdateQueue(ctx context.Context, req *proto.UpdateQueueRequest) (*proto.QueueConfig, error) {
 	if !a.handle.IsLeader() {
 		client, err := a.handle.AdminClient()
 		if err != nil {
 			return nil, status.Errorf(codes.Internal, "could not forward request: %v", err)
 		}
-		return client.UpdateNamespace(ctx, req)
+		return client.UpdateQueue(ctx, req)
 	}
 
-	feed, err := a.fm.Lease(req.GetNamespace().GetId())
+	feed, err := a.fm.Lease(req.GetQueue().GetId())
 	if err != nil {
 		return nil, status.Errorf(codes.Internal, "could not get lease for update: %v", err)
 	}
 	defer feed.Release()
 
-	ns := feed.Feed().Namespace.N
-	// Important note: Do not update the value of the namespace id or the
+	ns := feed.Feed().Settings.S
+	// Important note: Do not update the value of the queue id or the
 	// last delivered task.
-	if req.GetNamespace().GetAckDeadlineSeconds() != 0 {
-		ns.AckDeadlineSeconds = req.GetNamespace().GetAckDeadlineSeconds()
+	if req.GetQueue().GetAckDeadlineSeconds() != 0 {
+		ns.AckDeadlineSeconds = req.GetQueue().GetAckDeadlineSeconds()
 	}
 	return ns, nil
 }

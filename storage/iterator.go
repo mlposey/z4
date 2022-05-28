@@ -93,7 +93,7 @@ func (ti *TaskIterator) Close() error {
 }
 
 type TaskRange interface {
-	GetNamespace() string
+	GetQueue() string
 	GetStart() []byte
 	GetEnd() []byte
 	GetPrefix() []byte
@@ -101,8 +101,8 @@ type TaskRange interface {
 
 // ScheduledRange is a query for tasks within a time range.
 type ScheduledRange struct {
-	// Namespace restricts the search to only tasks in a given namespace.
-	Namespace string
+	// Queue restricts the search to only tasks in a given queue.
+	Queue string
 
 	// StartID restricts the search to all task IDs that are equal to it
 	// or occur after it in ascending sorted order.
@@ -114,44 +114,44 @@ type ScheduledRange struct {
 }
 
 func (tr *ScheduledRange) GetPrefix() []byte {
-	return getSchedPrefix(tr.Namespace)
+	return getSchedPrefix(tr.Queue)
 }
 
-func (tr *ScheduledRange) GetNamespace() string {
-	return tr.Namespace
+func (tr *ScheduledRange) GetQueue() string {
+	return tr.Queue
 }
 
 func (tr *ScheduledRange) GetStart() []byte {
-	return getScheduledTaskKey(tr.Namespace, tr.StartID)
+	return getScheduledTaskKey(tr.Queue, tr.StartID)
 }
 
 func (tr *ScheduledRange) GetEnd() []byte {
-	return getScheduledTaskKey(tr.Namespace, tr.EndID)
+	return getScheduledTaskKey(tr.Queue, tr.EndID)
 }
 
 // FifoRange is a query for tasks within an index range
 type FifoRange struct {
-	// Namespace restricts the search to only tasks in a given namespace.
-	Namespace string
+	// Queue restricts the search to only tasks in a given queue.
+	Queue string
 
 	StartIndex uint64
 	EndIndex   uint64
 }
 
 func (fr *FifoRange) GetPrefix() []byte {
-	return getFifoPrefix(fr.Namespace)
+	return getFifoPrefix(fr.Queue)
 }
 
-func (fr *FifoRange) GetNamespace() string {
-	return fr.Namespace
+func (fr *FifoRange) GetQueue() string {
+	return fr.Queue
 }
 
 func (fr *FifoRange) GetStart() []byte {
 	id := iden.New(time.Time{}, fr.StartIndex)
-	return getFifoTaskKey(fr.Namespace, id)
+	return getFifoTaskKey(fr.Queue, id)
 }
 
 func (fr *FifoRange) GetEnd() []byte {
 	id := iden.New(time.Time{}, fr.EndIndex)
-	return getFifoTaskKey(fr.Namespace, id)
+	return getFifoTaskKey(fr.Queue, id)
 }

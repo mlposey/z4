@@ -77,14 +77,14 @@ type IndexStore struct {
 	seqCache gcache.Cache
 }
 
-func NewIndexStore(namespaces *NamespaceStore) *IndexStore {
-	release := func(namespace string, seq *Sequence) {
+func NewIndexStore(settings *SettingStore) *IndexStore {
+	release := func(queue string, seq *Sequence) {
 		telemetry.Logger.Info("closing seq")
 		err := seq.Close()
 		if err != nil {
 			telemetry.Logger.Error("failed to close sequence",
 				zap.Error(err),
-				zap.String("namespace", namespace))
+				zap.String("queue", queue))
 		}
 	}
 
@@ -92,7 +92,7 @@ func NewIndexStore(namespaces *NamespaceStore) *IndexStore {
 		seqCache: gcache.New(100).
 			ARC().
 			LoaderFunc(func(i interface{}) (interface{}, error) {
-				return namespaces.Sequence(i.(string))
+				return settings.Sequence(i.(string))
 			}).
 			EvictedFunc(func(key interface{}, value interface{}) {
 				release(key.(string), value.(*Sequence))
@@ -104,8 +104,8 @@ func NewIndexStore(namespaces *NamespaceStore) *IndexStore {
 	}
 }
 
-func (c *IndexStore) Next(namespace string) (uint64, error) {
-	seq, err := c.seqCache.Get(namespace)
+func (c *IndexStore) Next(queue string) (uint64, error) {
+	seq, err := c.seqCache.Get(queue)
 	if err != nil {
 		return 0, err
 	}

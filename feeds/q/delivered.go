@@ -11,12 +11,12 @@ import (
 )
 
 type deliveredReader struct {
-	namespace *proto.Namespace
-	tasks     *storage.TaskStore
-	lastRun   time.Time
-	interval  time.Duration
-	active    bool
-	qf        QueryFactory
+	settings *proto.QueueConfig
+	tasks    *storage.TaskStore
+	lastRun  time.Time
+	interval time.Duration
+	active   bool
+	qf       QueryFactory
 }
 
 var _ Reader = (*deliveredReader)(nil)
@@ -24,16 +24,16 @@ var _ Reader = (*deliveredReader)(nil)
 func newDeliveredReader(
 	interval time.Duration,
 	tasks *storage.TaskStore,
-	namespace *proto.Namespace,
+	settings *proto.QueueConfig,
 	qf QueryFactory,
 ) *deliveredReader {
 	return &deliveredReader{
-		namespace: namespace,
-		tasks:     tasks,
-		lastRun:   time.Time{},
-		interval:  interval,
-		active:    false,
-		qf:        qf,
+		settings: settings,
+		tasks:    tasks,
+		lastRun:  time.Time{},
+		interval: interval,
+		active:   false,
+		qf:       qf,
 	}
 }
 
@@ -49,7 +49,7 @@ func (d *deliveredReader) Read(f func(task *proto.Task) error) error {
 		if err != nil {
 			telemetry.Logger.Error("redelivery reader failed",
 				zap.Error(err),
-				zap.String("namespace", d.namespace.GetId()))
+				zap.String("queue", d.settings.GetId()))
 		}
 	}()
 	return nil
@@ -86,9 +86,9 @@ func (d *deliveredReader) run(f func(task *proto.Task) error) error {
 }
 
 func (d *deliveredReader) executeQuery(handle func(task *proto.Task) error) error {
-	ackDeadline := time.Second * time.Duration(d.namespace.GetAckDeadlineSeconds())
+	ackDeadline := time.Second * time.Duration(d.settings.GetAckDeadlineSeconds())
 	watermark := time.Now().Add(-ackDeadline)
-	query := d.qf.Query(d.namespace)
+	query := d.qf.Query(d.settings)
 	it := storage.NewTaskIterator(d.tasks.Client, query)
 	defer it.Close()
 

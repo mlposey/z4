@@ -10,11 +10,11 @@ service Admin {
   // CheckHealth determines whether the service is in a healthy state.
   rpc CheckHealth(CheckHealthRequest) returns (Status) {};
 
-  // GetNamespace gets settings for a task namespace.
-  rpc GetNamespace(GetNamespaceRequest) returns (Namespace) {};
+  // GetQueue gets settings for a task queue.
+  rpc GetQueue(GetQueueRequest) returns (QueueConfig) {};
 
-  // UpdateNamespace updates the settings of a task namespace.
-  rpc UpdateNamespace(UpdateNamespaceRequest) returns (Namespace) {};
+  // UpdateQueue updates the settings of a task queue.
+  rpc UpdateQueue(UpdateQueueRequest) returns (QueueConfig) {};
 
   // GetClusterInfo returns information about the structure of the Raft cluster.
   rpc GetClusterInfo(GetClusterInfoRequest) returns (ClusterInfo) {};
@@ -42,22 +42,22 @@ message CheckHealthRequest {
 message Status {
 }
 
-message GetNamespaceRequest {
+message GetQueueRequest {
   string request_id = 1;
-  string namespace_id = 2;
+  string queue = 2;
 }
 
-message UpdateNamespaceRequest {
+message UpdateQueueRequest {
   string request_id = 1;
 
-  // A new version of the namespace
+  // A new version of the queue
   //
   // The following fields cannot be updated
   // - id
   // - last_delivered_task
-  Namespace namespace = 2;
+  QueueConfig queue = 2;
 
-  // TODO: Add field mask support so we can selectively update parts of the namespace.
+  // TODO: Add field mask support so we can selectively update parts of the queue.
 }
 
 message GetClusterInfoRequest {

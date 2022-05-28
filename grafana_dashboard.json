@@ -113,9 +113,9 @@
             "uid": "prometheus"
           },
           "exemplar": true,
-          "expr": "sum(rate(z4_pushed_task_total[2m])) by (pod, method, task_namespace)",
+          "expr": "sum(rate(z4_pushed_task_total[2m])) by (pod, method, queue)",
           "interval": "",
-          "legendFormat": "{{task_namespace}}: {{method}}",
+          "legendFormat": "{{queue}}: {{method}}",
           "refId": "A"
         }
       ],
@@ -199,9 +199,9 @@
             "uid": "prometheus"
           },
           "exemplar": true,
-          "expr": "sum(rate(z4_pulled_task_total[2m])) by (pod, method, task_namespace)",
+          "expr": "sum(rate(z4_pulled_task_total[2m])) by (pod, method, queue)",
           "interval": "",
-          "legendFormat": "{{task_namespace}}: {{method}}",
+          "legendFormat": "{{queue}}: {{method}}",
           "refId": "A"
         }
       ],
@@ -285,9 +285,9 @@
             "uid": "prometheus"
           },
           "exemplar": true,
-          "expr": "sum(rate(z4_removed_task_total[2m])) by (pod, method, task_namespace)",
+          "expr": "sum(rate(z4_removed_task_total[2m])) by (pod, method, queue)",
           "interval": "",
-          "legendFormat": "{{task_namespace}}: {{method}}",
+          "legendFormat": "{{queue}}: {{method}}",
           "refId": "A"
         }
       ],

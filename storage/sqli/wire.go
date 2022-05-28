@@ -15,18 +15,18 @@ import (
 
 // TODO: Refine this implementation.
 // SQL support is still pretty fragile. We need to increase the robustness
-// of the namespace/timestamp indexing and also add functional tests.
+// of the queue/timestamp indexing and also add functional tests.
 
 type WireConfig struct {
-	Port       int
-	Tasks      *storage.TaskStore
-	Namespaces *storage.NamespaceStore
+	Port     int
+	Tasks    *storage.TaskStore
+	Settings *storage.SettingStore
 }
 
 func StartWireListener(config WireConfig) error {
 	db := NewDatabase("z4")
 	db.AddTable(newTaskTable(config.Tasks))
-	db.AddTable(newNamespaceTable(config.Namespaces))
+	db.AddTable(newQueueTable(config.Settings))
 
 	engine := sqle.NewDefault(
 		sql.NewDatabaseProvider(

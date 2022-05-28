@@ -12,12 +12,12 @@ import (
 
 type batchWriter struct {
 	tw     q.TaskWriter
-	ns     *storage.NamespaceStore
+	ns     *storage.SettingStore
 	Handle *LeaderHandle
 
-	acks       []*proto.Ack
-	tasks      []*proto.Task
-	namespaces []*proto.Namespace
+	acks     []*proto.Ack
+	tasks    []*proto.Task
+	settings []*proto.QueueConfig
 
 	mu sync.Mutex
 	wg sync.WaitGroup
@@ -25,7 +25,7 @@ type batchWriter struct {
 
 func newBatchWriter(
 	tw q.TaskWriter,
-	ns *storage.NamespaceStore,
+	ns *storage.SettingStore,
 ) *batchWriter {
 	return &batchWriter{
 		tw: tw,
@@ -45,7 +45,7 @@ func (w *batchWriter) Write(logs []*raft.Log) []interface{} {
 	}
 
 	var errs [3]error
-	w.applyNamespaces(&errs[0])
+	w.applySettings(&errs[0])
 	w.applyTasks(&errs[1])
 	w.applyAcks(&errs[2])
 
@@ -60,7 +60,7 @@ func (w *batchWriter) Write(logs []*raft.Log) []interface{} {
 
 func (w *batchWriter) reset() {
 	w.acks = nil
-	w.namespaces = nil
+	w.settings = nil
 	w.tasks = nil
 }
 
@@ -83,8 +83,8 @@ func (w *batchWriter) groupByType(logs []*raft.Log) error {
 		case *proto.Command_Ack:
 			w.acks = append(w.acks, v.Ack)
 
-		case *proto.Command_Namespace:
-			w.namespaces = append(w.namespaces, v.Namespace)
+		case *proto.Command_Queue:
+			w.settings = append(w.settings, v.Queue)
 
 		default:
 			return errors.New("unknown command type: expected ack or task")
@@ -100,16 +100,16 @@ func (w *batchWriter) packErrors(err error, res []interface{}) []interface{} {
 	return res
 }
 
-func (w *batchWriter) applyNamespaces(err *error) {
-	if len(w.namespaces) == 0 {
+func (w *batchWriter) applySettings(err *error) {
+	if len(w.settings) == 0 {
 		return
 	}
 
 	w.wg.Add(1)
 	go func() {
 		defer w.wg.Done()
-		for _, namespace := range w.namespaces {
-			*err = w.ns.Save(namespace)
+		for _, queue := range w.settings {
+			*err = w.ns.Save(queue)
 			if *err != nil {
 				return
 			}
