@@ -5,10 +5,10 @@ import (
 	"encoding/json"
 	"flag"
 	"fmt"
+	"github.com/mlposey/z4/pkg/z4"
 	"github.com/mlposey/z4/proto"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials/insecure"
-	"google.golang.org/grpc/metadata"
 )
 
 func main() {
@@ -23,7 +23,7 @@ func main() {
 		return
 	}
 
-	admin, collection, err := makeClients(*host)
+	admin, conn, err := makeClient(*host)
 	if err != nil {
 		panic(err)
 	}
@@ -39,7 +39,7 @@ func main() {
 		info(admin)
 
 	case "consume":
-		consume(collection, *namespace)
+		consume(conn, *namespace)
 
 	default:
 		printHelp()
@@ -50,13 +50,13 @@ func printHelp() {
 	fmt.Println("help")
 }
 
-func makeClients(host string) (proto.AdminClient, proto.QueueClient, error) {
+func makeClient(host string) (proto.AdminClient, *grpc.ClientConn, error) {
 	opts := []grpc.DialOption{grpc.WithTransportCredentials(insecure.NewCredentials())}
 	conn, err := grpc.Dial(host, opts...)
 	if err != nil {
 		return nil, nil, err
 	}
-	return proto.NewAdminClient(conn), proto.NewQueueClient(conn), nil
+	return proto.NewAdminClient(conn), conn, nil
 }
 
 func addPeer(client proto.AdminClient, addr, id string) {
@@ -93,37 +93,27 @@ func info(client proto.AdminClient) {
 	fmt.Println(string(out))
 }
 
-func consume(client proto.QueueClient, namespace string) {
-	md := metadata.New(map[string]string{"namespace": namespace})
-	ctx := metadata.NewOutgoingContext(context.Background(), md)
-
-	stream, err := client.Pull(ctx)
+func consume(conn *grpc.ClientConn, namespace string) {
+	consumer, err := z4.NewConsumer(z4.ConsumerOptions{
+		Conn:      conn,
+		Namespace: namespace,
+	})
 	if err != nil {
 		panic(err)
 	}
 
-	for {
-		task, err := stream.Recv()
-		if err != nil {
-			fmt.Println(err)
-			return
-		}
+	err = consumer.Consume(func(m z4.Message) error {
+		defer m.Ack()
 
-		out, err := json.MarshalIndent(task, "", "  ")
+		out, err := json.MarshalIndent(m.Task(), "", "  ")
 		if err != nil {
 			fmt.Println(err)
-			continue
 		}
 		fmt.Println(string(out))
 
-		err = stream.Send(&proto.Ack{
-			Reference: &proto.TaskReference{
-				Namespace: task.GetNamespace(),
-				TaskId:    task.GetId(),
-			},
-		})
-		if err != nil {
-			fmt.Println(err)
-		}
+		return nil
+	})
+	if err != nil {
+		panic(err)
 	}
 }
