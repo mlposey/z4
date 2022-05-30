@@ -16,6 +16,9 @@ github.com/beorn7/perks/quantile
 # github.com/bluele/gcache v0.0.2
 ## explicit; go 1.15
 github.com/bluele/gcache
+# github.com/boltdb/bolt v1.3.1
+## explicit
+github.com/boltdb/bolt
 # github.com/cespare/xxhash v1.1.0
 ## explicit
 github.com/cespare/xxhash
@@ -197,6 +200,9 @@ github.com/hashicorp/golang-lru/simplelru
 # github.com/hashicorp/raft v1.3.6
 ## explicit; go 1.12
 github.com/hashicorp/raft
+# github.com/hashicorp/raft-boltdb v0.0.0-20220329195025-15018e9b97e0
+## explicit; go 1.16
+github.com/hashicorp/raft-boltdb
 # github.com/kelseyhightower/envconfig v1.4.0
 ## explicit
 github.com/kelseyhightower/envconfig
@@ -274,15 +280,6 @@ github.com/src-d/go-oniguruma
 ## explicit; go 1.13
 github.com/stretchr/testify/assert
 github.com/stretchr/testify/require
-# github.com/vmihailenco/msgpack/v5 v5.3.5
-## explicit; go 1.11
-github.com/vmihailenco/msgpack/v5
-github.com/vmihailenco/msgpack/v5/msgpcode
-# github.com/vmihailenco/tagparser/v2 v2.0.0
-## explicit; go 1.15
-github.com/vmihailenco/tagparser/v2
-github.com/vmihailenco/tagparser/v2/internal
-github.com/vmihailenco/tagparser/v2/internal/parser
 # go.uber.org/atomic v1.7.0
 ## explicit; go 1.13
 go.uber.org/atomic

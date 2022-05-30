@@ -4,9 +4,9 @@ import (
 	"errors"
 	"fmt"
 	"github.com/hashicorp/raft"
+	"github.com/hashicorp/raft-boltdb"
 	"github.com/mlposey/z4/feeds/q"
 	"github.com/mlposey/z4/storage"
-	"github.com/mlposey/z4/storage/raftutil"
 	"github.com/mlposey/z4/telemetry"
 	"go.uber.org/multierr"
 	"go.uber.org/zap"
@@ -38,7 +38,7 @@ type Peer struct {
 	snapshots   *raft.FileSnapshotStore
 	transport   *raft.NetworkTransport
 	fsm         *stateMachine
-	db          *storage.PebbleClient
+	db          *raftboltdb.BoltStore
 }
 
 func NewPeer(config PeerConfig) (*Peer, error) {
@@ -67,18 +67,16 @@ func (p *Peer) initStorage() error {
 		}
 	}
 
-	p.db, err = storage.NewPebbleClient(p.config.DataDir)
+	p.db, err = raftboltdb.New(raftboltdb.Options{
+		Path:   p.config.DataDir + "/bolt.db",
+		NoSync: true,
+	})
 	if err != nil {
 		return fmt.Errorf("failed to init raft db: %w", err)
 	}
 
-	p.logStore, err = raftutil.NewLogStore(p.db.DB)
-	if err != nil {
-		return fmt.Errorf("failed to load log store: %w", err)
-	}
-	p.logStore, _ = raft.NewLogCache(100_000, p.logStore)
-
-	p.stableStore = raftutil.NewStableStore(p.db.DB)
+	p.logStore, _ = raft.NewLogCache(100_000, p.db)
+	p.stableStore = p.db
 
 	p.snapshots, err = raft.NewFileSnapshotStore(p.config.DataDir, 1, os.Stderr)
 	if err != nil {
@@ -93,7 +91,7 @@ func (p *Peer) joinNetwork() error {
 	c.BatchApplyCh = true
 	c.MaxAppendEntries = p.config.LogBatchSize
 	c.NoSnapshotRestoreOnStart = true
-	c.SnapshotInterval = 10 * time.Second
+	c.SnapshotInterval = 30 * time.Second
 	err := raft.ValidateConfig(c)
 	if err != nil {
 		return fmt.Errorf("invalid raft config: %w", err)
