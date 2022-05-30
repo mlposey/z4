@@ -1,25 +1,22 @@
 package main
 
 import (
+	"context"
 	"fmt"
 	"github.com/mlposey/z4/pkg/z4"
-	"google.golang.org/grpc"
-	"google.golang.org/grpc/credentials/insecure"
 	"os"
 	"time"
 )
 
 func main() {
-	opts := []grpc.DialOption{grpc.WithTransportCredentials(insecure.NewCredentials())}
-	conn, err := grpc.Dial(os.Getenv("TARGET"), opts...)
+	client, err := z4.NewClient(z4.ClientOptions{
+		Addr: os.Getenv("TARGET"),
+	})
 	if err != nil {
 		panic(err)
 	}
 
-	consumer, err := z4.NewConsumer(z4.ConsumerOptions{
-		Conn:  conn,
-		Queue: os.Getenv("QUEUE"),
-	})
+	consumer, err := client.Consumer(context.Background(), os.Getenv("QUEUE"))
 	if err != nil {
 		panic(err)
 	}

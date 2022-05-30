@@ -1,13 +1,12 @@
 package main
 
 import (
+	"context"
 	"fmt"
 	"github.com/google/uuid"
 	"github.com/mlposey/z4/pkg/z4"
 	"github.com/mlposey/z4/proto"
 	"go.uber.org/ratelimit"
-	"google.golang.org/grpc"
-	"google.golang.org/grpc/credentials/insecure"
 	"os"
 	"strconv"
 	"time"
@@ -22,28 +21,32 @@ func main() {
 }
 
 func loadTestStreaming(rps int) {
-	opts := []grpc.DialOption{grpc.WithTransportCredentials(insecure.NewCredentials())}
-	conn, err := grpc.Dial(os.Getenv("TARGET"), opts...)
+	client, err := z4.NewClient(z4.ClientOptions{
+		Addr: os.Getenv("TARGET"),
+	})
 	if err != nil {
 		panic(err)
 	}
 
 	const requestsToSend = 100_000_000
 	done := make(chan bool)
+	responses := make(chan z4.StreamResponse, 10_000)
 	count := 0
 
-	producer, err := z4.NewStreamingProducer(z4.StreamingProducerOptions{
-		ProducerOptions: z4.ProducerOptions{
-			Conn: conn,
-		},
-		Callback: func(res z4.StreamResponse) {
-			count++
-			if count == requestsToSend {
-				done <- true
+	go func() {
+		for res := range responses {
+			if res.Error() != nil {
+				fmt.Println(res.Error())
+			} else {
+				count++
+				if count == requestsToSend {
+					done <- true
+					return
+				}
 			}
-		},
-	})
-
+		}
+	}()
+	producer, err := client.StreamingProducer(context.Background())
 	if err != nil {
 		panic(err)
 	}
@@ -52,15 +55,12 @@ func loadTestStreaming(rps int) {
 	start := time.Now()
 	for i := 0; i < requestsToSend; i++ {
 		rl.Take()
-		err := producer.CreateTask(&proto.PushTaskRequest{
+		responses <- producer.CreateTask(&proto.PushTaskRequest{
 			RequestId: uuid.New().String(),
 			Queue:     os.Getenv("QUEUE"),
 			Async:     true,
 			Payload:   []byte("buy eggs"),
 		})
-		if err != nil {
-			fmt.Println(err)
-		}
 	}
 	<-done
 	fmt.Println("total time", time.Since(start))

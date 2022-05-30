@@ -12,8 +12,8 @@ import (
 )
 
 func main() {
-	host := flag.String("t", "", "host:port of the peer to send requests to")
-	peerAddress := flag.String("p", "", "host:port of the peer")
+	addr := flag.String("t", "", "host:port of the peer to send requests to")
+	peerAddress := flag.String("p", "", "addr:port of the peer")
 	peerID := flag.String("id", "", "id of the peer")
 	queue := flag.String("q", "", "queue")
 	flag.Parse()
@@ -23,7 +23,7 @@ func main() {
 		return
 	}
 
-	admin, conn, err := makeClient(*host)
+	admin, err := newAdminClient(*addr)
 	if err != nil {
 		panic(err)
 	}
@@ -39,7 +39,7 @@ func main() {
 		info(admin)
 
 	case "consume":
-		consume(conn, *queue)
+		consume(*addr, *queue)
 
 	default:
 		printHelp()
@@ -50,13 +50,13 @@ func printHelp() {
 	fmt.Println("help")
 }
 
-func makeClient(host string) (proto.AdminClient, *grpc.ClientConn, error) {
+func newAdminClient(addr string) (proto.AdminClient, error) {
 	opts := []grpc.DialOption{grpc.WithTransportCredentials(insecure.NewCredentials())}
-	conn, err := grpc.Dial(host, opts...)
+	conn, err := grpc.Dial(addr, opts...)
 	if err != nil {
-		return nil, nil, err
+		return nil, err
 	}
-	return proto.NewAdminClient(conn), conn, nil
+	return proto.NewAdminClient(conn), nil
 }
 
 func addPeer(client proto.AdminClient, addr, id string) {
@@ -93,11 +93,15 @@ func info(client proto.AdminClient) {
 	fmt.Println(string(out))
 }
 
-func consume(conn *grpc.ClientConn, queue string) {
-	consumer, err := z4.NewConsumer(z4.ConsumerOptions{
-		Conn:  conn,
-		Queue: queue,
+func consume(addr, queue string) {
+	client, err := z4.NewClient(z4.ClientOptions{
+		Addr: addr,
 	})
+	if err != nil {
+		panic(err)
+	}
+
+	consumer, err := client.Consumer(context.Background(), queue)
 	if err != nil {
 		panic(err)
 	}

@@ -6,7 +6,6 @@ import (
 	"fmt"
 	"github.com/mlposey/z4/proto"
 	"go.uber.org/multierr"
-	"google.golang.org/grpc"
 	"google.golang.org/grpc/metadata"
 	"io"
 	"sync/atomic"
@@ -20,28 +19,6 @@ type Consumer struct {
 	acks            chan *proto.Ack
 	unackedMsgCount *int64
 	closed          bool
-}
-
-func NewConsumer(opt ConsumerOptions) (*Consumer, error) {
-	ctx := opt.Ctx
-	if ctx == nil {
-		ctx = context.Background()
-	}
-
-	return &Consumer{
-		client:          proto.NewQueueClient(opt.Conn),
-		queue:           opt.Queue,
-		ctx:             ctx,
-		acks:            make(chan *proto.Ack),
-		unackedMsgCount: new(int64),
-	}, nil
-}
-
-type ConsumerOptions struct {
-	Conn *grpc.ClientConn
-	// TODO: Support reading multiple queues at once.
-	Queue string
-	Ctx   context.Context
 }
 
 func (c *Consumer) Consume(f func(m Message) error) error {

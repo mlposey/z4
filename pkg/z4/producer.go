@@ -1,30 +1,17 @@
 package z4
 
 import (
+	"container/list"
 	"context"
 	"errors"
 	"fmt"
 	"github.com/mlposey/z4/proto"
-	"google.golang.org/grpc"
 	"io"
+	"sync"
 )
-
-type ProducerOptions struct {
-	Conn *grpc.ClientConn
-}
 
 type UnaryProducer struct {
 	client proto.QueueClient
-}
-
-func NewUnaryProducer(opt UnaryProducerOptions) (*UnaryProducer, error) {
-	return &UnaryProducer{
-		client: proto.NewQueueClient(opt.Conn),
-	}, nil
-}
-
-type UnaryProducerOptions struct {
-	ProducerOptions
 }
 
 func (p *UnaryProducer) CreateTask(ctx context.Context, req *proto.PushTaskRequest) (*proto.Task, error) {
@@ -36,39 +23,11 @@ func (p *UnaryProducer) CreateTask(ctx context.Context, req *proto.PushTaskReque
 }
 
 type StreamingProducer struct {
-	client   proto.QueueClient
-	stream   proto.Queue_PushStreamClient
-	ctx      context.Context
-	callback func(res StreamResponse)
-	closed   bool
-}
-
-func NewStreamingProducer(opt StreamingProducerOptions) (*StreamingProducer, error) {
-	client := proto.NewQueueClient(opt.Conn)
-
-	if opt.Ctx == nil {
-		opt.Ctx = context.Background()
-	}
-
-	stream, err := client.PushStream(opt.Ctx)
-	if err != nil {
-		return nil, err
-	}
-
-	p := &StreamingProducer{
-		client:   client,
-		stream:   stream,
-		ctx:      opt.Ctx,
-		callback: opt.Callback,
-	}
-	go p.handleCallbacks()
-	return p, nil
-}
-
-type StreamingProducerOptions struct {
-	ProducerOptions
-	Ctx      context.Context
-	Callback func(res StreamResponse)
+	stream  proto.Queue_PushStreamClient
+	ctx     context.Context
+	closed  bool
+	pending *list.List
+	pm      sync.Mutex
 }
 
 func (p *StreamingProducer) Close() error {
@@ -93,33 +52,50 @@ func (p *StreamingProducer) handleCallbacks() {
 			continue
 		}
 
-		if p.callback == nil {
-			continue
-		}
+		p.pm.Lock()
+		el := p.pending.Front()
+		p.pending.Remove(el)
+		p.pm.Unlock()
+		future := el.Value.(StreamResponse)
 
 		if res.GetTask() == nil {
-			p.callback(StreamResponse{
-				err: TaskCreationError{
-					Status:  res.GetStatus(),
-					Message: res.GetMessage(),
-				},
-			})
+			future.errC <- TaskCreationError{
+				Status:  res.GetStatus(),
+				Message: res.GetMessage(),
+			}
 		} else {
-			p.callback(StreamResponse{task: res.GetTask()})
+			future.task = res.GetTask()
+			future.errC <- nil
 		}
 	}
 }
 
-func (p *StreamingProducer) CreateTask(req *proto.PushTaskRequest) error {
-	return p.stream.Send(req)
+func (p *StreamingProducer) CreateTask(req *proto.PushTaskRequest) StreamResponse {
+	res := StreamResponse{errC: make(chan error, 1)}
+	err := p.stream.Send(req)
+	if err != nil {
+		res.errC <- err
+	} else {
+		p.pm.Lock()
+		p.pending.PushBack(res)
+		p.pm.Unlock()
+	}
+	return res
 }
 
 type StreamResponse struct {
 	task *proto.Task
+	errC chan error
 	err  error
+	done bool
 }
 
 func (r StreamResponse) Error() error {
+	if r.done {
+		return r.err
+	}
+	r.err = <-r.errC
+	r.done = true
 	return r.err
 }
 
