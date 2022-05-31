@@ -11,6 +11,7 @@ import (
 	"sync/atomic"
 )
 
+// Consumer reads tasks as they become available for consumption.
 type Consumer struct {
 	client          proto.QueueClient
 	stream          proto.Queue_PullClient
@@ -21,6 +22,7 @@ type Consumer struct {
 	closed          bool
 }
 
+// Consume invokes f on ready tasks.
 func (c *Consumer) Consume(f func(m Message) error) error {
 	md := metadata.New(map[string]string{"queue": c.queue})
 	ctx := metadata.NewOutgoingContext(c.ctx, md)
@@ -85,6 +87,11 @@ func (c *Consumer) startAckHandler() {
 	}
 }
 
+// Message represents a task that is ready for consumption.
+//
+// The Ack method must be invoked once the task is successfully
+// processed. Failure to acknowledge a task will result in it
+// being redelivered.
 type Message struct {
 	task *proto.Task
 	acks chan<- *proto.Ack

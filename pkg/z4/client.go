@@ -8,6 +8,7 @@ import (
 	"google.golang.org/grpc/credentials/insecure"
 )
 
+// Client provides access to the features of a z4 server.
 type Client struct {
 	conn *grpc.ClientConn
 }
