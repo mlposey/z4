@@ -71,16 +71,15 @@ func (p *StreamingProducer) handleCallbacks() {
 		el := p.pending.Front()
 		p.pending.Remove(el)
 		p.pm.Unlock()
-		future := el.Value.(StreamResponse)
+		future := el.Value.(*TaskFuture)
 
 		if res.GetTask() == nil {
-			future.errC <- TaskCreationError{
+			future.set(nil, TaskCreationError{
 				Status:  res.GetStatus(),
 				Message: res.GetMessage(),
-			}
+			})
 		} else {
-			future.task = res.GetTask()
-			future.errC <- nil
+			future.set(res.GetTask(), nil)
 		}
 	}
 }
@@ -90,42 +89,47 @@ func (p *StreamingProducer) handleCallbacks() {
 // Because this is a streaming producer, the server response may not
 // be immediately available. The returned future will provide access
 // to the task (or an error upon failure) once the response is received.
-func (p *StreamingProducer) CreateTask(req *proto.PushTaskRequest) StreamResponse {
-	res := StreamResponse{errC: make(chan error, 1)}
+func (p *StreamingProducer) CreateTask(req *proto.PushTaskRequest) *TaskFuture {
+	p.pm.Lock()
+	defer p.pm.Unlock()
+
+	future := &TaskFuture{errC: make(chan error, 1)}
 	err := p.stream.Send(req)
 	if err != nil {
-		res.errC <- err
+		future.set(nil, err)
 	} else {
-		p.pm.Lock()
-		p.pending.PushBack(res)
-		p.pm.Unlock()
+		p.pending.PushBack(future)
 	}
-	return res
+	return future
 }
 
-// StreamResponse is a response to streaming task creation.
+// TaskFuture is an async response to creating a task.
 //
 // To use objects of this type, first invoke the Error method.
 // It will block until a response is received from the server.
 // If the error is nil, the Task method will provide a non-nil task.
-type StreamResponse struct {
+type TaskFuture struct {
 	task *proto.Task
-	errC chan error
 	err  error
-	done bool
+	errC chan error
 }
 
-func (r StreamResponse) Error() error {
-	if r.done {
-		return r.err
+func (f *TaskFuture) set(task *proto.Task, err error) {
+	f.task = task
+	f.errC <- err
+	close(f.errC)
+}
+
+func (f *TaskFuture) Error() error {
+	if f.err != nil {
+		return f.err
 	}
-	r.err = <-r.errC
-	r.done = true
-	return r.err
+	f.err = <-f.errC
+	return f.err
 }
 
-func (r StreamResponse) Task() *proto.Task {
-	return r.task
+func (f *TaskFuture) Task() *proto.Task {
+	return f.task
 }
 
 // TaskCreationError represents an error encountered by the server

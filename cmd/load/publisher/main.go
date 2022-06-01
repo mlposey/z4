@@ -30,7 +30,7 @@ func loadTestStreaming(rps int) {
 
 	const requestsToSend = 100_000_000
 	done := make(chan bool)
-	responses := make(chan z4.StreamResponse, 10_000)
+	responses := make(chan *z4.TaskFuture, 10_000)
 	count := 0
 
 	go func() {
