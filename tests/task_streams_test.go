@@ -10,8 +10,6 @@ import (
 	"github.com/mlposey/z4/proto"
 	"github.com/mlposey/z4/tests/util"
 	"go.uber.org/multierr"
-	"google.golang.org/grpc"
-	"google.golang.org/grpc/credentials/insecure"
 	pb "google.golang.org/protobuf/proto"
 	"sync"
 	"testing"
@@ -46,8 +44,10 @@ type taskStreams struct {
 	taskRequest   *proto.PushTaskRequest
 	createdTask   *proto.Task
 	receivedTasks []*proto.Task
-	conn          *grpc.ClientConn
+	client        *z4.Client
 	taskMu        sync.Mutex
+	ctx           context.Context
+	ctxCancel     context.CancelFunc
 }
 
 func (ts *taskStreams) setupSuite() error {
@@ -56,27 +56,33 @@ func (ts *taskStreams) setupSuite() error {
 	ts.taskRequest = nil
 	ts.createdTask = nil
 	ts.receivedTasks = nil
+	ts.consumer = nil
 
 	err := ts.server.Start()
 	if err != nil {
 		return err
 	}
 
-	opts := []grpc.DialOption{grpc.WithTransportCredentials(insecure.NewCredentials())}
+	ts.ctx, ts.ctxCancel = context.WithCancel(context.Background())
+
 	target := fmt.Sprintf("localhost:%d", ts.serverPort)
-	ts.conn, err = grpc.Dial(target, opts...)
+	ts.client, err = z4.NewClient(ts.ctx, z4.ClientOptions{
+		Addrs: []string{target},
+	})
 	if err != nil {
 		return err
 	}
 
-	ts.producer, err = z4.NewUnaryProducer(z4.UnaryProducerOptions{
-		ProducerOptions: z4.ProducerOptions{Conn: ts.conn},
-	})
+	ts.producer = ts.client.UnaryProducer()
 	return err
 }
 
 func (ts *taskStreams) teardownSuite() error {
-	err1 := ts.conn.Close()
+	var err1 error
+	if ts.client != nil {
+		err1 = ts.client.Close()
+		ts.ctxCancel()
+	}
 	err2 := ts.server.Stop()
 	return multierr.Combine(err1, err2)
 }
@@ -108,17 +114,9 @@ func (ts *taskStreams) afterSecondsIShouldReceiveTasks(arg1, arg2 int) error {
 	return nil
 }
 
-func (ts *taskStreams) iBeginStreamingAfterASecondDelay(arg1 int) error {
-	time.Sleep(time.Duration(arg1) * time.Second)
-	return ts.consumeTaskStream("")
-}
-
 func (ts *taskStreams) consumeTaskStream(queue string) error {
 	var err error
-	ts.consumer, err = z4.NewConsumer(z4.ConsumerOptions{
-		Conn:  ts.conn,
-		Queue: queue,
-	})
+	ts.consumer, err = ts.client.Consumer(ts.ctx, queue)
 	if err != nil {
 		return err
 	}
@@ -151,7 +149,7 @@ func (ts *taskStreams) iHaveCreatedTheTask(arg1 *godog.DocString) error {
 			TtsSeconds: int64(taskDef["tts_seconds"].(float64)),
 		},
 	}
-	task, err := ts.producer.CreateTask(context.Background(), ts.taskRequest)
+	task, err := ts.producer.CreateTask(ts.ctx, ts.taskRequest)
 	ts.createdTask = task
 	return err
 }

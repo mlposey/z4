@@ -25,6 +25,14 @@ type ClientOptions struct {
 	Addrs []string
 }
 
+func (c *Client) Close() error {
+	leader := c.pool.GetLeader()
+	if leader != nil {
+		return leader.Close()
+	}
+	return nil
+}
+
 func (c *Client) UnaryProducer() *UnaryProducer {
 	return &UnaryProducer{
 		client: proto.NewQueueClient(c.pool.GetLeader()),
