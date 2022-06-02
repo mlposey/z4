@@ -122,12 +122,12 @@ Storage is persisted when restarting individual containers but erased when using
 7. Terminate the leader
    ```
    > cd ../..
-   > docker-compose -f docker/docker-compose.yaml stop peer1
+   > docker-compose -f deployments/docker/docker-compose.yaml stop peer1
    ```
 8. Add more tasks using either peer2 or peer3
 9. Restart the old leader (and observe that they become a follower this time)
    ```
-   > docker-compose -f docker/docker-compose.yaml start peer1
+   > docker-compose -f deployments/docker/docker-compose.yaml start peer1
    ```
 10. Add more tasks using any peer
 11. Tear down the cluster
