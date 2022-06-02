@@ -50,7 +50,7 @@ Feature: Task Streaming
       }
       """
     When I subscribe to tasks in the "campaigns" queue after a 5 second delay
-    Then after 2 seconds I should receive 1 tasks
+    Then after 5 seconds I should receive 1 tasks
 
   Scenario: Stream does not return tasks from other queues
     Given I have created the task:
