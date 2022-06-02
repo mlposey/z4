@@ -51,10 +51,10 @@ func (c *Client) StreamingProducer(ctx context.Context) (*StreamingProducer, err
 
 func (c *Client) Consumer(ctx context.Context, queue string) (*Consumer, error) {
 	return &Consumer{
-		client:          proto.NewQueueClient(c.pool.GetLeader()),
 		queue:           queue,
 		ctx:             ctx,
 		acks:            make(chan *proto.Ack),
 		unackedMsgCount: new(int64),
+		pool:            c.pool,
 	}, nil
 }

@@ -85,6 +85,10 @@ func (p *connectionPool) seed(addr string) error {
 	if err != nil {
 		return err
 	}
+
+	if p.conn != nil {
+		_ = p.conn.Close()
+	}
 	p.conn = conn
 	admin := proto.NewAdminClient(p.conn)
 
