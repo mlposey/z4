@@ -5,6 +5,7 @@ go 1.17
 require (
 	github.com/araddon/dateparse v0.0.0-20210429162001-6b43995a97de
 	github.com/bluele/gcache v0.0.2
+	github.com/cenkalti/backoff/v4 v4.1.3
 	github.com/cockroachdb/pebble v0.0.0-20220517003944-e567fec84c6e
 	github.com/cucumber/godog v0.12.5
 	github.com/dolthub/go-mysql-server v0.11.0

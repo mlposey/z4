@@ -4,35 +4,36 @@ import (
 	"container/list"
 	"context"
 	"github.com/mlposey/z4/proto"
-	"google.golang.org/grpc"
-	"google.golang.org/grpc/credentials/insecure"
 )
 
 // Client provides access to the features of a z4 server.
 type Client struct {
-	conn *grpc.ClientConn
+	pool *connectionPool
 }
 
-func NewClient(opt ClientOptions) (*Client, error) {
-	opts := []grpc.DialOption{grpc.WithTransportCredentials(insecure.NewCredentials())}
-	conn, err := grpc.Dial(opt.Addr, opts...)
+func NewClient(ctx context.Context, opt ClientOptions) (*Client, error) {
+	pool, err := newConnectionPool(ctx, opt.Addrs)
 	if err != nil {
 		return nil, err
 	}
-	return &Client{conn: conn}, nil
+	return &Client{pool: pool}, nil
 }
 
 type ClientOptions struct {
-	// Addr is the host:port of the cluster leader.
-	Addr string
+	// Addrs is a list of host:port targets that identify members
+	// of a z4 cluster.
+	Addrs []string
 }
 
 func (c *Client) UnaryProducer() *UnaryProducer {
-	return &UnaryProducer{client: proto.NewQueueClient(c.conn)}
+	return &UnaryProducer{
+		client: proto.NewQueueClient(c.pool.GetLeader()),
+		pool:   c.pool,
+	}
 }
 
 func (c *Client) StreamingProducer(ctx context.Context) (*StreamingProducer, error) {
-	client := proto.NewQueueClient(c.conn)
+	client := proto.NewQueueClient(c.pool.GetLeader())
 	stream, err := client.PushStream(ctx)
 	if err != nil {
 		return nil, err
@@ -42,6 +43,7 @@ func (c *Client) StreamingProducer(ctx context.Context) (*StreamingProducer, err
 		stream:  stream,
 		ctx:     ctx,
 		pending: list.New(),
+		pool:    c.pool,
 	}
 	go p.handleCallbacks()
 	return p, nil
@@ -49,7 +51,7 @@ func (c *Client) StreamingProducer(ctx context.Context) (*StreamingProducer, err
 
 func (c *Client) Consumer(ctx context.Context, queue string) (*Consumer, error) {
 	return &Consumer{
-		client:          proto.NewQueueClient(c.conn),
+		client:          proto.NewQueueClient(c.pool.GetLeader()),
 		queue:           queue,
 		ctx:             ctx,
 		acks:            make(chan *proto.Ack),
