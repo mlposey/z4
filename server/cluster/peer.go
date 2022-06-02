@@ -27,6 +27,8 @@ type PeerConfig struct {
 	Tasks            *storage.TaskStore
 	Settings         *storage.SettingStore
 	Writer           q.TaskWriter
+	SQLPort          int
+	QueuePort        int
 }
 
 // Peer controls a node's membership in the raft cluster.

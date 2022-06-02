@@ -12,6 +12,8 @@ import (
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 	emptypb "google.golang.org/protobuf/types/known/emptypb"
+	"strconv"
+	"strings"
 )
 
 // Admin implements the gRPC Admin service.
@@ -23,6 +25,8 @@ type Admin struct {
 	serverID      string
 	advertiseAddr string
 	ids           *storage.IDGenerator
+	sqlPort       int32
+	queuePort     int32
 }
 
 func NewAdmin(
@@ -39,6 +43,8 @@ func NewAdmin(
 		handle:        handle,
 		fm:            fm,
 		ids:           ids,
+		sqlPort:       int32(cfg.SQLPort),
+		queuePort:     int32(cfg.QueuePort),
 	}
 }
 
@@ -101,20 +107,45 @@ func (a *Admin) GetClusterInfo(
 	var members []*proto.Server
 	config := a.raft.GetConfiguration()
 	if err := config.Error(); err != nil {
-		telemetry.Logger.Error("failed to fetch server list", zap.Error(err))
-	} else {
-		for _, server := range config.Configuration().Servers {
-			members = append(members, &proto.Server{
-				Id:      string(server.ID),
-				Address: string(server.Address),
-			})
+		return nil, status.Errorf(codes.Internal, "failed to get configuration: %v", err)
+	}
+
+	leaderAddr := a.handle.LeaderAddress()
+	var leaderID string
+
+	for _, server := range config.Configuration().Servers {
+		addr := string(server.Address)
+		if addr == leaderAddr {
+			leaderID = string(server.ID)
 		}
+
+		addrParts := strings.Split(addr, ":")
+		if len(addrParts) != 2 {
+			return nil, status.Errorf(codes.Internal, "invalid address: %s", addr)
+		}
+
+		port, err := strconv.Atoi(addrParts[1])
+		if err != nil {
+			return nil, status.Errorf(codes.Internal, "invalid port: %s", addr)
+		}
+
+		members = append(members, &proto.Server{
+			Id:       string(server.ID),
+			Host:     addrParts[0],
+			RaftPort: int32(port),
+
+			// TODO: Find a way to stop assuming these.
+			// It's not necessarily the case that peers are
+			// using the same port numbers for these.
+			SqlPort:   a.sqlPort,
+			QueuePort: a.queuePort,
+		})
 	}
 
 	return &proto.ClusterInfo{
-		ServerId:      a.serverID,
-		LeaderAddress: a.handle.LeaderAddress(),
-		Members:       members,
+		ServerId: a.serverID,
+		LeaderId: leaderID,
+		Members:  members,
 	}, nil
 }
 

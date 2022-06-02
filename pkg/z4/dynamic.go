@@ -3,11 +3,11 @@ package z4
 import (
 	"context"
 	"errors"
+	"fmt"
 	"github.com/cenkalti/backoff/v4"
 	"github.com/mlposey/z4/proto"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials/insecure"
-	"strings"
 	"sync"
 )
 
@@ -98,21 +98,25 @@ func (p *connectionPool) seed(addr string) error {
 		return err
 	}
 
-	leaderHost := strings.Split(info.GetLeaderAddress(), ":")[0]
-	port := strings.Split(addr, ":")[1]
-	leaderAddr := leaderHost + ":" + port
-
-	if leaderAddr == "" {
+	if info.GetLeaderId() == "" {
 		_ = p.conn.Close()
 		p.conn = nil
 		return ErrNoLeader
-	} else if leaderAddr == addr {
-		p.peerAddresses = nil
-		for _, member := range info.GetMembers() {
-			memberHost := strings.Split(member.GetAddress(), ":")[0]
-			peerAddr := memberHost + ":" + port
-			p.peerAddresses = append(p.peerAddresses, peerAddr)
+	}
+
+	var addresses []string
+	var leaderAddr string
+	for _, member := range info.GetMembers() {
+		peerAddr := fmt.Sprintf("%s:%d", member.GetHost(), member.GetQueuePort())
+		addresses = append(addresses, peerAddr)
+
+		if member.GetId() == info.GetLeaderId() {
+			leaderAddr = peerAddr
 		}
+	}
+
+	if info.GetServerId() == info.GetLeaderId() {
+		p.peerAddresses = addresses
 		return nil
 	} else {
 		_ = p.conn.Close()
