@@ -3,7 +3,7 @@ name: z4
 description: A Helm chart for the z4 task queue service
 type: application
 version: 0.1.0
-appVersion: "0.1.0"
+appVersion: "0.2.0"
 dependencies:
   - name: kube-prometheus-stack
     repository: https://prometheus-community.github.io/helm-charts
