@@ -65,7 +65,7 @@ func (q *Queue) PushStream(stream proto.Queue_PushStreamServer) error {
 
 		task, err := q.createTask(stream.Context(), req)
 		if err != nil {
-			return status.Errorf(codes.Internal, "failed to create task: %v", err)
+			return err
 		}
 
 		err = stream.Send(&proto.PushStreamResponse{
@@ -96,13 +96,13 @@ func (q *Queue) createTask(ctx context.Context, req *proto.PushTaskRequest) (*pr
 
 	task, err := q.makeTask(req)
 	if err != nil {
-		return nil, status.Errorf(codes.Internal, "task creation failed: %v", err)
+		return nil, status.Errorf(codes.Internal, "failed to create task: %v", err)
 	}
 
 	if req.GetAsync() {
 		cluster.ApplySaveTaskCommand(q.raft, task)
 	} else {
-		err := cluster.ApplySaveTaskCommand(q.raft, task).Error()
+		err = cluster.ApplySaveTaskCommand(q.raft, task).Error()
 		if err != nil {
 			return nil, status.Errorf(codes.Internal, "failed to save task: %v", err)
 		}
