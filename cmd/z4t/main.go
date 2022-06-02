@@ -94,8 +94,8 @@ func info(client proto.AdminClient) {
 }
 
 func consume(addr, queue string) {
-	client, err := z4.NewClient(z4.ClientOptions{
-		Addr: addr,
+	client, err := z4.NewClient(context.Background(), z4.ClientOptions{
+		Addrs: []string{addr},
 	})
 	if err != nil {
 		panic(err)

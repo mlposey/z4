@@ -21,8 +21,8 @@ func main() {
 }
 
 func loadTestStreaming(rps int) {
-	client, err := z4.NewClient(z4.ClientOptions{
-		Addr: os.Getenv("TARGET"),
+	client, err := z4.NewClient(context.Background(), z4.ClientOptions{
+		Addrs: []string{os.Getenv("TARGET")},
 	})
 	if err != nil {
 		panic(err)
