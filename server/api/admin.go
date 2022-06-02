@@ -12,6 +12,7 @@ import (
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 	emptypb "google.golang.org/protobuf/types/known/emptypb"
+	"net"
 	"strconv"
 	"strings"
 )
@@ -115,7 +116,8 @@ func (a *Admin) GetClusterInfo(
 
 	for _, server := range config.Configuration().Servers {
 		addr := string(server.Address)
-		if addr == leaderAddr {
+		ipAddr, err := net.ResolveTCPAddr("tcp", addr)
+		if err == nil && ipAddr.String() == leaderAddr {
 			leaderID = string(server.ID)
 		}
 

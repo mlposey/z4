@@ -120,6 +120,7 @@ func (p *connectionPool) seed(addr string) error {
 		return nil
 	} else {
 		_ = p.conn.Close()
+		p.conn = nil
 		return p.seed(leaderAddr)
 	}
 }
