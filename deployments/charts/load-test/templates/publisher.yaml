@@ -14,8 +14,8 @@ spec:
           image: "{{ .Values.publisherImage.repository }}:{{ .Values.publisherImage.tag | default .Chart.AppVersion }}"
           imagePullPolicy: {{ .Values.publisherImage.pullPolicy }}
           env:
-            - name: TARGET
-              value: {{ .Values.env.target }}
+            - name: TARGETS
+              value: {{ .Values.env.targets }}
             - name: QUEUE
               value: {{ .Values.env.queue }}
             - name: RPS
