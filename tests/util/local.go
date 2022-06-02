@@ -38,7 +38,7 @@ func (ls *LocalServer) Start() error {
 
 // starts the application in a new process
 func (ls *LocalServer) startApp() error {
-	_ = os.Setenv("Z4_DB_DATA_DIR", ls.dbDataDir)
+	_ = os.Setenv("Z4_DATA_DIR", ls.dbDataDir)
 	_ = os.Setenv("Z4_SERVICE_PORT", fmt.Sprint(ls.serverPort))
 	_ = os.Setenv("Z4_DEBUG_LOGGING_ENABLED", "true")
 	_ = os.Setenv("Z4_PEER_ID", "godog")

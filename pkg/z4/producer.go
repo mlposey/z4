@@ -6,8 +6,14 @@ import (
 	"errors"
 	"fmt"
 	"github.com/mlposey/z4/proto"
+	"google.golang.org/grpc/codes"
+	"google.golang.org/grpc/status"
 	"io"
 	"sync"
+)
+
+var (
+	ErrInterruptedFuture = errors.New("connection closed before future completion")
 )
 
 // UnaryProducer supports the creation of tasks using the unary rpc.
@@ -18,12 +24,35 @@ import (
 // cases, consider using StreamingProducer instead.
 type UnaryProducer struct {
 	client proto.QueueClient
+	pool   *connectionPool
+	mu     sync.Mutex
 }
 
 func (p *UnaryProducer) CreateTask(ctx context.Context, req *proto.PushTaskRequest) (*proto.Task, error) {
+	p.mu.Lock()
+	defer p.mu.Unlock()
+
 	res, err := p.client.Push(ctx, req)
 	if err != nil {
+		code := status.Code(err)
+		if code == codes.Unavailable {
+			conn, err := p.pool.ResetConn(ctx)
+			if err != nil {
+				return nil, err
+			}
+			p.client = proto.NewQueueClient(conn)
+			return p.CreateTask(ctx, req)
+		}
 		return nil, err
+	}
+
+	if res.GetForwardedTo() != "" {
+		conn, err := p.pool.SetLeader(res.GetForwardedTo())
+		if err != nil {
+			fmt.Println("failed to load leader")
+		} else {
+			p.client = proto.NewQueueClient(conn)
+		}
 	}
 	return res.GetTask(), nil
 }
@@ -35,11 +64,40 @@ func (p *UnaryProducer) CreateTask(ctx context.Context, req *proto.PushTaskReque
 //
 // Close() should be called when the producer object is no longer needed.
 type StreamingProducer struct {
-	stream  proto.Queue_PushStreamClient
-	ctx     context.Context
-	closed  bool
+	stream proto.Queue_PushStreamClient
+	ctx    context.Context
+
 	pending *list.List
 	pm      sync.Mutex
+
+	pool *connectionPool
+}
+
+func (p *StreamingProducer) reconnectWithLock() error {
+	p.pm.Lock()
+	defer p.pm.Unlock()
+	return p.reconnect()
+}
+
+func (p *StreamingProducer) reconnect() error {
+	conn, err := p.pool.ResetConn(p.ctx)
+	if err != nil {
+		return err
+	}
+
+	for el := p.pending.Front(); el != nil; el = el.Next() {
+		future := el.Value.(*TaskFuture)
+		future.set(nil, ErrInterruptedFuture)
+	}
+	p.pending.Init()
+
+	client := proto.NewQueueClient(conn)
+	stream, err := client.PushStream(p.ctx)
+	if err != nil {
+		return err
+	}
+	p.stream = stream
+	return nil
 }
 
 // Close releases resources allocated to the producer.
@@ -50,7 +108,7 @@ func (p *StreamingProducer) Close() error {
 }
 
 func (p *StreamingProducer) handleCallbacks() {
-	for !p.closed {
+	for {
 		select {
 		case <-p.ctx.Done():
 			return
@@ -59,10 +117,14 @@ func (p *StreamingProducer) handleCallbacks() {
 
 		res, err := p.stream.Recv()
 		if err != nil {
-			if errors.Is(err, io.EOF) {
-				// TODO: Wait to reconnect.
-				return
+			if errors.Is(err, io.EOF) || status.Code(err) == codes.Unavailable {
+				err = p.reconnectWithLock()
+				if err != nil {
+					return
+				}
+				continue
 			}
+
 			fmt.Println(err)
 			continue
 		}
@@ -71,8 +133,8 @@ func (p *StreamingProducer) handleCallbacks() {
 		el := p.pending.Front()
 		p.pending.Remove(el)
 		p.pm.Unlock()
-		future := el.Value.(*TaskFuture)
 
+		future := el.Value.(*TaskFuture)
 		if res.GetTask() == nil {
 			future.set(nil, TaskCreationError{
 				Status:  res.GetStatus(),
@@ -80,6 +142,13 @@ func (p *StreamingProducer) handleCallbacks() {
 			})
 		} else {
 			future.set(res.GetTask(), nil)
+
+			if res.GetForwardedTo() != "" {
+				err = p.reconnectWithLock()
+				if err != nil {
+					return
+				}
+			}
 		}
 	}
 }
@@ -94,8 +163,15 @@ func (p *StreamingProducer) CreateTask(req *proto.PushTaskRequest) *TaskFuture {
 	defer p.pm.Unlock()
 
 	future := &TaskFuture{errC: make(chan error, 1)}
+SEND:
 	err := p.stream.Send(req)
 	if err != nil {
+		if status.Code(err) == codes.Unavailable {
+			err = p.reconnect()
+			if err == nil {
+				goto SEND
+			}
+		}
 		future.set(nil, err)
 	} else {
 		p.pending.PushBack(future)

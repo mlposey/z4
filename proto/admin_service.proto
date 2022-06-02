@@ -69,8 +69,8 @@ message ClusterInfo {
   // The unique id of the peer that the request was sent to.
   string server_id = 1;
 
-  // The host:port of the cluster leader's Raft server.
-  string leader_address = 2;
+  // The unique id of the cluster leader.
+  string leader_id = 2;
 
   // All peers of the cluster.
   repeated Server members = 3;
@@ -82,8 +82,10 @@ message Server {
   // The unique id of the peer.
   string id = 1;
 
-  // The host:port of the peer's Raft server.
-  string address = 2;
+  string host = 2;
+  int32 raft_port = 3;
+  int32 sql_port = 4;
+  int32 queue_port = 5;
 }
 
 message AddClusterMemberRequest {

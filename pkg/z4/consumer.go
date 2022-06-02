@@ -6,32 +6,59 @@ import (
 	"fmt"
 	"github.com/mlposey/z4/proto"
 	"go.uber.org/multierr"
+	"google.golang.org/grpc"
+	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/metadata"
+	"google.golang.org/grpc/status"
 	"io"
+	"sync"
 	"sync/atomic"
 )
 
 // Consumer reads tasks as they become available for consumption.
 type Consumer struct {
-	client          proto.QueueClient
 	stream          proto.Queue_PullClient
 	ctx             context.Context
 	queue           string
 	acks            chan *proto.Ack
 	unackedMsgCount *int64
 	closed          bool
+	pool            *connectionPool
+	mu              sync.Mutex
+}
+
+func (c *Consumer) reconnectWithLock() error {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	return c.reconnect()
+}
+
+func (c *Consumer) reconnect() error {
+	conn, err := c.pool.ResetConn(c.ctx)
+	if err != nil {
+		return err
+	}
+	return c.startStream(conn)
+}
+
+func (c *Consumer) startStream(conn *grpc.ClientConn) error {
+	client := proto.NewQueueClient(conn)
+
+	md := metadata.New(map[string]string{"queue": c.queue})
+	ctx := metadata.NewOutgoingContext(c.ctx, md)
+	stream, err := client.Pull(ctx)
+	if err == nil {
+		c.stream = stream
+	}
+	return err
 }
 
 // Consume invokes f on ready tasks.
 func (c *Consumer) Consume(f func(m Message) error) error {
-	md := metadata.New(map[string]string{"queue": c.queue})
-	ctx := metadata.NewOutgoingContext(c.ctx, md)
-	stream, err := c.client.Pull(ctx)
+	err := c.startStream(c.pool.GetLeader())
 	if err != nil {
 		return err
 	}
-	c.stream = stream
-
 	go c.startAckHandler()
 
 	for {
@@ -41,10 +68,14 @@ func (c *Consumer) Consume(f func(m Message) error) error {
 		default:
 		}
 
-		task, err := stream.Recv()
+		task, err := c.stream.Recv()
 		if err != nil {
-			if errors.Is(err, io.EOF) {
-				return nil
+			if errors.Is(err, io.EOF) || status.Code(err) == codes.Unavailable {
+				err = c.reconnectWithLock()
+				if err != nil {
+					return nil
+				}
+				continue
 			}
 			return err
 		}
@@ -79,11 +110,21 @@ func (c *Consumer) startAckHandler() {
 			}
 		}
 
+		c.mu.Lock()
+	SEND_ACK:
 		err := c.stream.Send(ack)
 		if err != nil {
+			if status.Code(err) == codes.Unavailable {
+				err = c.reconnect()
+				if err == nil {
+					goto SEND_ACK
+				}
+			}
+
 			// TODO: Notify client that ack failed. Use a callback?
 			fmt.Println("ack failed", err)
 		}
+		c.mu.Unlock()
 	}
 }
 

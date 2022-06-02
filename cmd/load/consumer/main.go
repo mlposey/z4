@@ -5,12 +5,13 @@ import (
 	"fmt"
 	"github.com/mlposey/z4/pkg/z4"
 	"os"
+	"strings"
 	"time"
 )
 
 func main() {
-	client, err := z4.NewClient(z4.ClientOptions{
-		Addr: os.Getenv("TARGET"),
+	client, err := z4.NewClient(context.Background(), z4.ClientOptions{
+		Addrs: strings.Split(os.Getenv("TARGETS"), ","),
 	})
 	if err != nil {
 		panic(err)

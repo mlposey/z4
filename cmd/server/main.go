@@ -34,6 +34,8 @@ func main() {
 		PeerConfig: cluster.PeerConfig{
 			ID:               config.PeerID,
 			Port:             config.PeerPort,
+			SQLPort:          config.SQLPort,
+			QueuePort:        config.ServicePort,
 			AdvertiseAddr:    config.PeerAdvertiseAddr,
 			DataDir:          config.DataDir + "/cluster",
 			LogBatchSize:     1000,

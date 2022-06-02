@@ -14,8 +14,8 @@ spec:
           image: "{{ .Values.consumerImage.repository }}:{{ .Values.consumerImage.tag | default .Chart.AppVersion }}"
           imagePullPolicy: {{ .Values.consumerImage.pullPolicy }}
           env:
-            - name: TARGET
-              value: {{ .Values.env.target }}
+            - name: TARGETS
+              value: {{ .Values.env.targets }}
             - name: QUEUE
               value: {{ .Values.env.queue }}
       {{- with .Values.nodeSelector }}

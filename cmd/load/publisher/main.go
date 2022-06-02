@@ -9,6 +9,7 @@ import (
 	"go.uber.org/ratelimit"
 	"os"
 	"strconv"
+	"strings"
 	"time"
 )
 
@@ -21,8 +22,8 @@ func main() {
 }
 
 func loadTestStreaming(rps int) {
-	client, err := z4.NewClient(z4.ClientOptions{
-		Addr: os.Getenv("TARGET"),
+	client, err := z4.NewClient(context.Background(), z4.ClientOptions{
+		Addrs: strings.Split(os.Getenv("TARGETS"), ","),
 	})
 	if err != nil {
 		panic(err)
