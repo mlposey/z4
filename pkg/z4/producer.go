@@ -47,9 +47,11 @@ func (p *UnaryProducer) CreateTask(ctx context.Context, req *proto.PushTaskReque
 	}
 
 	if res.GetForwardedTo() != "" {
-		conn, err := p.pool.SetLeader(res.GetForwardedTo())
+		// TODO: use pool.SetLeader instead
+		// Need to fix port in GetForwardedTo response first.
+		conn, err := p.pool.ResetConn(ctx)
 		if err != nil {
-			fmt.Println("failed to load leader")
+			fmt.Println("failed to reset conn", err)
 		} else {
 			p.client = proto.NewQueueClient(conn)
 		}
