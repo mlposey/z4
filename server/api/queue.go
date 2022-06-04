@@ -6,7 +6,8 @@ import (
 	"github.com/mlposey/z4/feeds"
 	"github.com/mlposey/z4/iden"
 	"github.com/mlposey/z4/proto"
-	"github.com/mlposey/z4/server/cluster"
+	"github.com/mlposey/z4/server/cluster/group"
+	"github.com/mlposey/z4/server/cluster/sm"
 	"github.com/mlposey/z4/storage"
 	"github.com/mlposey/z4/telemetry"
 	"go.uber.org/zap"
@@ -23,7 +24,7 @@ type Queue struct {
 	fm     *feeds.Manager
 	tasks  *storage.TaskStore
 	raft   *raft.Raft
-	handle *cluster.LeaderHandle
+	handle *group.LeaderHandle
 	ids    *storage.IDGenerator
 }
 
@@ -31,7 +32,7 @@ func NewQueue(
 	fm *feeds.Manager,
 	tasks *storage.TaskStore,
 	raft *raft.Raft,
-	handle *cluster.LeaderHandle,
+	handle *group.LeaderHandle,
 	ids *storage.IDGenerator,
 ) proto.QueueServer {
 	return &Queue{
@@ -100,9 +101,9 @@ func (q *Queue) createTask(ctx context.Context, req *proto.PushTaskRequest) (*pr
 	}
 
 	if req.GetAsync() {
-		cluster.ApplySaveTaskCommand(q.raft, task)
+		sm.ApplySaveTaskCommand(q.raft, task)
 	} else {
-		err = cluster.ApplySaveTaskCommand(q.raft, task).Error()
+		err = sm.ApplySaveTaskCommand(q.raft, task).Error()
 		if err != nil {
 			return nil, status.Errorf(codes.Internal, "failed to save task: %v", err)
 		}
@@ -201,9 +202,9 @@ func (q *Queue) Delete(ctx context.Context, req *proto.DeleteTaskRequest) (*prot
 	}
 
 	if req.GetAsync() {
-		cluster.ApplyAckCommand(q.raft, ack)
+		sm.ApplyAckCommand(q.raft, ack)
 	} else {
-		err := cluster.ApplyAckCommand(q.raft, ack).Error()
+		err := sm.ApplyAckCommand(q.raft, ack).Error()
 		if err != nil {
 			return nil, status.Errorf(codes.Internal, "failed to delete task: %v", err)
 		}

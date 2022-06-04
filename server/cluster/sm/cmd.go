@@ -1,4 +1,4 @@
-package cluster
+package sm
 
 import (
 	"github.com/hashicorp/raft"

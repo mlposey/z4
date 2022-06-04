@@ -117,6 +117,8 @@ func (p *StreamingProducer) handleCallbacks() {
 
 		res, err := p.stream.Recv()
 		if err != nil {
+			// TODO: If error is leadership lost, reconnect
+			// rpc error: code = Internal desc = failed to save task: leadership lost while committing log
 			if errors.Is(err, io.EOF) || status.Code(err) == codes.Unavailable {
 				err = p.reconnectWithLock()
 				if err != nil {
@@ -125,7 +127,7 @@ func (p *StreamingProducer) handleCallbacks() {
 				continue
 			}
 
-			fmt.Println(err)
+			//fmt.Println(err)
 			continue
 		}
 
