@@ -238,11 +238,9 @@ Prometheus metrics are exposed on a configurable port that defaults to 2112.
 |Name|Type|Description|
 |----|----|-----------|
 |z4_received_log_count|Counter|The total number of Raft logs sent for application to the fsm|
-|z4_applied_log_count|Counter|The total number of Raft logs successfully applied/saved to the fsm|
 |z4_is_leader|Gauge|A boolean value that indicates if a peer is the cluster leader|
 
 #### Database Metrics
 |Name|Type|Description|
 |----|----|-----------|
-|z4_last_db_gc|Gauge|The unix tine in seconds when the last gc phase was run for the database|
 |z4_last_fsm_snapshot|Gauge|The unix time in seconds when the last fsm snapshot was taken|
