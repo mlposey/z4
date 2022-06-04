@@ -6,6 +6,8 @@ import (
 	"github.com/hashicorp/raft"
 	"github.com/hashicorp/raft-boltdb"
 	"github.com/mlposey/z4/feeds/q"
+	"github.com/mlposey/z4/server/cluster/group"
+	"github.com/mlposey/z4/server/cluster/sm"
 	"github.com/mlposey/z4/storage"
 	"github.com/mlposey/z4/telemetry"
 	"go.uber.org/multierr"
@@ -39,7 +41,7 @@ type Peer struct {
 	stableStore raft.StableStore
 	snapshots   *raft.FileSnapshotStore
 	transport   *raft.NetworkTransport
-	fsm         *stateMachine
+	fsm         *sm.StateMachine
 	db          *raftboltdb.BoltStore
 }
 
@@ -110,7 +112,8 @@ func (p *Peer) joinNetwork() error {
 		return fmt.Errorf("could not create transport for raft peer: %w", err)
 	}
 
-	p.fsm = newFSM(p.config.DB.DB, p.config.Writer, p.config.Settings)
+	store := newPebbleStore(p.config.DB.DB)
+	p.fsm = sm.New(store, p.config.Writer, p.config.Settings)
 	p.Raft, err = raft.NewRaft(
 		c,
 		p.fsm,
@@ -146,7 +149,7 @@ func (p *Peer) tryBootstrap() {
 	}
 }
 
-func (p *Peer) LoadHandle(handle *LeaderHandle) {
+func (p *Peer) LoadHandle(handle *group.LeaderHandle) {
 	p.fsm.SetHandle(handle)
 }
 

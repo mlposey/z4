@@ -1,4 +1,4 @@
-package cluster
+package group
 
 import (
 	"github.com/hashicorp/raft"

@@ -6,6 +6,7 @@ import (
 	"github.com/mlposey/z4/feeds"
 	"github.com/mlposey/z4/proto"
 	"github.com/mlposey/z4/server/cluster"
+	"github.com/mlposey/z4/server/cluster/group"
 	"github.com/mlposey/z4/storage"
 	"github.com/mlposey/z4/telemetry"
 	"go.uber.org/zap"
@@ -21,7 +22,7 @@ import (
 type Admin struct {
 	proto.UnimplementedAdminServer
 	raft          *raft.Raft
-	handle        *cluster.LeaderHandle
+	handle        *group.LeaderHandle
 	fm            *feeds.Manager
 	serverID      string
 	advertiseAddr string
@@ -33,7 +34,7 @@ type Admin struct {
 func NewAdmin(
 	raft *raft.Raft,
 	cfg cluster.PeerConfig,
-	handle *cluster.LeaderHandle,
+	handle *group.LeaderHandle,
 	fm *feeds.Manager,
 	ids *storage.IDGenerator,
 ) *Admin {

@@ -3,7 +3,7 @@ package feeds
 import (
 	"github.com/hashicorp/raft"
 	"github.com/mlposey/z4/proto"
-	"github.com/mlposey/z4/server/cluster"
+	"github.com/mlposey/z4/server/cluster/sm"
 	"github.com/mlposey/z4/telemetry"
 	"go.uber.org/zap"
 	"google.golang.org/grpc/codes"
@@ -75,7 +75,7 @@ func (tb *TaskBroker) startAckListener() {
 			Inc()
 
 		// This is intentionally async.
-		cluster.ApplyAckCommand(tb.raft, ack)
+		sm.ApplyAckCommand(tb.raft, ack)
 	}
 }
 

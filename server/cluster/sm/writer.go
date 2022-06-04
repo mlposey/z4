@@ -1,10 +1,11 @@
-package cluster
+package sm
 
 import (
 	"errors"
 	"github.com/hashicorp/raft"
 	"github.com/mlposey/z4/feeds/q"
 	"github.com/mlposey/z4/proto"
+	"github.com/mlposey/z4/server/cluster/group"
 	"github.com/mlposey/z4/storage"
 	pb "google.golang.org/protobuf/proto"
 	"sync"
@@ -13,7 +14,7 @@ import (
 type batchWriter struct {
 	tw     q.TaskWriter
 	ns     *storage.SettingStore
-	Handle *LeaderHandle
+	Handle *group.LeaderHandle
 
 	acks     []*proto.Ack
 	tasks    []*proto.Task

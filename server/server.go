@@ -7,6 +7,7 @@ import (
 	"github.com/mlposey/z4/proto"
 	"github.com/mlposey/z4/server/api"
 	"github.com/mlposey/z4/server/cluster"
+	"github.com/mlposey/z4/server/cluster/group"
 	"github.com/mlposey/z4/storage"
 	"github.com/mlposey/z4/telemetry"
 	"go.uber.org/multierr"
@@ -55,8 +56,8 @@ func (s *Server) Start() error {
 	}
 	s.fm = feeds.NewManager(s.config.DB, s.peer.Raft)
 
-	tracker := cluster.NewTracker(s.peer.Raft, s.config.PeerConfig.ID)
-	handle, err := cluster.NewHandle(tracker, s.config.GRPCPort)
+	tracker := group.NewTracker(s.peer.Raft, s.config.PeerConfig.ID)
+	handle, err := group.NewHandle(tracker, s.config.GRPCPort)
 	if err != nil {
 		return fmt.Errorf("failed to obtain leader handle: %w", err)
 	}
